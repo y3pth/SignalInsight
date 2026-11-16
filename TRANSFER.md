@@ -4,7 +4,7 @@
 > 适用对象：接手本项目的下一个 Qoder 对话
 > 阅读顺序：本文件 → `AGENTS.md` → `README.md` → `HANDOFF.md` → `立项确定书.md`
 > 当前分支：`feat/trust-lab`
-> 最新提交：`1c59a96 docs: point handoff at the trust lab publication`
+> 最近功能提交：`0373577 docs: add the engineering transfer guide`
 > 工作区状态：干净
 > 公开站点：<https://signal-insight-s31b5iv5ld0.qoder.zone>
 > 当前线上 action：`2751a5c0-6fea-48f6-9a4b-887c1e95c0bb`
