@@ -1,14 +1,22 @@
 # SignalInsight Repository Instructions
 
-## Sources of truth
+## Read first
 
-1. Actual Git state, source and test results.
-2. `README.md` and `docs/` for product, architecture, contracts and release state.
-3. `contracts/openapi.json` for the Python HTTP contract.
-4. `site/` for the deployed Qoder Sites application.
-5. Qoder auto-memory is machine-local and not authoritative.
+1. `HANDOFF.md` — current authoritative handoff.
+2. `README.md` — current deliverable and commands.
+3. `立项确定书.md` — original motivation and research background only.
 
-## Start every Qoder session
+The old Python backend and full-platform design were intentionally removed. Do not recreate or reference them unless the user explicitly changes direction again.
+
+## Current source of truth
+
+- `site/dist/`: deployed browser application.
+- `site/functions/`: deployed Qoder Sites Edge Function.
+- `site/.SignalInsight.qoder.site`: generated publication descriptor; never hand-edit.
+- `site/test/`: required regression tests for deployed code.
+- Git state and actual test results override all prose.
+
+## Session start
 
 ```bash
 git status --short --branch
@@ -16,68 +24,14 @@ git branch --show-current
 git log -5 --oneline
 ```
 
-Then read:
+Do not work directly on `main`. Use a dedicated branch for each task.
 
-- `README.md`
-- `docs/06-审计与交接.md`
-- the task-specific docs under `docs/`
+## Rules
 
-Never work directly on `main`. If the task is not already on a dedicated branch:
-
-```bash
-git switch main
-git pull --ff-only
-git switch -c feat/<task-id>-<short-name>
-```
-
-## Async collaboration
-
-- One task = one branch = one owner.
-- Do not share a branch between two people or two machines.
-- Fetch and merge latest `main` into the branch before review; never force-push.
-- Keep contract changes and implementation in separate reviewable commits when possible.
-- Do not edit generated OpenAPI examples manually.
-- Do not mark a task complete without tests and a real validation result.
-- Qoder memory differences between machines are expected; repository docs are canonical.
-
-## Current architecture
-
-- `site/dist/`: deployed browser MVP.
-- `site/functions/`: Qoder Sites Deno Function for Qwen explanation.
-- `backend/`: partially implemented FastAPI product backend, not deployed.
-- Python backend and browser JavaScript are two implementations; do not claim they share runtime code.
-
-## Secrets and Qoder Sites
-
-- Never place `DASHSCOPE_API_KEY`, Qoder tokens or database credentials in source, chat or command arguments.
-- Configure application Secrets only through Qoder Sites Settings/Secrets or Qoder CLI `/sites`.
-- Do not hand-edit `.SignalInsight.qoder.site`.
-- Qoder Sites action/deployment records are host-local and do not transfer through Git.
-- Use one designated release machine. Other machines may edit source and open PRs, but should not publish the existing action.
-- Publishing from another machine requires a new preparation action under the same account and an explicit release task.
-
-## Verification
-
-Site:
-
-```bash
-node site/test/dsp.test.mjs
-node site/test/function.test.mjs
-```
-
-Backend:
-
-```bash
-cd backend
-uv sync --dev
-uv run ruff check app tests scripts
-uv run mypy app
-uv run pytest
-```
-
-## Safety
-
-- Do not delete unknown work, reset uncommitted changes or force-push.
-- Do not present the browser MVP as the full Python backend.
-- Do not promise an award without confirmed competition rules.
-- Update `docs/06-审计与交接.md` when release state or blocking conditions change.
+- Never place API keys, Qoder tokens or user data in source, chat or command arguments.
+- Configure `DASHSCOPE_API_KEY` only through Qoder Sites Settings/Secrets or Qoder CLI `/sites`.
+- Qoder Sites action records are host-local. Use one release machine; do not reuse an old action from another machine.
+- Do not publish descriptions that imply Python backend deployment or award guarantees.
+- Do not delete unknown work, force-push or rewrite history.
+- Run `node site/test/dsp.test.mjs` and `node site/test/function.test.mjs` after changing analysis or Function behavior.
+- Update `HANDOFF.md` when release state, blocking conditions or direction changes.

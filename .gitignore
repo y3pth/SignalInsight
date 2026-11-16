@@ -1,29 +1,19 @@
-# Secrets and local configuration
+# Secrets
 .env
 .env.*
 !.env.example
 *.pem
 *.key
 
-# Python
+# Dependencies and caches
+node_modules/
 __pycache__/
-*.py[cod]
-.venv/
-venv/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.coverage
-htmlcov/
+*.py[cod]
 
-# Node and frontend output
-node_modules/
-frontend/dist/
-frontend/src/api/generated/
-playwright-report/
-test-results/
-
-# Runtime data and artifacts
+# Runtime data
 data/
 *.db
 *.db-shm
