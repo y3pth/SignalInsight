@@ -25,9 +25,36 @@ assert.equal(quotedNewline.rows.length, 3);
 assert.equal(quotedNewline.headers.length, 3);
 assert.equal(quotedNewline.numericColumns.length, 2);
 
+const twoRows = parseCsv("time,signal\n0,1\n0.1,2");
+assert.equal(twoRows.rows.length, 2);
+assert.throws(() => parseCsv("time,signal\n0,1"), /至少需要/);
+
+const crlf = parseCsv("time,signal\r\n0,1\r\n0.1,2\r\n0.2,3\r\n");
+assert.equal(crlf.rows.length, 3);
+
+const blanks = parseCsv("\n\ntime,signal\n0,1\n0.1,2\n0.2,3\n\n");
+assert.equal(blanks.rows.length, 3);
+
+const scientific = parseCsv("time,signal\n0,1e-1\n0.1,2e0\n0.2,-3e-1");
+assert.equal(scientific.numericColumns.length, 2);
+
+const quotedHeader = parseCsv('time,signal,"note, text"\n0,1,"a"\n0.1,2,"b"\n0.2,3,"c"');
+assert.deepEqual(quotedHeader.headers, ["time", "signal", "note, text"]);
+
 assert.throws(() => parseCsv("time,signal\n0,1\n0.1,2\n0.2,3,4"), /字段数/);
 assert.throws(() => parseCsv("time,time\n0,1\n0.1,2\n0.2,3"), /重复表头/);
 assert.throws(() => parseCsv("time,signal\n0,\n0.1,2\n0.2,3"), /两个以上/);
 assert.throws(() => parseCsv("time\n0\n0.1\n0.2"), /至少需要|分隔符/);
 
-console.log("CSV tests passed");
+const largeRows = ["time,signal"];
+for (let index = 0; index < 50000; index += 1) {
+  const t = index / 1000;
+  largeRows.push(`${t.toFixed(6)},${(0.1 + 2 * Math.sin(2 * Math.PI * 50 * t)).toFixed(6)}`);
+}
+const largeStart = Date.now();
+const large = parseCsv(largeRows.join("\n"));
+const largeElapsed = Date.now() - largeStart;
+assert.equal(large.rows.length, 50000);
+assert.ok(largeElapsed < 3000, `large CSV parse ${largeElapsed}ms`);
+
+console.log("CSV tests passed", { largeElapsedMs: largeElapsed });

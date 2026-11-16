@@ -49,6 +49,7 @@ const state = {
   result: null,
   busy: false,
   aiConfigured: false,
+  aiHealth: "checking",
 };
 
 const AI_CACHE_LIMIT = 20;
@@ -263,6 +264,9 @@ async function analyzeCurrent() {
   try {
     setBusy(true);
     const data = selectedSignal();
+    if (data.values.length > 100000) {
+      showToast("大样本分析已转入 Worker，可能需要数十秒。");
+    }
     const started = performance.now();
     const result = await analyzeSignalSafely(data.time, data.values);
     if (sequence !== analysisSequence) return;
@@ -443,11 +447,23 @@ function renderLocalExplanation(result) {
     return paragraph;
   }));
   renderAiLimitations(explanation.limitations);
-  elements.aiStatus.textContent = state.aiConfigured
-    ? "AI 不参与参数计算，也不能修改可信等级。"
-    : "当前显示确定性解释；配置 DASHSCOPE_API_KEY 后可启用 Qwen。";
-  elements.aiButton.disabled = !state.aiConfigured;
-  elements.aiButton.textContent = state.aiConfigured ? "用 Qwen 深入解释" : "Qwen 尚未配置";
+  if (state.aiHealth === "configured") {
+    elements.aiStatus.textContent = "AI 不参与参数计算，也不能修改可信等级。";
+    elements.aiButton.disabled = false;
+    elements.aiButton.textContent = "用 Qwen 深入解释";
+  } else if (state.aiHealth === "not_configured") {
+    elements.aiStatus.textContent = "当前显示确定性解释；配置 DASHSCOPE_API_KEY 后可启用 Qwen。";
+    elements.aiButton.disabled = true;
+    elements.aiButton.textContent = "Qwen 尚未配置";
+  } else if (state.aiHealth === "unreachable") {
+    elements.aiStatus.textContent = "无法连接 AI Function；本地预览或网络不可用，继续显示确定性解释。";
+    elements.aiButton.disabled = true;
+    elements.aiButton.textContent = "AI 服务不可达";
+  } else {
+    elements.aiStatus.textContent = "正在检查 AI 服务…";
+    elements.aiButton.disabled = true;
+    elements.aiButton.textContent = "正在检查 AI 服务…";
+  }
 }
 
 function downsample(x, series, maxPoints = 1600) {
@@ -643,8 +659,10 @@ async function checkAiAvailability() {
     });
     const data = await response.json();
     state.aiConfigured = Boolean(response.ok && data?.configured);
+    state.aiHealth = state.aiConfigured ? "configured" : "not_configured";
   } catch {
     state.aiConfigured = false;
+    state.aiHealth = "unreachable";
   }
   if (state.result) renderLocalExplanation(state.result);
 }

@@ -28,6 +28,7 @@ Python FastAPI 后端、旧契约、fixtures 和旧设计文档已从当前工�
 ```bash
 node site/test/dsp.test.mjs
 node site/test/csv.test.mjs
+node site/test/extreme.test.mjs
 node site/test/function.test.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
@@ -48,6 +49,7 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 - 只支持实数、单通道、近似均匀采样 CSV。
 - 包含单频、多频、AM/FM 候选；不包含 MAT、复数 IQ、非均匀采样或多通道分析。
 - 参数不确定度为线性拟合近似，频率行是 1/T 分辨率，不是严格置信区间。
+- 50 万点属于极端输入，浏览器 Worker 约 30 秒；正常样本约 1–2 秒。
 - 不保证获奖；正式赛事规则仍待核验。
 - API Key 只通过 Qoder Sites Secrets 配置，不进入源码或聊天。
 - 发布使用 Qoder CN 桌面端 Sites 面板/MCP；不要用 CN CLI 直接 `prepare_site`。

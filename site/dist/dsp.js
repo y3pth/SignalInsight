@@ -696,9 +696,9 @@ function goldenMinimum(fn, left, right, iterations = 48) {
   return (a + b) / 2;
 }
 
-function optimizeFrequencies(tau, values, initialFrequencies, nyquist, span) {
+function optimizeFrequencies(tau, values, initialFrequencies, nyquist, span, sweeps = 3, iterations = 48) {
   let frequencies = [...initialFrequencies];
-  for (let sweep = 0; sweep < 3; sweep += 1) {
+  for (let sweep = 0; sweep < sweeps; sweep += 1) {
     for (let index = 0; index < frequencies.length; index += 1) {
       const lower = Math.max(0.5 / (tau.at(-1) || 1), frequencies[index] - span);
       const upper = Math.min(nyquist * 0.999, frequencies[index] + span);
@@ -714,6 +714,7 @@ function optimizeFrequencies(tau, values, initialFrequencies, nyquist, span) {
         },
         lower,
         upper,
+        iterations,
       );
     }
   }
@@ -733,7 +734,29 @@ function sortComponents(frequencies, coefficients) {
 function fitCandidate(values, tau, sampleRate, initialFrequencies, count, spectrum) {
   const nyquist = sampleRate / 2;
   const span = spectrum.binWidth * 2;
-  const frequencies = optimizeFrequencies(tau, values, initialFrequencies, nyquist, span);
+  const searchSize = 32768;
+  const [tauSearch, valuesSearch] = downsampleArrays([tau, values], searchSize);
+  let frequencies = optimizeFrequencies(
+    tauSearch,
+    valuesSearch,
+    initialFrequencies,
+    nyquist,
+    span,
+    tauSearch.length < tau.length ? 2 : 3,
+    tauSearch.length < tau.length ? 32 : 48,
+  );
+  if (tauSearch.length < tau.length) {
+    const refineSpan = Math.max(span, (sampleRate / searchSize) * 2);
+    frequencies = optimizeFrequencies(
+      tau,
+      values,
+      frequencies,
+      nyquist,
+      refineSpan,
+      1,
+      count === 1 ? 24 : 8,
+    );
+  }
   const solved = fitAtFrequencies(tau, values, frequencies);
   const components = sortComponents(frequencies, solved.coefficients);
   const freeParameters = 1 + 3 * count;
@@ -828,7 +851,9 @@ export function validateSignal(time, values) {
   if (diffs.some((diff) => diff <= 0)) throw new Error("时间列必须严格递增。");
   diffs.sort((a, b) => a - b);
   const dt = diffs[Math.floor(diffs.length / 2)];
-  const jitter = Math.max(...diffs.map((diff) => Math.abs(diff - dt))) / dt;
+  let maxDeviation = 0;
+  for (const diff of diffs) maxDeviation = Math.max(maxDeviation, Math.abs(diff - dt));
+  const jitter = maxDeviation / dt;
   if (jitter > 0.05) throw new Error("首版仅支持近似均匀采样，时间抖动需不超过 5%。");
   return { dt, sampleRate: 1 / dt, duration: time.at(-1) - time[0] };
 }
@@ -880,14 +905,26 @@ export function analyzeSignal(time, values) {
   }
   candidates.sort((a, b) => a.metrics.bic - b.metrics.bic);
   const modulationCandidates = candidates.filter((candidate) => candidate.family !== "tone");
-  let bestTone = [...toneCandidates].sort((a, b) => a.metrics.bic - b.metrics.bic)[0] ?? null;
-  if (bestTone?.count > 1) {
-    const single = toneCandidates.find((candidate) => candidate.count === 1);
-    const rssReduction = single ? 1 - bestTone.metrics.rss / Math.max(single.metrics.rss, 1e-30) : 0;
-    if (!single || bestTone.metrics.bic > single.metrics.bic - 10 || rssReduction < 0.1) bestTone = single;
+  const singleTone = toneCandidates.find((candidate) => candidate.id === "single_tone") ?? null;
+  const twoTone = toneCandidates.find((candidate) => candidate.id === "multi_tone_2") ?? null;
+  const threeTone = toneCandidates.find((candidate) => candidate.id === "multi_tone_3") ?? null;
+  const improvesTone = (candidate, baseline) => {
+    if (!candidate || !baseline) return false;
+    const bothExact = candidate.metrics.rss <= numericalFloor && baseline.metrics.rss <= numericalFloor;
+    if (bothExact) return false;
+    const rssReduction = 1 - candidate.metrics.rss / Math.max(baseline.metrics.rss, 1e-30);
+    return candidate.metrics.bic <= baseline.metrics.bic - 10 && rssReduction >= 0.1;
+  };
+  let bestTone = singleTone ?? twoTone ?? threeTone ?? null;
+  if (bestTone === singleTone) {
+    if (twoTone && improvesTone(twoTone, singleTone)) {
+      bestTone = twoTone;
+      if (threeTone && improvesTone(threeTone, twoTone)) bestTone = threeTone;
+    }
+  } else if (bestTone === twoTone && threeTone && improvesTone(threeTone, twoTone)) {
+    bestTone = threeTone;
   }
   let best = bestTone;
-  const singleTone = toneCandidates.find((candidate) => candidate.id === "single_tone") ?? null;
   for (const candidate of modulationCandidates) {
     const evidence = candidate.modulationEvidence;
     const gate = evidence && evidence.index >= (candidate.family === "am" ? 0.08 : 0.1) && evidence.prominence >= 6;

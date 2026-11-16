@@ -69,7 +69,7 @@ export function parseCsv(text) {
   const numericColumns = [];
   headers.forEach((header, columnIndex) => {
     const values = dataRows.map((row) => Number(row[columnIndex]));
-    if (values.every((value) => Number.isFinite(value) && rowNotEmpty(dataRows, columnIndex))) {
+    if (rowNotEmpty(dataRows, columnIndex) && values.every(Number.isFinite)) {
       numericColumns.push({ header, values });
     }
   });
