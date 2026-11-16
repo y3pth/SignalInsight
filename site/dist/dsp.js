@@ -369,6 +369,7 @@ function fitAmCandidate(values, tau, sampleRate, spectrum, analytic, inst, durat
   const trimmedAnalysis = residualStatistics(evaluated.residual.slice(edgeTrim, n - edgeTrim), sampleRate);
   const u = fit.coefficients[1];
   const v = fit.coefficients[2];
+  const carrierAmplitude = a0 * Math.hypot(u, v);
   let signalCov = null;
   try {
     signalCov = {
@@ -388,6 +389,25 @@ function fitAmCandidate(values, tau, sampleRate, spectrum, analytic, inst, durat
   const modulationCov = envCov ? coefficientCovariance(envCov.inverse, envCov.variance, 1, 2) : null;
   const modulationSigmas = modulationCov ? amplitudePhaseSigma(a, b, modulationCov) : {};
   const resolution = 1 / Math.max(tau.at(-1) || 1, 1e-12);
+  const viewStep = Math.max(1, Math.ceil(n / 512));
+  const viewIndices = [];
+  for (let index = 0; index < n; index += viewStep) viewIndices.push(index);
+  if (viewIndices.at(-1) !== n - 1) viewIndices.push(n - 1);
+  const modulationView = {
+    type: "am",
+    time: viewIndices.map((index) => tau[index]),
+    primary: viewIndices.map((index) => envelope[index]),
+    fitted: viewIndices.map((index) => envFit.fitted[index]),
+    carrierFrequency: fc,
+    modulationFrequency: fm,
+    modulationIndex,
+    carrierAmplitude,
+    sidebands: [
+      { frequency: fc - fm, amplitude: carrierAmplitude * modulationIndex / 2 },
+      { frequency: fc, amplitude: carrierAmplitude },
+      { frequency: fc + fm, amplitude: carrierAmplitude * modulationIndex / 2 },
+    ],
+  };
   return {
     id: "am",
     family: "am",
@@ -406,7 +426,7 @@ function fitAmCandidate(values, tau, sampleRate, spectrum, analytic, inst, durat
       {
         id: "amplitude_1",
         label: "载波幅值",
-        value: a0 * Math.hypot(u, v),
+        value: carrierAmplitude,
         unit: "a.u.",
         sigma: carrierSigmas.sigmaAmplitude == null ? undefined : a0 * carrierSigmas.sigmaAmplitude,
       },
@@ -439,6 +459,7 @@ function fitAmCandidate(values, tau, sampleRate, spectrum, analytic, inst, durat
     residual: evaluated.residual,
     metrics: evaluated.metrics,
     residualAnalysis: trimmedAnalysis,
+    modulationView,
     modulationEvidence: {
       frequency: fm,
       index: modulationIndex,
@@ -554,6 +575,26 @@ function fitFmCandidate(values, tau, sampleRate, spectrum, inst, duration) {
   const fInstSigmas = fInstCoeffCov ? amplitudePhaseSigma(modulationCos, modulationSin, fInstCoeffCov) : {};
   const resolution = 1 / Math.max(tau.at(-1) || 1, 1e-12);
   const deviationSigma = Math.max(fInstSigmas.sigmaAmplitude ?? 0, resolution);
+  const viewStep = Math.max(1, Math.ceil(inst.time.length / 512));
+  const viewIndices = [];
+  for (let index = 0; index < inst.time.length; index += viewStep) viewIndices.push(index);
+  if (viewIndices.at(-1) !== inst.time.length - 1) viewIndices.push(inst.time.length - 1);
+  const sidebandTolerance = Math.max(spectrum.binWidth * 1.5, fm * 0.2);
+  const sidebands = [fcFinal - 2 * fm, fcFinal - fm, fcFinal, fcFinal + fm, fcFinal + 2 * fm].map((frequency) => {
+    const peak = spectrum.peaks.find((item) => Math.abs(item.frequency - frequency) <= sidebandTolerance);
+    return { frequency, amplitude: peak?.amplitude ?? 0 };
+  });
+  const modulationView = {
+    type: "fm",
+    time: viewIndices.map((index) => inst.time[index]),
+    primary: viewIndices.map((index) => inst.values[index]),
+    fitted: viewIndices.map((index) => fInstFit.fitted[index]),
+    carrierFrequency: fcFinal,
+    modulationFrequency: fm,
+    frequencyDeviation: deviationFinal,
+    modulationIndex: beta,
+    sidebands,
+  };
   return {
     id: "fm",
     family: "fm",
@@ -612,6 +653,7 @@ function fitFmCandidate(values, tau, sampleRate, spectrum, inst, duration) {
     residual: evaluated.residual,
     metrics: evaluated.metrics,
     residualAnalysis: trimmedAnalysis,
+    modulationView,
     modulationEvidence: {
       frequency: fm,
       index: beta,

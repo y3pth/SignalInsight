@@ -27,6 +27,11 @@ const elements = {
   healthStatus: document.querySelector("#health-status"),
   healthList: document.querySelector("#health-list"),
   designList: document.querySelector("#design-list"),
+  modulationLab: document.querySelector("#modulation-lab"),
+  modulationType: document.querySelector("#modulation-type"),
+  modulationChart: document.querySelector("#modulation-chart"),
+  modulationFacts: document.querySelector("#modulation-facts"),
+  modulationSidebands: document.querySelector("#modulation-sidebands"),
   metricSamples: document.querySelector("#metric-samples"),
   metricRate: document.querySelector("#metric-rate"),
   metricR2: document.querySelector("#metric-r2"),
@@ -309,6 +314,9 @@ function invalidateResult(message = "数据已变更，请重新运行分析。"
   elements.healthStatus.className = "health-status";
   elements.healthList.replaceChildren();
   elements.designList.replaceChildren();
+  elements.modulationLab.hidden = true;
+  elements.modulationFacts.replaceChildren();
+  elements.modulationSidebands.replaceChildren();
 }
 
 function markDataChanged(message) {
@@ -340,6 +348,9 @@ async function analyzeCurrent() {
     elements.healthStatus.className = "health-status";
     elements.healthList.replaceChildren();
     elements.designList.replaceChildren();
+    elements.modulationLab.hidden = true;
+    elements.modulationFacts.replaceChildren();
+    elements.modulationSidebands.replaceChildren();
     const data = selectedSignal();
     if (data.values.length > 100000) {
       showToast("大样本分析已转入 Worker，可能需要数十秒。");
@@ -453,6 +464,69 @@ function renderHealth(result) {
   elements.designList.replaceChildren(summary, ...designRows);
 }
 
+function drawModulationChart(result) {
+  const view = result.best?.modulationView;
+  if (!view) return;
+  drawPlot(
+    elements.modulationChart,
+    view.time,
+    [
+      { values: view.primary, color: "cyan", width: 1 },
+      { values: view.fitted, color: "warn", width: 1.4 },
+    ],
+    { xLabel: "time / s", yLabel: view.type === "am" ? "envelope" : "inst. freq / Hz" },
+  );
+}
+
+function renderModulation(result) {
+  const view = result.best?.modulationView;
+  if (!view || !["am", "fm"].includes(result.best?.family)) {
+    elements.modulationLab.hidden = true;
+    elements.modulationFacts.replaceChildren();
+    elements.modulationSidebands.replaceChildren();
+    return;
+  }
+  elements.modulationLab.hidden = false;
+  elements.modulationType.textContent = `${view.type.toUpperCase()} · ${view.carrierFrequency.toFixed(2)} Hz`;
+  const facts = view.type === "am"
+    ? [
+        ["载频", `${view.carrierFrequency.toFixed(3)} Hz`],
+        ["调制频率", `${view.modulationFrequency.toFixed(3)} Hz`],
+        ["调制指数", view.modulationIndex.toFixed(3)],
+        ["载波幅值", `${view.carrierAmplitude.toFixed(3)} a.u.`],
+      ]
+    : [
+        ["载频", `${view.carrierFrequency.toFixed(3)} Hz`],
+        ["调制频率", `${view.modulationFrequency.toFixed(3)} Hz`],
+        ["频偏", `${view.frequencyDeviation.toFixed(3)} Hz`],
+        ["调制指数", view.modulationIndex.toFixed(3)],
+      ];
+  elements.modulationFacts.replaceChildren(...facts.map(([label, value]) => {
+    const row = document.createElement("div");
+    row.className = "modulation-fact";
+    const title = document.createElement("span");
+    title.textContent = label;
+    const strong = document.createElement("strong");
+    strong.textContent = value;
+    row.append(title, strong);
+    return row;
+  }));
+  const maxAmplitude = Math.max(...view.sidebands.map((sideband) => sideband.amplitude), 1e-12);
+  elements.modulationSidebands.replaceChildren(...view.sidebands.map((sideband) => {
+    const row = document.createElement("div");
+    row.className = "modulation-sideband";
+    const label = document.createElement("span");
+    label.textContent = `${sideband.frequency.toFixed(3)} Hz`;
+    const value = document.createElement("strong");
+    value.textContent = sideband.amplitude.toFixed(3);
+    const bar = document.createElement("i");
+    bar.style.width = `${Math.max(2, (sideband.amplitude / maxAmplitude) * 100)}%`;
+    row.append(label, value, bar);
+    return row;
+  }));
+  requestAnimationFrame(() => drawModulationChart(result));
+}
+
 function render(result) {
   const best = result.best;
   elements.recommendation.textContent = result.unknown
@@ -476,6 +550,7 @@ function render(result) {
     : `分析完成：推荐${best.label}，可信等级${result.reliability.label}。`;
   renderConclusion(result);
   renderHealth(result);
+  renderModulation(result);
   elements.metricSamples.textContent = `${result.sampleCount.toLocaleString()} 点`;
   elements.metricRate.textContent = `${result.sampleRate.toFixed(2)} Hz · Nyq ${result.nyquist.toFixed(1)} Hz`;
   elements.metricR2.textContent = best?.metrics.r2 == null ? "—" : `R² ${best.metrics.r2.toFixed(4)}`;
@@ -913,6 +988,16 @@ function downloadReport() {
     reliability: result.reliability,
     health: result.health,
     experimentPlan: buildExperimentPlan(result),
+    modulation: result.best?.modulationView
+      ? {
+          type: result.best.modulationView.type,
+          carrierFrequency: result.best.modulationView.carrierFrequency,
+          modulationFrequency: result.best.modulationView.modulationFrequency,
+          modulationIndex: result.best.modulationView.modulationIndex,
+          frequencyDeviation: result.best.modulationView.frequencyDeviation ?? null,
+          sidebands: result.best.modulationView.sidebands,
+        }
+      : null,
     candidates: result.candidates.map((candidate) => ({
       id: candidate.id,
       label: candidate.label,
@@ -982,7 +1067,10 @@ function bindEvents() {
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
-      if (state.result) renderCharts(state.result);
+      if (state.result) {
+        renderCharts(state.result);
+        if (state.result.best?.modulationView) drawModulationChart(state.result);
+      }
     }, 150);
   });
 }

@@ -300,6 +300,18 @@ select:focus-visible, button:focus-visible, .drop-zone:focus-within { outline: 2
 .design-item > span { color: var(--muted); font-family: var(--mono); font-size: 0.65rem; white-space: nowrap; }
 .design-item.pass > span { color: var(--accent); }
 .design-item.warn > span { color: var(--warn); }
+.modulation-lab { border: 1px solid var(--border); border-radius: var(--site-radius); background: var(--surface); padding: calc(16px * var(--site-space, 1)); }
+.modulation-layout { display: grid; grid-template-columns: 1.4fr .8fr; gap: 16px; margin-top: 12px; }
+.modulation-chart-wrap canvas { display: block; width: 100%; height: 240px; }
+.modulation-facts { display: grid; gap: 6px; }
+.modulation-fact { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(169, 213, 196, .08); font-size: 0.7rem; }
+.modulation-fact span { color: var(--muted); }
+.modulation-fact strong { font-family: var(--mono); font-weight: 600; }
+.modulation-sidebands { display: grid; gap: 6px; margin-top: 12px; }
+.modulation-sideband { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; font-size: 0.65rem; }
+.modulation-sideband span { color: var(--muted); }
+.modulation-sideband strong { font-family: var(--mono); }
+.modulation-sideband i { position: absolute; left: 0; bottom: 0; height: 2px; background: var(--accent); }
 .table-wrap { overflow-x: auto; margin-top: 10px; }
 table { width: 100%; border-collapse: collapse; font-size: .73rem; }
 th { text-align: left; color: var(--muted); font-weight: 500; font-size: .64rem; padding: 8px 8px 7px; border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -364,7 +376,7 @@ td.model-name { font-family: var(--site-font); font-weight: 620; }
   .shell { width: calc(100% - 24px); padding-top: 22px; }
   .control-panel { grid-template-columns: 1fr; }
   .metric-row { grid-template-columns: 1fr 1fr; }
-  .chart-grid, .analysis-grid, .health-grid { grid-template-columns: 1fr; }
+  .chart-grid, .analysis-grid, .health-grid, .modulation-layout { grid-template-columns: 1fr; }
   .chart-card.wide { grid-row: auto; }
   .chart-card.wide canvas { height: 250px; }
   .limitations { grid-template-columns: 1fr; }

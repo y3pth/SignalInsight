@@ -126,6 +126,9 @@ assert.ok(buildDecision(amResult).evidenceIds.includes("modulation_structure"));
 const amPlan = buildExperimentPlan(amResult);
 assert.ok(amPlan.items.some((item) => item.id === "modulation_cycles"));
 assert.ok(amPlan.items.some((item) => item.id === "sample_rate"));
+assert.equal(amResult.best.modulationView.type, "am");
+assert.equal(amResult.best.modulationView.sidebands.length, 3);
+assert.ok(amResult.best.modulationView.time.length <= 513);
 
 const fm = buildFmSignal();
 const fmResult = analyzeSignal(fm.time, fm.values);
@@ -138,6 +141,9 @@ assert.ok(Math.abs(fmFrequency - 4) < 0.2, `FM modulation frequency ${fmFrequenc
 assert.ok(Math.abs(fmIndex - 2) < 0.15, `FM modulation index ${fmIndex}`);
 assert.ok(fmResult.reliability.evidence.some((item) => item.id === "modulation_structure"));
 assert.ok(buildDecision(fmResult).evidenceIds.includes("modulation_structure"));
+assert.equal(fmResult.best.modulationView.type, "fm");
+assert.equal(fmResult.best.modulationView.sidebands.length, 5);
+assert.ok(fmResult.best.modulationView.time.length <= 513);
 
 console.log("DSP tests passed", {
   singleFrequency: frequency,
