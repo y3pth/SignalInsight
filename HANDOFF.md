@@ -317,7 +317,7 @@ P1/P2 已发布并完成线上回归：
 ## 9. Git 状态与分支
 
 - 当前分支：`feat/ai-explanations`
-- 最新提交：`9ed9b60 feat: add AM/FM candidates and parameter uncertainty`
+- 最新提交：`50a6b98 docs: record final P1/P2 publication`
 - AI UI 提交：`43c941f feat: surface AI limitations and harden Qwen requests`
 - P1 提交：`7874c50 feat: move analysis to a worker and harden AI delivery`
 - `main` 仍为 `ff2b226 refactor: reduce repository to deployed Qoder Sites deliverable`
