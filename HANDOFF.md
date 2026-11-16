@@ -226,10 +226,10 @@ DASHSCOPE_BASE_URL    默认 https://dashscope.aliyuncs.com/compatible-mode/v1
 
 原因：CN CLI 1.1.89 只接受旧版扁平 `.qoder.site` 描述文件（顶层 actionId/projectId/siteId/deploymentId/artifactSha256/indexSha256/indexHtml），当前描述文件是国际版生成的 `design + publication` 嵌套格式。CN CLI 的 `get_context` / `prepare_site` 会报 `sites_document_invalid` 或 `sites_invalid_request`。
 
-不要为了迁就 CN CLI 手工改发布描述文件。需要发布时使用桌面端 MCP：
+不要为了迁就 CN CLI 手工改发布描述文件。描述文件只保留 `site/.SignalInsight.qoder.site` 一个，不要同时在仓库根生成第二个。需要发布时使用桌面端 MCP：
 
 1. `get_context`
-2. `prepare_site`（projectRoot=`F:/SignalInsight`，webDirectory=`site/dist`，functionDirectory=`site/functions`，projectId 如上，secretNames 含 `DASHSCOPE_API_KEY`）
+2. `prepare_site`（projectRoot=`F:/SignalInsight/site`，webDirectory=`dist`，functionDirectory=`functions`，projectId 如上，secretNames 含 `DASHSCOPE_API_KEY`）
 3. `get_publish_status` 直到 `artifactReady` / `dependenciesReady` / `canPublish`
 4. `publish_site`
 5. 验证 health、单频/双频/噪声/CSV、AI、导出
