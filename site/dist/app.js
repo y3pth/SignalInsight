@@ -3,6 +3,7 @@ import {
   buildAiPayload,
   buildDecision,
   buildExperimentPlan,
+  stressTest,
   templateExplanation,
 } from "./dsp.js";
 import { parseCsv } from "./csv.js";
@@ -32,6 +33,9 @@ const elements = {
   modulationChart: document.querySelector("#modulation-chart"),
   modulationFacts: document.querySelector("#modulation-facts"),
   modulationSidebands: document.querySelector("#modulation-sidebands"),
+  stressButton: document.querySelector("#stress-button"),
+  stressSummary: document.querySelector("#stress-summary"),
+  stressList: document.querySelector("#stress-list"),
   metricSamples: document.querySelector("#metric-samples"),
   metricRate: document.querySelector("#metric-rate"),
   metricR2: document.querySelector("#metric-r2"),
@@ -69,6 +73,7 @@ const state = {
   resultVersion: -1,
   resultStale: false,
   aiRequestSequence: 0,
+  lastData: null,
 };
 
 const AI_CACHE_LIMIT = 20;
@@ -221,7 +226,7 @@ const ANALYZER_TIMEOUT_MS = 90000;
 function getAnalyzerWorker() {
   if (analyzerWorker || typeof Worker === "undefined") return analyzerWorker;
   try {
-    analyzerWorker = new Worker(new URL("./analyzer-worker.js", import.meta.url), { type: "module" });
+    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=3", import.meta.url), { type: "module" });
     analyzerWorker.addEventListener("message", (event) => {
       const { id, ok, result, error } = event.data ?? {};
       const pending = analyzerPending.get(id);
@@ -247,7 +252,7 @@ function getAnalyzerWorker() {
   return analyzerWorker;
 }
 
-function analyzeInWorker(worker, time, values) {
+function analyzeInWorker(worker, time, values, type = "analyze", baseline = null) {
   const id = ++analyzerRequestId;
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -264,7 +269,7 @@ function analyzeInWorker(worker, time, values) {
     }, ANALYZER_TIMEOUT_MS);
     analyzerPending.set(id, { resolve, reject, timeout });
     try {
-      worker.postMessage({ id, time, values });
+      worker.postMessage({ id, type, time, values, baseline });
     } catch (error) {
       analyzerPending.delete(id);
       clearTimeout(timeout);
@@ -289,6 +294,17 @@ async function analyzeSignalSafely(time, values) {
     const result = analyzeSignal(time, values);
     result.engine = "main";
     return result;
+  }
+}
+
+async function stressTestSafely(time, values, baseline) {
+  const worker = getAnalyzerWorker();
+  if (!worker) return stressTest(time, values, baseline);
+  try {
+    return await analyzeInWorker(worker, time, values, "stress", baseline);
+  } catch (error) {
+    if (error instanceof Error && error.name === "AnalyzerTimeoutError") throw error;
+    return stressTest(time, values, baseline);
   }
 }
 
@@ -317,6 +333,10 @@ function invalidateResult(message = "数据已变更，请重新运行分析。"
   elements.modulationLab.hidden = true;
   elements.modulationFacts.replaceChildren();
   elements.modulationSidebands.replaceChildren();
+  elements.stressButton.disabled = true;
+  elements.stressButton.textContent = "运行反事实测试";
+  elements.stressSummary.textContent = "等待当前分析完成。";
+  elements.stressList.replaceChildren();
 }
 
 function markDataChanged(message) {
@@ -351,6 +371,10 @@ async function analyzeCurrent() {
     elements.modulationLab.hidden = true;
     elements.modulationFacts.replaceChildren();
     elements.modulationSidebands.replaceChildren();
+    elements.stressButton.disabled = true;
+    elements.stressButton.textContent = "运行反事实测试";
+    elements.stressSummary.textContent = "等待当前分析完成。";
+    elements.stressList.replaceChildren();
     const data = selectedSignal();
     if (data.values.length > 100000) {
       showToast("大样本分析已转入 Worker，可能需要数十秒。");
@@ -362,6 +386,7 @@ async function analyzeCurrent() {
     state.result = result;
     state.resultVersion = version;
     state.resultStale = false;
+    state.lastData = { time: data.time, values: data.values };
     state.sourceLabel = data.label;
     render(result);
     showToast(`分析完成 · ${Math.round(result.elapsedMs)} ms · ${result.engine === "worker" ? "Worker" : "主线程"} · ${data.label}`);
@@ -527,6 +552,57 @@ function renderModulation(result) {
   requestAnimationFrame(() => drawModulationChart(result));
 }
 
+function renderStress(result) {
+  elements.stressList.replaceChildren(...result.variants.map((variant) => {
+    const row = document.createElement("div");
+    row.className = `stress-item${variant.flipped ? " flip" : ""}`;
+    const title = document.createElement("strong");
+    title.textContent = variant.label;
+    const model = document.createElement("span");
+    model.textContent = variant.error
+      ? `失败：${variant.error}`
+      : `${variant.recommendedModel} · ${variant.reliability}`;
+    const badge = document.createElement("span");
+    badge.className = `stress-badge${variant.flipped ? " flip" : ""}`;
+    badge.textContent = variant.flipped ? "结论翻转" : "结论稳定";
+    row.append(title, model, badge);
+    return row;
+  }));
+}
+
+async function runStressTest() {
+  if (!state.result || state.resultStale || !state.lastData) return;
+  if (state.result.sampleCount > 50000) {
+    showToast("压力测试仅支持 5 万点以内，请先降低样本量。", true);
+    return;
+  }
+  elements.stressButton.disabled = true;
+  elements.stressButton.textContent = "测试中…";
+  elements.stressSummary.textContent = "正在生成扰动场景并重新分析…";
+  elements.stressList.replaceChildren();
+  try {
+    const baseline = {
+      model: state.result.unknown ? "unknown" : state.result.best?.label ?? "unknown",
+    };
+    const result = await stressTestSafely(state.lastData.time, state.lastData.values, baseline);
+    if (state.resultStale) return;
+    if (!result || !Array.isArray(result.variants)) {
+      throw new Error("压力测试返回格式无效，请刷新页面后重试。");
+    }
+    elements.stressSummary.textContent = result.summary;
+    renderStress(result);
+  } catch (error) {
+    if (!state.resultStale) {
+      elements.stressSummary.textContent = error instanceof Error ? error.message : "压力测试失败。";
+    }
+  } finally {
+    if (!state.resultStale) {
+      elements.stressButton.disabled = false;
+      elements.stressButton.textContent = "重新运行压力测试";
+    }
+  }
+}
+
 function render(result) {
   const best = result.best;
   elements.recommendation.textContent = result.unknown
@@ -551,6 +627,13 @@ function render(result) {
   renderConclusion(result);
   renderHealth(result);
   renderModulation(result);
+  const stressAvailable = result.sampleCount <= 50000;
+  elements.stressButton.disabled = !stressAvailable;
+  elements.stressButton.textContent = stressAvailable ? "运行反事实测试" : "样本过大不可用";
+  elements.stressSummary.textContent = stressAvailable
+    ? "加噪、缩短观测、降采样，观察推荐模型是否翻转。"
+    : "压力测试仅支持 5 万点以内，避免多轮分析过慢。";
+  elements.stressList.replaceChildren();
   elements.metricSamples.textContent = `${result.sampleCount.toLocaleString()} 点`;
   elements.metricRate.textContent = `${result.sampleRate.toFixed(2)} Hz · Nyq ${result.nyquist.toFixed(1)} Hz`;
   elements.metricR2.textContent = best?.metrics.r2 == null ? "—" : `R² ${best.metrics.r2.toFixed(4)}`;
@@ -1060,6 +1143,7 @@ function bindEvents() {
   elements.analyze.addEventListener("click", analyzeCurrent);
   elements.download.addEventListener("click", downloadReport);
   elements.aiButton.addEventListener("click", requestQwenExplanation);
+  elements.stressButton.addEventListener("click", runStressTest);
   elements.timeColumn.addEventListener("change", () => markDataChanged("字段映射已变更，请重新运行分析。"));
   elements.signalColumn.addEventListener("change", () => markDataChanged("字段映射已变更，请重新运行分析。"));
 

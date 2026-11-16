@@ -1452,3 +1452,92 @@ export function buildExperimentPlan(result) {
       : "当前采样条件足以支撑本页演示；若要区分更近的模型，可继续延长观测。",
   };
 }
+
+function stressNoise(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6d2b79f5;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function stressGaussian(random) {
+  const u = Math.max(random(), 1e-12);
+  const v = random();
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v);
+}
+
+export function stressTest(time, values, baseline = null) {
+  const n = values.length;
+  const center = mean(values);
+  const signalRms = rms(values.map((value) => value - center));
+  const baseModel = baseline?.model ?? null;
+  const variants = [];
+
+  const run = (id, label, data) => {
+    try {
+      const result = analyzeSignal(data.time, data.values);
+      const recommendedModel = result.unknown ? "unknown" : result.best?.label ?? "unknown";
+      variants.push({
+        id,
+        label,
+        recommendedModel,
+        reliability: result.reliability.label,
+        unknown: result.unknown,
+        r2: result.best?.metrics.r2 ?? null,
+        bicGap: result.reliability.bicGap ?? null,
+        healthStatus: result.health?.status ?? "unknown",
+        sampleCount: result.sampleCount,
+        sampleRate: result.sampleRate,
+        flipped: baseModel != null && recommendedModel !== baseModel,
+      });
+    } catch (error) {
+      variants.push({
+        id,
+        label,
+        error: error instanceof Error ? error.message : "分析失败",
+        flipped: false,
+      });
+    }
+  };
+
+  const addNoise = (snrDb) => {
+    const random = stressNoise(12345 + Math.round(snrDb));
+    const sigma = signalRms / 10 ** (snrDb / 20);
+    return {
+      time,
+      values: values.map((value) => value + sigma * stressGaussian(random)),
+    };
+  };
+
+  run("noise20", "加噪 20 dB", addNoise(20));
+  run("noise10", "加噪 10 dB", addNoise(10));
+
+  const shortCount = Math.max(64, Math.floor(n * 0.5));
+  run("short50", "观测减半", {
+    time: time.slice(0, shortCount),
+    values: values.slice(0, shortCount),
+  });
+
+  const decimatedTime = [];
+  const decimatedValues = [];
+  for (let index = 0; index < n; index += 2) {
+    decimatedTime.push(time[index]);
+    decimatedValues.push(values[index]);
+  }
+  run("decimate2", "降采样 2×", { time: decimatedTime, values: decimatedValues });
+
+  const flipped = variants.filter((variant) => variant.flipped).length;
+  return {
+    baseline,
+    variants,
+    flipped,
+    total: variants.length,
+    summary: flipped
+      ? `${flipped}/${variants.length} 个扰动场景发生结论翻转。`
+      : `当前结论在 ${variants.length} 个扰动场景中保持稳定。`,
+  };
+}

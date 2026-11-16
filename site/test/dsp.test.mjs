@@ -4,6 +4,7 @@ import {
   buildAiPayload,
   buildDecision,
   buildExperimentPlan,
+  stressTest,
   templateExplanation,
 } from "../dist/dsp.js";
 
@@ -65,6 +66,10 @@ assert.ok(singleDecision.evidenceIds.length > 0);
 assert.ok(singleDecision.whatWouldChange.length > 0);
 assert.equal(singleResult.health.status, "ok");
 assert.ok(buildExperimentPlan(singleResult).items.length > 0);
+const stress = stressTest(single.time, single.values, { model: "单频模型" });
+assert.equal(stress.variants.length, 4);
+assert.equal(stress.total, 4);
+assert.ok(stress.variants.some((variant) => variant.recommendedModel));
 
 const dual = buildSignal([
   { amplitude: 1.2, frequency: 80.5, phase: 0.1 },
