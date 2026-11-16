@@ -44,6 +44,23 @@ def test_fresh_database_migration(tmp_path: Path) -> None:
     assert EXPECTED_TABLES <= tables
 
 
+def test_upgrade_from_0001_adds_upload_path(tmp_path: Path) -> None:
+    config = migration_config(tmp_path)
+    command.upgrade(config, "20261116_0001")
+
+    engine = create_engine(f"sqlite:///{(tmp_path / 'signalinsight.db').as_posix()}")
+    columns_before = {column["name"] for column in inspect(engine).get_columns("datasets")}
+    engine.dispose()
+    assert "upload_path" not in columns_before
+
+    command.upgrade(config, "head")
+
+    engine = create_engine(f"sqlite:///{(tmp_path / 'signalinsight.db').as_posix()}")
+    columns_after = {column["name"] for column in inspect(engine).get_columns("datasets")}
+    engine.dispose()
+    assert "upload_path" in columns_after
+
+
 def test_upgrade_and_downgrade_round_trip(tmp_path: Path) -> None:
     config = migration_config(tmp_path)
     command.upgrade(config, "head")

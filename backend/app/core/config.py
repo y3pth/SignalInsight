@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     data_dir: Path = Path("../data")
     database_url: str = "sqlite:///../data/signalinsight.db"
+    max_upload_bytes: int = Field(default=52_428_800, gt=0)
 
     @field_validator("api_prefix")
     @classmethod

@@ -11,7 +11,14 @@ from app.schemas.analysis import (
 )
 from app.schemas.capabilities import CapabilitiesResponse, ModelDefinition
 from app.schemas.common import ErrorResponse
-from app.schemas.datasets import DatasetManifest, DatasetMapping
+from app.schemas.datasets import (
+    DatasetDetail,
+    DatasetManifest,
+    DatasetMapping,
+    DatasetSummary,
+    DatasetSummaryListResponse,
+    DatasetUploadAccepted,
+)
 from app.schemas.explanations import ExplanationRecord
 from app.schemas.health import HealthResponse
 from app.schemas.series import SeriesResponse
@@ -105,6 +112,20 @@ def dataset_manifest() -> dict[str, Any]:
         "confirmed_mapping": mapping,
         "validation_summary": {"valid": True, "issues": []},
         "metadata": {},
+        "created_at": CREATED_AT,
+    }
+
+
+def dataset_summary() -> dict[str, Any]:
+    return {
+        "dataset_id": DATASET_ID,
+        "original_filename": "single_tone.csv",
+        "media_type": "csv",
+        "origin": "upload",
+        "source_sha256": SHA256,
+        "file_size_bytes": 1024,
+        "total_numeric_count": 0,
+        "status": "uploaded",
         "created_at": CREATED_AT,
     }
 
@@ -373,7 +394,7 @@ def payloads() -> dict[str, tuple[Any, Any]]:
             CapabilitiesResponse,
             {
                 "api_version": "v1",
-                "contract_version": "1.0.0",
+                "contract_version": "1.1.0",
                 "dataset_formats": ["csv", "mat", "mat_v7_3"],
                 "signal_kinds": ["real", "complex_analytic", "complex_baseband"],
                 "sampling_kinds": ["uniform", "nonuniform", "unknown"],
@@ -389,6 +410,27 @@ def payloads() -> dict[str, tuple[Any, Any]]:
         "models": (list[ModelDefinition], model_definitions()),
         "dataset_manifest": (DatasetManifest, dataset_manifest()),
         "dataset_mapping": (DatasetMapping, dataset_mapping()),
+        "dataset_summary": (DatasetSummary, dataset_summary()),
+        "dataset_summary_list": (
+            DatasetSummaryListResponse,
+            {"items": [dataset_summary()], "total": 1, "limit": 50, "offset": 0},
+        ),
+        "dataset_upload_accepted": (
+            DatasetUploadAccepted,
+            {
+                "dataset_id": DATASET_ID,
+                "status": "uploaded",
+                "original_filename": "single_tone.csv",
+                "media_type": "csv",
+                "source_sha256": SHA256,
+                "file_size_bytes": 1024,
+                "created_at": CREATED_AT,
+            },
+        ),
+        "dataset_detail": (
+            DatasetDetail,
+            {**dataset_summary(), "manifest": None},
+        ),
         "series_time": (
             SeriesResponse,
             {

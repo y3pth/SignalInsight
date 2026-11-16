@@ -82,4 +82,8 @@ def test_generated_file_matches_contract_routes() -> None:
 
 def test_runtime_does_not_expose_unimplemented_business_routes() -> None:
     runtime_paths = create_app(Settings(environment="test")).openapi()["paths"]
-    assert set(runtime_paths) == {"/api/v1/health"}
+    assert set(runtime_paths) == {
+        "/api/v1/health",
+        "/api/v1/datasets",
+        "/api/v1/datasets/{dataset_id}",
+    }

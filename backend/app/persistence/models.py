@@ -26,6 +26,7 @@ class Dataset(Base):
     confirmed_mapping: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     validation_summary: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     extra: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict)
+    upload_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="uploaded")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 

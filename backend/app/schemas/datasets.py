@@ -8,6 +8,7 @@ from app.schemas.base import ContractModel
 from app.schemas.enums import (
     DatasetMediaType,
     DatasetOrigin,
+    DatasetStatus,
     SamplingKind,
     Severity,
     SignalKind,
@@ -114,3 +115,36 @@ class DatasetListResponse(ContractModel):
     total: int = Field(ge=0)
     limit: int = Field(ge=1, le=100)
     offset: int = Field(ge=0)
+
+
+class DatasetSummary(ContractModel):
+    dataset_id: UUID
+    original_filename: str
+    media_type: DatasetMediaType
+    origin: DatasetOrigin
+    source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    file_size_bytes: int = Field(gt=0, le=52_428_800)
+    total_numeric_count: int = Field(ge=0, le=2_000_000)
+    status: DatasetStatus
+    created_at: datetime
+
+
+class DatasetSummaryListResponse(ContractModel):
+    items: list[DatasetSummary]
+    total: int = Field(ge=0)
+    limit: int = Field(ge=1, le=100)
+    offset: int = Field(ge=0)
+
+
+class DatasetDetail(DatasetSummary):
+    manifest: DatasetManifest | None = None
+
+
+class DatasetUploadAccepted(ContractModel):
+    dataset_id: UUID
+    status: Literal["uploaded"]
+    original_filename: str
+    media_type: DatasetMediaType
+    source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    file_size_bytes: int = Field(gt=0, le=52_428_800)
+    created_at: datetime

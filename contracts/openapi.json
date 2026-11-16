@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "SignalInsight API",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "paths": {
     "/api/v1/health": {
@@ -183,7 +183,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DatasetManifest"
+                  "$ref": "#/components/schemas/DatasetUploadAccepted"
                 }
               }
             }
@@ -284,7 +284,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DatasetListResponse"
+                  "$ref": "#/components/schemas/DatasetSummaryListResponse"
                 }
               }
             }
@@ -364,7 +364,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DatasetManifest"
+                  "$ref": "#/components/schemas/DatasetDetail"
                 }
               }
             }
@@ -2832,41 +2832,73 @@
         ],
         "title": "DataLocator"
       },
-      "DatasetListResponse": {
+      "DatasetDetail": {
         "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/DatasetManifest"
-            },
-            "type": "array",
-            "title": "Items"
+          "dataset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Dataset Id"
           },
-          "total": {
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename"
+          },
+          "media_type": {
+            "$ref": "#/components/schemas/DatasetMediaType"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/DatasetOrigin"
+          },
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256"
+          },
+          "file_size_bytes": {
             "type": "integer",
+            "maximum": 52428800.0,
+            "exclusiveMinimum": 0.0,
+            "title": "File Size Bytes"
+          },
+          "total_numeric_count": {
+            "type": "integer",
+            "maximum": 2000000.0,
             "minimum": 0.0,
-            "title": "Total"
+            "title": "Total Numeric Count"
           },
-          "limit": {
-            "type": "integer",
-            "maximum": 100.0,
-            "minimum": 1.0,
-            "title": "Limit"
+          "status": {
+            "$ref": "#/components/schemas/DatasetStatus"
           },
-          "offset": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Offset"
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "manifest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatasetManifest"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "items",
-          "total",
-          "limit",
-          "offset"
+          "dataset_id",
+          "original_filename",
+          "media_type",
+          "origin",
+          "source_sha256",
+          "file_size_bytes",
+          "total_numeric_count",
+          "status",
+          "created_at"
         ],
-        "title": "DatasetListResponse"
+        "title": "DatasetDetail"
       },
       "DatasetManifest": {
         "properties": {
@@ -3051,6 +3083,158 @@
           "simulation"
         ],
         "title": "DatasetOrigin"
+      },
+      "DatasetStatus": {
+        "type": "string",
+        "enum": [
+          "uploaded",
+          "parsed",
+          "failed"
+        ],
+        "title": "DatasetStatus"
+      },
+      "DatasetSummary": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Dataset Id"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename"
+          },
+          "media_type": {
+            "$ref": "#/components/schemas/DatasetMediaType"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/DatasetOrigin"
+          },
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256"
+          },
+          "file_size_bytes": {
+            "type": "integer",
+            "maximum": 52428800.0,
+            "exclusiveMinimum": 0.0,
+            "title": "File Size Bytes"
+          },
+          "total_numeric_count": {
+            "type": "integer",
+            "maximum": 2000000.0,
+            "minimum": 0.0,
+            "title": "Total Numeric Count"
+          },
+          "status": {
+            "$ref": "#/components/schemas/DatasetStatus"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "original_filename",
+          "media_type",
+          "origin",
+          "source_sha256",
+          "file_size_bytes",
+          "total_numeric_count",
+          "status",
+          "created_at"
+        ],
+        "title": "DatasetSummary"
+      },
+      "DatasetSummaryListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DatasetSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Offset"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "DatasetSummaryListResponse"
+      },
+      "DatasetUploadAccepted": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Dataset Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "uploaded",
+            "title": "Status"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename"
+          },
+          "media_type": {
+            "$ref": "#/components/schemas/DatasetMediaType"
+          },
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256"
+          },
+          "file_size_bytes": {
+            "type": "integer",
+            "maximum": 52428800.0,
+            "exclusiveMinimum": 0.0,
+            "title": "File Size Bytes"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "status",
+          "original_filename",
+          "media_type",
+          "source_sha256",
+          "file_size_bytes",
+          "created_at"
+        ],
+        "title": "DatasetUploadAccepted"
       },
       "DownsamplingInfo": {
         "properties": {
