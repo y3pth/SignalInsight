@@ -1,7 +1,7 @@
 # SignalInsight 新对话交接书
 
 > 更新日期：2026-11-17
-> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；新版 AI UI 已发布
+> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；P1/P2 已实现，待最终发布
 > 这是新对话的首要入口。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
 
 ---
@@ -69,6 +69,9 @@ site/.SignalInsight.qoder.site
 - AI 结果按 payload 做会话缓存；Qwen 端点增加 60 次/分钟/IP 的软限流，可用 `RATE_LIMIT_MAX` 调整
 - CSV 解析抽成 `csv.js`，支持引号内换行、自动识别分隔符、前 3 行预览
 - 分析结果增加 `aria-live` 播报
+- AM/FM 调制候选（保守证据门控）
+- 参数不确定度：线性拟合近似标准误 + 1/T 分辨率
+- 无噪声/数值精度极高时优先参数更少的模型，避免多频过拟合
 
 ---
 
@@ -76,7 +79,6 @@ site/.SignalInsight.qoder.site
 
 当前不能宣称支持：
 
-- AM、FM 自动辨识
 - MAT 文件
 - 多通道批量分析
 - 复数 IQ
@@ -84,7 +86,7 @@ site/.SignalInsight.qoder.site
 - Python FastAPI/SQLite 线上部署
 - 用户系统、历史持久化、共享报告
 
-P2 会优先做 AM/FM 候选模型与参数不确定性；MAT、IQ、非均匀采样、多通道另立阶段。不能把浏览器 MVP 描述为完整 Python 后端；不能把未实现模型说成已支持。
+AM/FM 候选模型与参数不确定度已实现，但仍受候选库和采样条件限制；MAT、IQ、非均匀采样、多通道另立阶段。不能把浏览器 MVP 描述为完整 Python 后端；不能把未实现模型说成已支持。
 
 ---
 
@@ -177,6 +179,15 @@ y(t) = c + Σ Aᵢ sin(2πfᵢ(t-t₀)+φᵢ)
 
 可信等级是规则汇总，不是概率。
 
+### 6.7 AM / FM 候选
+
+- 用 FFT 构造解析信号，提取包络与瞬时频率。
+- AM：包络正弦拟合 + 载波约束拟合，估计调制频率/调制指数。
+- FM：瞬时频率正弦拟合得到载频/频偏/调制相位，再做载频、频偏、相位局部精化。
+- 选择门控：调制指数、包络/瞬时频率显著度、BIC 与 RSS；残差都接近数值精度时优先参数更少的模型。
+- AM/FM 残差证据使用中间 90% 样本，规避解析信号边缘效应。
+- 参数不确定度是线性拟合近似标准误；频率类标注 1/T 分辨率，不是严格置信区间。
+
 ---
 
 ## 7. Qwen 配置与发布流程
@@ -249,6 +260,12 @@ DASHSCOPE_BASE_URL    默认 https://dashscope.aliyuncs.com/compatible-mode/v1
 - 只对异常高频请求做软限制，不阻断正常演示
 - 在百炼侧设置预算/告警，避免额度被刷
 
+### 7.5 软限流与缓存
+
+- `/explain` 默认 60 次/分钟/IP，可用 `RATE_LIMIT_MAX` 调整。
+- 计数在单个 Function isolate 内存中，属于软限制；正常单用户演示不会触发。
+- 浏览器端按结构化 payload 做会话缓存，相同结果重复点击不再请求 Qwen。
+
 ---
 
 ## 8. 验证基线
@@ -274,15 +291,27 @@ node site/test/function.test.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
 
-新版 AI UI 已用本地 mock 验证：限制展示、超时提示、上游错误提示均正常。
+2026-11-17 P1/P2 本地验证：
+
+- Web Worker 生效（副标题显示 Worker）
+- CSV 引号换行可解析，前 3 行预览正常
+- AI 缓存重复点击只请求一次
+- AM 合成信号：5 Hz / 0.60
+- FM 合成信号：4 Hz / β≈2.00
+- 参数不确定度列正常
+- 无噪声 FM 因残差结构显示“需要谨慎”
+- 线上 Qwen 对 AM payload 返回结构化解释
+
+当前线上仍是 AI UI 版本；P1/P2 待最终发布后需要重新做线上回归。
 
 ---
 
 ## 9. Git 状态与分支
 
 - 当前分支：`feat/ai-explanations`
-- 最新提交：`4dc92d2 docs: refresh handoff for live Qwen and CN publishing`
+- 最新提交：`9ed9b60 feat: add AM/FM candidates and parameter uncertainty`
 - AI UI 提交：`43c941f feat: surface AI limitations and harden Qwen requests`
+- P1 提交：`7874c50 feat: move analysis to a worker and harden AI delivery`
 - `main` 仍为 `ff2b226 refactor: reduce repository to deployed Qoder Sites deliverable`
 - 远端：尚未配置
 - 不直接修改 `main`；每个任务使用独立分支
@@ -324,10 +353,10 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 
 ### P2：模型扩展
 
-1. AM/FM 候选模型与保守证据选择。
-2. 参数置信区间/不确定性展示。
-3. 本地分析历史（localStorage）或报告增强。
-4. MAT、复数 IQ、非均匀采样、多通道另立阶段，不能虚假宣称。
+1. [已完成] AM/FM 候选模型与保守证据选择。
+2. [已完成] 参数不确定度展示（近似标准误 + 分辨率）。
+3. [下一步] 本地分析历史（localStorage）或报告增强。
+4. [另立阶段] MAT、复数 IQ、非均匀采样、多通道，不能虚假宣称。
 
 ### 比赛
 
@@ -343,7 +372,10 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 
 - 未获得官方评分权重，无法保证获奖或确认格式合规。
 - Qwen 已真实联调，但公开端点仍受额度、网络和模型可用性影响。
-- 单频/多频算法只对候选库和当前采样条件负责。
+- 单频/多频/AM/FM 算法只对候选库和当前采样条件负责。
+- AM/FM 结论受调制证据门控，不等同于物理调制机制。
+- 参数不确定度为线性拟合近似；频率行是 1/T 分辨率，不是严格置信区间。
+- AI 限流是单 Function isolate 内存软限制，不是全局配额。
 - 可信等级不是概率。
 - 浏览器 MVP 不是 Python 后端。
 - 公开站点可匿名访问，Function 依赖账号 Secret 和额度。
@@ -361,3 +393,5 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 - 保留部署验证测试，即使它们不随网站打包。
 - 新版 AI UI 在独立分支提交，完成线上回归后发布。
 - AI 防滥用以“不影响正常演示”为硬约束，优先缓存和软限制。
+- AM/FM 仅在调制证据与 BIC/RSS 通过时选择；数值精度平局优先少参数模型。
+- 参数不确定度只做近似标准误与分辨率，不包装成严格置信区间。
