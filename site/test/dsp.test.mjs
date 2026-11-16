@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { analyzeSignal } from "../dist/dsp.js";
+import { analyzeSignal, buildAiPayload, templateExplanation } from "../dist/dsp.js";
 
 function seededNoise(seed) {
   let state = seed >>> 0;
@@ -41,6 +41,15 @@ assert.ok(Math.abs(amplitude - 2) < 0.02, `single amplitude ${amplitude}`);
 assert.ok(singleResult.best.metrics.r2 > 0.999, `single R2 ${singleResult.best.metrics.r2}`);
 assert.notEqual(singleResult.reliability.level, "unreliable");
 
+const singleExplanation = templateExplanation(singleResult);
+assert.ok(singleExplanation.summary.length > 0);
+assert.ok(singleExplanation.observations.length > 0);
+assert.ok(singleExplanation.limitations.length > 0);
+const singlePayload = buildAiPayload(singleResult);
+assert.equal(singlePayload.unknown, false);
+assert.ok(singlePayload.candidates.length > 0);
+assert.ok(singlePayload.reliability.limitations.length > 0);
+
 const dual = buildSignal([
   { amplitude: 1.2, frequency: 80.5, phase: 0.1 },
   { amplitude: 0.7, frequency: 173.2, phase: -0.5 },
@@ -55,6 +64,10 @@ const noiseRandom = seededNoise(7);
 const noise = { time: single.time, values: single.time.map(() => gaussianPair(noiseRandom)) };
 const noiseResult = analyzeSignal(noise.time, noise.values);
 assert.equal(noiseResult.unknown, true);
+const noisePayload = buildAiPayload(noiseResult);
+assert.equal(noisePayload.unknown, true);
+assert.equal(noisePayload.recommendedModel, null);
+assert.ok(noisePayload.reliability.limitations.length > 0);
 
 console.log("DSP tests passed", {
   singleFrequency: frequency,

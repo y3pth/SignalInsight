@@ -32,6 +32,7 @@ const elements = {
   nextStepList: document.querySelector("#next-step-list"),
   aiSummary: document.querySelector("#ai-summary"),
   aiObservations: document.querySelector("#ai-observations"),
+  aiLimitations: document.querySelector("#ai-limitations"),
   aiButton: document.querySelector("#ai-button"),
   aiStatus: document.querySelector("#ai-status"),
   timeLegend: document.querySelector("#time-legend"),
@@ -370,6 +371,18 @@ function listItem(text) {
   return item;
 }
 
+function renderAiLimitations(limitations) {
+  const items = Array.isArray(limitations)
+    ? limitations.map((text) => String(text ?? "").trim().slice(0, 500)).filter(Boolean).slice(0, 4)
+    : [];
+  elements.aiLimitations.replaceChildren(...items.map((text) => {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = text;
+    return paragraph;
+  }));
+  elements.aiLimitations.hidden = items.length === 0;
+}
+
 function renderLocalExplanation(result) {
   const explanation = templateExplanation(result);
   elements.aiSummary.textContent = explanation.summary;
@@ -378,6 +391,7 @@ function renderLocalExplanation(result) {
     paragraph.textContent = text;
     return paragraph;
   }));
+  renderAiLimitations(explanation.limitations);
   elements.aiStatus.textContent = state.aiConfigured
     ? "AI 不参与参数计算，也不能修改可信等级。"
     : "当前显示确定性解释；配置 DASHSCOPE_API_KEY 后可启用 Qwen。";
@@ -572,7 +586,10 @@ function amplitudeAt(spectrum, frequency) {
 
 async function checkAiAvailability() {
   try {
-    const response = await fetch("/functions/v1/app/health", { cache: "no-store" });
+    const response = await fetch("/functions/v1/app/health", {
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+    });
     const data = await response.json();
     state.aiConfigured = Boolean(response.ok && data?.configured);
   } catch {
@@ -580,6 +597,17 @@ async function checkAiAvailability() {
   }
   if (state.result) renderLocalExplanation(state.result);
 }
+
+const AI_ERROR_MESSAGES = {
+  service_not_configured: "Qwen 密钥尚未配置，继续显示确定性规则解释。",
+  upstream_error: "Qwen 上游返回错误，请检查 Key、模型名或额度。",
+  upstream_unavailable: "Qwen 服务暂时不可用，请稍后重试。",
+  invalid_model_output: "Qwen 返回格式不符合要求，请重试。",
+  invalid_upstream_response: "Qwen 返回内容异常，请重试。",
+  payload_too_large: "发送给 Qwen 的摘要过大，请减少数据量。",
+  invalid_payload: "发送给 Qwen 的摘要格式无效。",
+  invalid_json: "请求格式错误。",
+};
 
 async function requestQwenExplanation() {
   if (!state.result || state.busy || !state.aiConfigured) return;
@@ -591,13 +619,11 @@ async function requestQwenExplanation() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(buildAiPayload(state.result)),
+      signal: AbortSignal.timeout(30000),
     });
     const data = await response.json().catch(() => null);
     if (!response.ok || !data?.ok || !data?.explanation) {
-      const reason = data?.error === "service_not_configured"
-        ? "Qwen 密钥尚未配置，继续显示确定性规则解释。"
-        : "Qwen 暂不可用，继续显示确定性规则解释。";
-      throw new Error(reason);
+      throw new Error(AI_ERROR_MESSAGES[data?.error] ?? "Qwen 暂不可用，继续显示确定性规则解释。");
     }
     const explanation = data.explanation;
     elements.aiSummary.textContent = String(explanation.summary ?? "").slice(0, 2200);
@@ -607,10 +633,14 @@ async function requestQwenExplanation() {
       paragraph.textContent = String(text).slice(0, 500);
       return paragraph;
     }));
+    renderAiLimitations(explanation.limitations);
     elements.aiStatus.textContent = "Qwen 仅解释已计算证据，未修改任何数值结论。";
     elements.aiButton.textContent = "重新生成解释";
   } catch (error) {
-    elements.aiStatus.textContent = error instanceof Error ? error.message : "Qwen 暂不可用。";
+    const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+    elements.aiStatus.textContent = timedOut
+      ? "Qwen 响应超时，请重试。"
+      : error instanceof Error ? error.message : "Qwen 暂不可用。";
     elements.aiButton.textContent = "重试 Qwen 解释";
   } finally {
     elements.aiButton.disabled = false;

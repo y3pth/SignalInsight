@@ -281,6 +281,9 @@ td.model-name { font-family: var(--site-font); font-weight: 620; }
 .ai-observations { display: grid; gap: 6px; margin-top: 12px; }
 .ai-observations p { margin: 0; color: var(--muted); font-size: .72rem; }
 .ai-observations p::before { content: "—"; color: var(--accent); margin-right: 7px; }
+.ai-limitations { display: grid; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed color-mix(in srgb, var(--border) 80%, transparent); }
+.ai-limitations p { margin: 0; color: var(--muted); font-size: .72rem; }
+.ai-limitations p::before { content: "限制"; color: var(--warn); margin-right: 7px; font-size: .62rem; letter-spacing: .08em; }
 .ai-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 17px; }
 .ai-status { color: var(--muted); font-size: .67rem; }
 .workspace-footer { display: flex; justify-content: space-between; gap: 20px; padding: 8px 3px 0; color: var(--muted); font-size: .65rem; }
