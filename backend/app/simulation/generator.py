@@ -3,9 +3,9 @@ from typing import cast
 
 import numpy as np
 
+from app.core.hashing import compute_signal_sha256
 from app.schemas.enums import DatasetOrigin, SamplingKind, SignalKind
 from app.schemas.simulations import SimulationRequest
-from app.simulation.hashing import compute_signal_sha256
 from app.simulation.noise import apply_gaussian_noise
 from app.simulation.timebase import generate_timebase
 from app.simulation.types import (
