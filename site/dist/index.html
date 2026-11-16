@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b1718" />
+    <meta name="description" content="SignalInsight：在浏览器中完成单频/多频信号模型辨识、参数估计、模型竞争与可信度分析。" />
+    <title>SignalInsight · 信号可信分析实验台</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="ambient-grid" aria-hidden="true"></div>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="SignalInsight 首页">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        <span><strong>SignalInsight</strong><small>信号可信分析实验台</small></span>
+      </a>
+      <div class="topbar-meta">
+        <span class="status-pill"><span class="status-dot"></span>本地确定性引擎</span>
+        <span class="topbar-version">StudyHack · Qoder Sites</span>
+      </div>
+    </header>
+
+    <main class="shell">
+      <aside class="control-panel" aria-label="数据与实验控制">
+        <div class="panel-heading">
+          <p class="eyebrow">01 / SIGNAL INPUT</p>
+          <h1>从观测数据到可验证的模型结论</h1>
+          <p class="lede">不是挑一条最漂亮的曲线，而是让多个模型竞争，并明确告诉你不确定性在哪里。</p>
+        </div>
+
+        <section class="control-block">
+          <div class="block-title"><span>数据源</span><span class="micro">单通道</span></div>
+          <div class="source-tabs" role="tablist" aria-label="数据源">
+            <button class="source-tab active" data-example="single" type="button">单频示例</button>
+            <button class="source-tab" data-example="dual" type="button">双频示例</button>
+            <button class="source-tab" data-example="noise" type="button">库外噪声</button>
+          </div>
+          <label class="drop-zone" for="csv-file">
+            <input id="csv-file" type="file" accept=".csv,text/csv" />
+            <span class="drop-icon" aria-hidden="true">↥</span>
+            <span><strong>上传实验 CSV</strong><small>UTF-8 · 时间列 + 单通道数值 · ≤ 10 MB</small></span>
+          </label>
+          <div id="mapping-panel" class="mapping-panel" hidden>
+            <label>时间列<select id="time-column"></select></label>
+            <label>信号列<select id="signal-column"></select></label>
+          </div>
+        </section>
+
+        <section class="control-block compact">
+          <div class="block-title"><span>分析边界</span><span class="micro">v0.1</span></div>
+          <ul class="scope-list">
+            <li><span>候选模型</span><b>单频 / 多频</b></li>
+            <li><span>采样条件</span><b>近似均匀</b></li>
+            <li><span>数据类型</span><b>实数单通道</b></li>
+          </ul>
+          <button id="analyze-button" class="primary-button" type="button">
+            <span>运行可信分析</span><span aria-hidden="true">→</span>
+          </button>
+        </section>
+
+        <div class="privacy-note">
+          <strong>计算边界</strong>
+          <p>数值计算在浏览器本地完成。仅在你点击 AI 解释时，发送结构化摘要，不上传原始序列。</p>
+        </div>
+      </aside>
+
+      <section class="workspace">
+        <div class="result-head">
+          <div>
+            <p class="eyebrow">02 / MODEL COMPETITION</p>
+            <div class="result-title-row">
+              <h2 id="recommended-model">正在分析…</h2>
+              <span id="reliability-badge" class="reliability-badge">—</span>
+            </div>
+            <p id="result-subtitle" class="result-subtitle">准备模型候选与残差证据</p>
+          </div>
+          <button id="download-button" class="ghost-button" type="button" disabled>导出报告</button>
+        </div>
+
+        <div class="metric-row" aria-label="核心指标">
+          <article class="metric-card"><span>样本 / 采样率</span><strong id="metric-samples">—</strong><small id="metric-rate">—</small></article>
+          <article class="metric-card"><span>拟合解释能力</span><strong id="metric-r2">—</strong><small id="metric-rmse">—</small></article>
+          <article class="metric-card"><span>模型区分度</span><strong id="metric-gap">—</strong><small>BIC 差距</small></article>
+          <article class="metric-card"><span>观测分辨率</span><strong id="metric-resolution">—</strong><small id="metric-duration">—</small></article>
+        </div>
+
+        <div class="chart-grid">
+          <article class="chart-card wide">
+            <div class="card-head"><div><span>时域</span><h3>观测与拟合</h3></div><small id="time-legend">观测 / 拟合</small></div>
+            <canvas id="time-chart" height="230" aria-label="观测信号与拟合曲线"></canvas>
+          </article>
+          <article class="chart-card">
+            <div class="card-head"><div><span>频域</span><h3>幅度谱与候选峰</h3></div><small>Hann 窗</small></div>
+            <canvas id="spectrum-chart" height="230" aria-label="信号幅度谱"></canvas>
+          </article>
+          <article class="chart-card">
+            <div class="card-head"><div><span>残差</span><h3>模型还遗漏了什么</h3></div><small id="residual-label">残差序列</small></div>
+            <canvas id="residual-chart" height="230" aria-label="模型残差"></canvas>
+          </article>
+        </div>
+
+        <div class="analysis-grid">
+          <article class="data-card">
+            <div class="card-head"><div><span>候选竞争</span><h3>统一口径比较</h3></div><small>同一数据 · 同一指标</small></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>模型</th><th>R²</th><th>RMSE</th><th>AIC</th><th>BIC</th></tr></thead>
+                <tbody id="candidate-body"></tbody>
+              </table>
+            </div>
+          </article>
+          <article class="data-card">
+            <div class="card-head"><div><span>推荐参数</span><h3>数学量 + 物理量</h3></div><small id="phase-note">相位相对首样本</small></div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>参数</th><th>估计值</th><th>单位</th></tr></thead>
+                <tbody id="parameter-body"></tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+
+        <article class="evidence-card">
+          <div class="card-head"><div><span>可信度引擎</span><h3>结论背后的证据</h3></div><small>规则汇总，不是概率</small></div>
+          <div id="evidence-list" class="evidence-list"></div>
+          <div class="limitations">
+            <div><strong>边界</strong><ul id="limitation-list"></ul></div>
+            <div><strong>下一步</strong><ul id="next-step-list"></ul></div>
+          </div>
+        </article>
+
+        <article class="ai-card">
+          <div class="ai-orb" aria-hidden="true"></div>
+          <div class="card-head"><div><span>AI 解释层</span><h3>把数学结果翻译成通信语言</h3></div><small>Qwen · 结构化摘要</small></div>
+          <p id="ai-summary" class="ai-summary">正在准备确定性解释…</p>
+          <div id="ai-observations" class="ai-observations"></div>
+          <div class="ai-actions">
+            <button id="ai-button" class="secondary-button" type="button">用 Qwen 深入解释</button>
+            <span id="ai-status" class="ai-status">AI 不参与参数计算，也不能修改可信等级。</span>
+          </div>
+        </article>
+
+        <footer class="workspace-footer">
+          <span>SignalInsight v0.1 · 浏览器确定性数值内核</span>
+          <span>结论仅适用于当前候选模型库与观测条件</span>
+        </footer>
+      </section>
+    </main>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
