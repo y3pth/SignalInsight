@@ -41,9 +41,17 @@
             <span class="drop-icon" aria-hidden="true">↥</span>
             <span><strong>上传实验 CSV</strong><small>UTF-8 · 时间列 + 单通道数值 · ≤ 10 MB</small></span>
           </label>
+          <label class="drop-zone mat-drop" for="mat-file">
+            <input id="mat-file" type="file" accept=".mat" />
+            <span class="drop-icon" aria-hidden="true">↥</span>
+            <span><strong>导入 MAT</strong><small>v5 实数矩阵 · 首列时间；单列用采样率</small></span>
+          </label>
+          <label class="mat-rate">MAT 单列采样率 <input id="mat-rate" type="number" min="1" step="1" value="1000" /></label>
           <div id="mapping-panel" class="mapping-panel" hidden>
             <label>时间列<select id="time-column"></select></label>
             <label>信号列<select id="signal-column"></select></label>
+            <label class="iq-toggle"><input id="iq-mode" type="checkbox" /> IQ 模式（当前信号列为 I）</label>
+            <label id="q-column-wrap" hidden>Q 列<select id="q-column"></select></label>
             <div id="csv-preview" class="csv-preview" hidden></div>
           </div>
         </section>
@@ -137,6 +145,12 @@
             </div>
           </article>
         </div>
+
+        <article id="channel-card" class="channel-card" hidden>
+          <div class="card-head"><div><span>多通道</span><h3>逐通道独立分析</h3></div><button id="channel-button" class="ghost-button" type="button">分析全部通道</button></div>
+          <p id="channel-summary" class="channel-summary">检测到多个信号列后可批量分析；每个通道独立建模。</p>
+          <div id="channel-list" class="channel-list"></div>
+        </article>
 
         <div class="health-grid">
           <article class="data-card">

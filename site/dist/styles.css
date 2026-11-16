@@ -186,9 +186,15 @@ a { color: inherit; text-decoration: none; }
 }
 .drop-zone strong { display: block; font-size: 0.8rem; }
 .drop-zone small { display: block; margin-top: 2px; color: var(--muted); font-size: 0.67rem; }
+.mat-drop { margin-top: 8px; }
+.mat-rate { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); font-size: 0.67rem; }
+.mat-rate input { width: 100px; border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; color: var(--ink); background: var(--site-bg); outline: none; }
+.mat-rate input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .mapping-panel { display: grid; gap: 10px; margin-top: 12px; }
 .mapping-panel label { display: grid; gap: 5px; color: var(--muted); font-size: 0.7rem; }
+.iq-toggle { display: flex !important; align-items: center; gap: 7px; cursor: pointer; }
+.iq-toggle input { width: auto; accent-color: var(--accent); }
 .csv-preview { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: rgba(0, 0, 0, 0.14); }
 .csv-preview table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: 0.62rem; }
 .csv-preview caption { padding: 7px 9px; color: var(--muted); text-align: left; font-size: 0.62rem; }
@@ -321,6 +327,15 @@ select:focus-visible, button:focus-visible, .drop-zone:focus-within { outline: 2
 .stress-item span { color: var(--muted); }
 .stress-badge { color: var(--accent); font-size: 0.62rem; white-space: nowrap; }
 .stress-badge.flip { color: var(--danger); }
+.channel-card { border: 1px solid var(--border); border-radius: var(--site-radius); background: var(--surface); padding: calc(16px * var(--site-space, 1)); }
+.channel-summary { margin: 12px 0 0; color: var(--muted); font-size: 0.7rem; line-height: 1.6; }
+.channel-list { display: grid; gap: 6px; margin-top: 10px; }
+.channel-row { display: grid; grid-template-columns: 1fr 1.6fr auto; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; background: transparent; color: var(--ink); font: inherit; font-size: 0.68rem; cursor: pointer; }
+.channel-row:hover { border-color: var(--accent); }
+.channel-row strong { font-size: 0.7rem; }
+.channel-row span { color: var(--muted); }
+.channel-badge { color: var(--accent); font-size: 0.62rem; white-space: nowrap; }
+.channel-badge.muted { color: var(--muted); }
 .table-wrap { overflow-x: auto; margin-top: 10px; }
 table { width: 100%; border-collapse: collapse; font-size: .73rem; }
 th { text-align: left; color: var(--muted); font-weight: 500; font-size: .64rem; padding: 8px 8px 7px; border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -387,6 +402,7 @@ td.model-name { font-family: var(--site-font); font-weight: 620; }
   .metric-row { grid-template-columns: 1fr 1fr; }
   .chart-grid, .analysis-grid, .health-grid, .modulation-layout { grid-template-columns: 1fr; }
   .stress-item { grid-template-columns: 1fr; gap: 4px; }
+  .channel-row { grid-template-columns: 1fr; gap: 4px; }
   .chart-card.wide { grid-row: auto; }
   .chart-card.wide canvas { height: 250px; }
   .limitations { grid-template-columns: 1fr; }

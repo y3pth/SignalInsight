@@ -1,5 +1,6 @@
 import {
   analyzeSignal,
+  analyzeIqSignal,
   buildAiPayload,
   buildDecision,
   buildExperimentPlan,
@@ -7,14 +8,20 @@ import {
   templateExplanation,
 } from "./dsp.js";
 import { parseCsv } from "./csv.js";
+import { parseMat } from "./mat.js";
 
 const elements = {
   tabs: [...document.querySelectorAll(".source-tab")],
   file: document.querySelector("#csv-file"),
+  matFile: document.querySelector("#mat-file"),
+  matRate: document.querySelector("#mat-rate"),
   mapping: document.querySelector("#mapping-panel"),
   csvPreview: document.querySelector("#csv-preview"),
   timeColumn: document.querySelector("#time-column"),
   signalColumn: document.querySelector("#signal-column"),
+  iqMode: document.querySelector("#iq-mode"),
+  qColumnWrap: document.querySelector("#q-column-wrap"),
+  qColumn: document.querySelector("#q-column"),
   analyze: document.querySelector("#analyze-button"),
   download: document.querySelector("#download-button"),
   recommendation: document.querySelector("#recommended-model"),
@@ -36,6 +43,10 @@ const elements = {
   stressButton: document.querySelector("#stress-button"),
   stressSummary: document.querySelector("#stress-summary"),
   stressList: document.querySelector("#stress-list"),
+  channelCard: document.querySelector("#channel-card"),
+  channelButton: document.querySelector("#channel-button"),
+  channelSummary: document.querySelector("#channel-summary"),
+  channelList: document.querySelector("#channel-list"),
   metricSamples: document.querySelector("#metric-samples"),
   metricRate: document.querySelector("#metric-rate"),
   metricR2: document.querySelector("#metric-r2"),
@@ -74,6 +85,9 @@ const state = {
   resultStale: false,
   aiRequestSequence: 0,
   lastData: null,
+  channelResults: null,
+  channelBusy: false,
+  inputMode: "real",
 };
 
 const AI_CACHE_LIMIT = 20;
@@ -154,8 +168,10 @@ function buildExample(kind) {
 
 function renderCsvPreview(parsed, filename) {
   const table = document.createElement("table");
+  const previewRows = parsed.previewRows ?? parsed.rows;
+  const rowCount = parsed.rowCount ?? parsed.rows.length;
   const caption = table.createCaption();
-  caption.textContent = `${filename} · 预览前 ${Math.min(3, parsed.rows.length)} 行 · 共 ${parsed.rows.length} 行`;
+  caption.textContent = `${filename} · 预览前 ${Math.min(3, previewRows.length)} 行 · 共 ${rowCount} 行`;
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
   for (const header of parsed.headers) {
@@ -165,7 +181,7 @@ function renderCsvPreview(parsed, filename) {
   }
   thead.append(headRow);
   const tbody = document.createElement("tbody");
-  for (const row of parsed.rows.slice(0, 3)) {
+  for (const row of previewRows.slice(0, 3)) {
     const tr = document.createElement("tr");
     for (const cell of row) {
       const td = document.createElement("td");
@@ -179,14 +195,67 @@ function renderCsvPreview(parsed, filename) {
   elements.csvPreview.hidden = false;
 }
 
+function matToParsed(variable, sampleRate) {
+  if (variable.complex || variable.imaginary) {
+    throw new Error("MAT 复数矩阵请改用 IQ CSV；当前 MAT 导入仅支持实数矩阵。");
+  }
+  const rows = variable.values;
+  const timeColumn = {
+    header: "time",
+    values: variable.cols === 1 ? rows.map((_, index) => index / sampleRate) : rows.map((row) => row[0]),
+  };
+  const signalColumns = [];
+  if (variable.cols === 1) {
+    signalColumns.push({ header: variable.name || "signal", values: rows.map((row) => row[0]) });
+  } else {
+    for (let column = 1; column < variable.cols; column += 1) {
+      signalColumns.push({
+        header: `${variable.name || "signal"}_${column}`,
+        values: rows.map((row) => row[column]),
+      });
+    }
+  }
+  if (!signalColumns.length) throw new Error("MAT 至少需要一列信号。");
+  return {
+    headers: [timeColumn.header, ...signalColumns.map((column) => column.header)],
+    rows: [],
+    previewRows: rows.slice(0, 3).map((row, index) => [
+      timeColumn.values[index],
+      ...signalColumns.map((column) => column.values[index]),
+    ]),
+    rowCount: rows.length,
+    numericColumns: [timeColumn, ...signalColumns],
+    timeCandidate: timeColumn,
+    signalCandidate: signalColumns[0],
+  };
+}
+
 function populateMapping(parsed, filename) {
   const options = parsed.numericColumns
     .map((column) => `<option value="${escapeHtml(column.header)}">${escapeHtml(column.header)}</option>`)
     .join("");
   elements.timeColumn.innerHTML = options;
   elements.signalColumn.innerHTML = options;
+  elements.qColumn.innerHTML = options;
   elements.timeColumn.value = parsed.timeCandidate.header;
   elements.signalColumn.value = parsed.signalCandidate.header;
+  elements.qColumn.value = parsed.signalCandidate.header;
+  const findByHeader = (pattern) => parsed.numericColumns.find((column) => pattern.test(column.header));
+  const iColumn = findByHeader(/^i([_\s-]|$)/i);
+  const qColumn = findByHeader(/^q([_\s-]|$)/i);
+  const iqAvailable = Boolean(
+    iColumn && qColumn &&
+    iColumn.header !== qColumn.header &&
+    iColumn.header !== parsed.timeCandidate.header &&
+    qColumn.header !== parsed.timeCandidate.header,
+  );
+  elements.iqMode.checked = iqAvailable;
+  elements.qColumnWrap.hidden = !iqAvailable;
+  if (iqAvailable) {
+    elements.signalColumn.value = iColumn.header;
+    elements.qColumn.value = qColumn.header;
+  }
+  state.inputMode = iqAvailable ? "iq" : "real";
   elements.mapping.hidden = false;
   renderCsvPreview(parsed, filename);
   state.uploadedColumns = parsed.numericColumns;
@@ -205,16 +274,127 @@ function escapeHtml(value) {
 function selectedSignal() {
   if (!state.uploadedColumns) return state.data;
   const timeHeader = elements.timeColumn.value;
+  if (state.inputMode === "iq") {
+    const iHeader = elements.signalColumn.value;
+    const qHeader = elements.qColumn.value;
+    if (new Set([timeHeader, iHeader, qHeader]).size < 3) {
+      throw new Error("时间、I、Q 列必须互不相同。");
+    }
+    const timeColumn = state.uploadedColumns.find((column) => column.header === timeHeader);
+    const iColumn = state.uploadedColumns.find((column) => column.header === iHeader);
+    const qColumn = state.uploadedColumns.find((column) => column.header === qHeader);
+    if (!timeColumn || !iColumn || !qColumn) throw new Error("IQ 字段映射无效。");
+    return {
+      kind: "iq",
+      time: timeColumn.values,
+      i: iColumn.values,
+      q: qColumn.values,
+      label: `${state.sourceLabel} · IQ 时间 ${timeHeader} / I ${iHeader} / Q ${qHeader}`,
+    };
+  }
   const signalHeader = elements.signalColumn.value;
   if (timeHeader === signalHeader) throw new Error("时间列与信号列不能相同。");
   const timeColumn = state.uploadedColumns.find((column) => column.header === timeHeader);
   const signalColumn = state.uploadedColumns.find((column) => column.header === signalHeader);
   if (!timeColumn || !signalColumn) throw new Error("字段映射无效。");
   return {
+    kind: "real",
     time: timeColumn.values,
     values: signalColumn.values,
     label: `${state.sourceLabel} · 时间 ${timeHeader} / 信号 ${signalHeader}`,
   };
+}
+
+function signalColumns() {
+  if (!state.uploadedColumns) return [];
+  const timeHeader = elements.timeColumn.value;
+  return state.uploadedColumns.filter((column) => column.header !== timeHeader);
+}
+
+function updateChannelCard() {
+  const columns = signalColumns();
+  const available = Boolean(state.uploadedColumns) && columns.length >= 2 && state.inputMode !== "iq";
+  elements.channelCard.hidden = !available;
+  if (!available) {
+    elements.channelButton.disabled = true;
+    elements.channelList.replaceChildren();
+    elements.channelSummary.textContent = "检测到多个信号列后可批量分析；每个通道独立建模。";
+    return;
+  }
+  elements.channelButton.disabled = state.channelBusy;
+  if (!state.channelBusy && !state.channelResults) {
+    elements.channelSummary.textContent = `检测到 ${columns.length} 个信号列；逐通道独立分析，不做通道间联合模型。`;
+  }
+}
+
+function renderChannelResults(results) {
+  elements.channelList.replaceChildren(...results.map((entry) => {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "channel-row";
+    const name = document.createElement("strong");
+    name.textContent = entry.column;
+    const detail = document.createElement("span");
+    detail.textContent = entry.error
+      ? `失败：${entry.error}`
+      : `${entry.model} · ${entry.reliability} · ${entry.r2 == null ? "—" : `R² ${entry.r2.toFixed(4)}`}`;
+    const badge = document.createElement("span");
+    badge.className = `channel-badge${entry.model === "unknown" || entry.error ? " muted" : ""}`;
+    badge.textContent = entry.error ? "失败" : entry.model === "unknown" ? "未知" : "完成";
+    row.append(name, detail, badge);
+    if (!entry.error) {
+      row.addEventListener("click", () => {
+        elements.signalColumn.value = entry.column;
+        elements.signalColumn.dispatchEvent(new Event("change", { bubbles: true }));
+        analyzeCurrent();
+      });
+    }
+    return row;
+  }));
+}
+
+async function analyzeAllChannels() {
+  if (!state.uploadedColumns || state.channelBusy || state.inputMode === "iq") return;
+  const columns = signalColumns();
+  if (columns.length < 2) return;
+  const selected = columns.slice(0, 8);
+  const timeHeader = elements.timeColumn.value;
+  const timeColumn = state.uploadedColumns.find((column) => column.header === timeHeader);
+  if (!timeColumn) return;
+  const version = state.dataVersion;
+  state.channelBusy = true;
+  elements.channelButton.disabled = true;
+  elements.channelList.replaceChildren();
+  elements.channelSummary.textContent = `正在逐通道分析 0/${selected.length}…`;
+  const results = [];
+  try {
+    for (let index = 0; index < selected.length; index += 1) {
+      if (version !== state.dataVersion) return;
+      const column = selected[index];
+      try {
+        const result = await analyzeSignalSafely(timeColumn.values, column.values);
+        results.push({
+          column: column.header,
+          model: result.unknown ? "unknown" : result.best?.label ?? "unknown",
+          reliability: result.reliability.label,
+          r2: result.best?.metrics.r2 ?? null,
+        });
+      } catch (error) {
+        results.push({
+          column: column.header,
+          error: error instanceof Error ? error.message : "分析失败",
+        });
+      }
+      elements.channelSummary.textContent = `正在逐通道分析 ${index + 1}/${selected.length}…`;
+    }
+    if (version !== state.dataVersion) return;
+    state.channelResults = results;
+    renderChannelResults(results);
+    elements.channelSummary.textContent = `已分析 ${results.length} 个通道；逐通道独立分析，不做通道间联合模型。`;
+  } finally {
+    state.channelBusy = false;
+    updateChannelCard();
+  }
 }
 
 let analyzerWorker = null;
@@ -226,7 +406,7 @@ const ANALYZER_TIMEOUT_MS = 90000;
 function getAnalyzerWorker() {
   if (analyzerWorker || typeof Worker === "undefined") return analyzerWorker;
   try {
-    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=3", import.meta.url), { type: "module" });
+    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=5", import.meta.url), { type: "module" });
     analyzerWorker.addEventListener("message", (event) => {
       const { id, ok, result, error } = event.data ?? {};
       const pending = analyzerPending.get(id);
@@ -252,7 +432,7 @@ function getAnalyzerWorker() {
   return analyzerWorker;
 }
 
-function analyzeInWorker(worker, time, values, type = "analyze", baseline = null) {
+function analyzeInWorker(worker, time, values, type = "analyze", baseline = null, qValues = null) {
   const id = ++analyzerRequestId;
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
@@ -269,7 +449,7 @@ function analyzeInWorker(worker, time, values, type = "analyze", baseline = null
     }, ANALYZER_TIMEOUT_MS);
     analyzerPending.set(id, { resolve, reject, timeout });
     try {
-      worker.postMessage({ id, type, time, values, baseline });
+      worker.postMessage({ id, type, time, values, qValues, baseline });
     } catch (error) {
       analyzerPending.delete(id);
       clearTimeout(timeout);
@@ -292,6 +472,25 @@ async function analyzeSignalSafely(time, values) {
   } catch (error) {
     if (error instanceof Error && error.name === "AnalyzerTimeoutError") throw error;
     const result = analyzeSignal(time, values);
+    result.engine = "main";
+    return result;
+  }
+}
+
+async function analyzeIqSafely(time, iValues, qValues) {
+  const worker = getAnalyzerWorker();
+  if (!worker) {
+    const result = analyzeIqSignal(time, iValues, qValues);
+    result.engine = "main";
+    return result;
+  }
+  try {
+    const result = await analyzeInWorker(worker, time, iValues, "iq", null, qValues);
+    result.engine = "worker";
+    return result;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AnalyzerTimeoutError") throw error;
+    const result = analyzeIqSignal(time, iValues, qValues);
     result.engine = "main";
     return result;
   }
@@ -341,7 +540,10 @@ function invalidateResult(message = "数据已变更，请重新运行分析。"
 
 function markDataChanged(message) {
   state.dataVersion += 1;
+  state.channelResults = null;
+  elements.channelList.replaceChildren();
   invalidateResult(message);
+  updateChannelCard();
 }
 
 function setBusy(busy) {
@@ -376,17 +578,22 @@ async function analyzeCurrent() {
     elements.stressSummary.textContent = "等待当前分析完成。";
     elements.stressList.replaceChildren();
     const data = selectedSignal();
-    if (data.values.length > 100000) {
+    const sampleLength = data.kind === "iq" ? data.i.length : data.values.length;
+    if (sampleLength > 100000) {
       showToast("大样本分析已转入 Worker，可能需要数十秒。");
     }
     const started = performance.now();
-    const result = await analyzeSignalSafely(data.time, data.values);
+    const result = data.kind === "iq"
+      ? await analyzeIqSafely(data.time, data.i, data.q)
+      : await analyzeSignalSafely(data.time, data.values);
     if (sequence !== analysisSequence || version !== state.dataVersion) return;
     result.elapsedMs = performance.now() - started;
     state.result = result;
     state.resultVersion = version;
     state.resultStale = false;
-    state.lastData = { time: data.time, values: data.values };
+    state.lastData = data.kind === "iq"
+      ? { kind: "iq", time: data.time, i: data.i, q: data.q }
+      : { kind: "real", time: data.time, values: data.values };
     state.sourceLabel = data.label;
     render(result);
     showToast(`分析完成 · ${Math.round(result.elapsedMs)} ms · ${result.engine === "worker" ? "Worker" : "主线程"} · ${data.label}`);
@@ -572,6 +779,10 @@ function renderStress(result) {
 
 async function runStressTest() {
   if (!state.result || state.resultStale || !state.lastData) return;
+  if (state.lastData.kind === "iq") {
+    showToast("IQ 模式暂不支持反事实压力测试。", true);
+    return;
+  }
   if (state.result.sampleCount > 50000) {
     showToast("压力测试仅支持 5 万点以内，请先降低样本量。", true);
     return;
@@ -627,12 +838,14 @@ function render(result) {
   renderConclusion(result);
   renderHealth(result);
   renderModulation(result);
-  const stressAvailable = result.sampleCount <= 50000;
+  const stressAvailable = result.kind !== "iq" && result.sampleCount <= 50000;
   elements.stressButton.disabled = !stressAvailable;
-  elements.stressButton.textContent = stressAvailable ? "运行反事实测试" : "样本过大不可用";
-  elements.stressSummary.textContent = stressAvailable
-    ? "加噪、缩短观测、降采样，观察推荐模型是否翻转。"
-    : "压力测试仅支持 5 万点以内，避免多轮分析过慢。";
+  elements.stressButton.textContent = stressAvailable ? "运行反事实测试" : result.kind === "iq" ? "IQ 模式暂不支持" : "样本过大不可用";
+  elements.stressSummary.textContent = result.kind === "iq"
+    ? "IQ 模式暂不支持反事实压力测试。"
+    : stressAvailable
+      ? "加噪、缩短观测、降采样，观察推荐模型是否翻转。"
+      : "压力测试仅支持 5 万点以内，避免多轮分析过慢。";
   elements.stressList.replaceChildren();
   elements.metricSamples.textContent = `${result.sampleCount.toLocaleString()} 点`;
   elements.metricRate.textContent = `${result.sampleRate.toFixed(2)} Hz · Nyq ${result.nyquist.toFixed(1)} Hz`;
@@ -931,7 +1144,7 @@ function renderCharts(result) {
   const windowTime = result.series.time.slice(0, windowCount);
   const observedWindow = result.series.observed.slice(0, windowCount);
   const fittedWindow = result.series.fitted.slice(0, windowCount);
-  elements.timeLegend.textContent = "局部 0.12 s · 观测 / 拟合";
+  elements.timeLegend.textContent = result.kind === "iq" ? "I 分量 · 观测 / 拟合" : "局部 0.12 s · 观测 / 拟合";
   drawPlot(
     elements.timeChart,
     windowTime,
@@ -1066,6 +1279,7 @@ function downloadReport() {
     sampleCount: result.sampleCount,
     sampleRateHz: result.sampleRate,
     durationSeconds: result.duration,
+    kind: result.kind ?? "real",
     recommendedModel: result.recommendedId,
     unknown: result.unknown,
     reliability: result.reliability,
@@ -1108,6 +1322,9 @@ function bindEvents() {
     tab.addEventListener("click", () => {
       elements.tabs.forEach((item) => item.classList.toggle("active", item === tab));
       state.uploadedColumns = null;
+      state.inputMode = "real";
+      elements.iqMode.checked = false;
+      elements.qColumnWrap.hidden = true;
       elements.mapping.hidden = true;
       elements.csvPreview.hidden = true;
       state.data = buildExample(tab.dataset.example);
@@ -1133,8 +1350,43 @@ function bindEvents() {
       elements.mapping.hidden = true;
       elements.csvPreview.hidden = true;
       state.uploadedColumns = null;
+      state.inputMode = "real";
+      elements.iqMode.checked = false;
+      elements.qColumnWrap.hidden = true;
       markDataChanged("CSV 解析失败，请检查文件。");
       showToast(error instanceof Error ? error.message : "CSV 解析失败。", true);
+    } finally {
+      event.target.value = "";
+    }
+  });
+
+  elements.matFile.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      showToast("MAT 文件超过 10 MB。", true);
+      return;
+    }
+    elements.csvPreview.hidden = true;
+    try {
+      const variables = parseMat(await file.arrayBuffer());
+      const variable = variables.find((item) => item.rows > 0 && item.cols > 0);
+      if (!variable) throw new Error("MAT 中没有可用的数值矩阵。");
+      const rate = Number(elements.matRate.value);
+      const parsed = matToParsed(variable, Number.isFinite(rate) && rate > 0 ? rate : 1000);
+      elements.tabs.forEach((tab) => tab.classList.remove("active"));
+      elements.mapping.hidden = true;
+      populateMapping(parsed, file.name);
+      showToast("MAT 已载入，请确认字段映射后运行分析。");
+    } catch (error) {
+      elements.mapping.hidden = true;
+      elements.csvPreview.hidden = true;
+      state.uploadedColumns = null;
+      state.inputMode = "real";
+      elements.iqMode.checked = false;
+      elements.qColumnWrap.hidden = true;
+      markDataChanged("MAT 解析失败，请检查文件。");
+      showToast(error instanceof Error ? error.message : "MAT 解析失败。", true);
     } finally {
       event.target.value = "";
     }
@@ -1145,7 +1397,22 @@ function bindEvents() {
   elements.aiButton.addEventListener("click", requestQwenExplanation);
   elements.stressButton.addEventListener("click", runStressTest);
   elements.timeColumn.addEventListener("change", () => markDataChanged("字段映射已变更，请重新运行分析。"));
-  elements.signalColumn.addEventListener("change", () => markDataChanged("字段映射已变更，请重新运行分析。"));
+  elements.signalColumn.addEventListener("change", () => {
+    state.dataVersion += 1;
+    invalidateResult("字段映射已变更，请重新运行分析。");
+  });
+  elements.iqMode.addEventListener("change", () => {
+    state.inputMode = elements.iqMode.checked ? "iq" : "real";
+    elements.qColumnWrap.hidden = !elements.iqMode.checked;
+    state.dataVersion += 1;
+    invalidateResult("分析模式已切换，请重新运行分析。");
+    updateChannelCard();
+  });
+  elements.qColumn.addEventListener("change", () => {
+    state.dataVersion += 1;
+    invalidateResult("Q 列已变更，请重新运行分析。");
+  });
+  elements.channelButton.addEventListener("click", analyzeAllChannels);
 
   let resizeTimer = null;
   window.addEventListener("resize", () => {

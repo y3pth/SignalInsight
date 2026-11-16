@@ -911,23 +911,24 @@ export function inspectData(time, values, sampleRate, duration, spectrum) {
   }
   const range = max - min;
   const tolerance = Math.max(range * 1e-9, 1e-12);
-  let low = 0;
-  let high = 0;
+  let maxRun = 0;
+  let minRun = 0;
+  let currentMax = 0;
+  let currentMin = 0;
   for (const value of values) {
-    if (value <= min + tolerance) low += 1;
-    if (value >= max - tolerance) high += 1;
+    if (value >= max - tolerance) currentMax += 1;
+    else currentMax = 0;
+    if (value <= min + tolerance) currentMin += 1;
+    else currentMin = 0;
+    if (currentMax > maxRun) maxRun = currentMax;
+    if (currentMin > minRun) minRun = currentMin;
   }
-  const clippedCount = Math.max(low, high);
-  const clippedFraction = clippedCount / n;
+  const longestRun = Math.max(maxRun, minRun);
   checks.push({
     id: "clipping",
     label: "削顶/饱和",
-    status: clippedCount > 3 && clippedFraction > 0.01
-      ? "fail"
-      : clippedCount > 2 && clippedFraction > 0.002 ? "warn" : "pass",
-    detail: clippedCount > 2 && clippedFraction > 0.002
-      ? `${(clippedFraction * 100).toFixed(2)}% 样本贴近极值`
-      : "未发现明显削顶",
+    status: longestRun >= 3 ? "fail" : longestRun === 2 ? "warn" : "pass",
+    detail: longestRun >= 2 ? `最长连续 ${longestRun} 个样本贴近极值` : "未发现明显削顶",
   });
 
   const baseline = mean(values);
@@ -980,14 +981,18 @@ export function inspectData(time, values, sampleRate, duration, spectrum) {
     detail: rmsVariation > 0.5 ? `分段 RMS 变化 ${(rmsVariation * 100).toFixed(0)}%` : "分段能量稳定",
   });
 
-  const uniqueStep = Math.max(1, Math.floor(n / 5000));
-  const unique = new Set();
-  for (let index = 0; index < n; index += uniqueStep) unique.add(values[index]);
+  let equalAdjacent = 0;
+  for (let index = 1; index < n; index += 1) {
+    if (values[index] === values[index - 1]) equalAdjacent += 1;
+  }
+  const flatFraction = equalAdjacent / Math.max(1, n - 1);
   checks.push({
     id: "quantization",
-    label: "量化级数",
-    status: n > 256 && unique.size < 6 ? "fail" : n > 256 && unique.size < 16 ? "warn" : "pass",
-    detail: n > 256 && unique.size < 16 ? `抽样仅 ${unique.size} 个不同取值` : "量化级数充足",
+    label: "阶梯/量化",
+    status: flatFraction > 0.5 ? "fail" : flatFraction > 0.25 ? "warn" : "pass",
+    detail: flatFraction > 0.25
+      ? `${(flatFraction * 100).toFixed(0)}% 相邻样本完全相同`
+      : "未发现明显阶梯/量化",
   });
 
   const top = spectrum?.peaks?.[0];
@@ -1244,6 +1249,292 @@ export function analyzeSignal(time, values) {
   };
 }
 
+function computeComplexSpectrum(iValues, qValues, sampleRate) {
+  const n = iValues.length;
+  const nfft = nextPowerOfTwo(n);
+  const re = new Float64Array(nfft);
+  const im = new Float64Array(nfft);
+  const meanI = mean(iValues);
+  const meanQ = mean(qValues);
+  let windowSum = 0;
+  for (let index = 0; index < n; index += 1) {
+    const window = 0.5 - 0.5 * Math.cos((TAU * index) / Math.max(1, n - 1));
+    re[index] = (iValues[index] - meanI) * window;
+    im[index] = (qValues[index] - meanQ) * window;
+    windowSum += window;
+  }
+  fft(re, im);
+  const frequencies = [];
+  const amplitudes = [];
+  const half = Math.floor(nfft / 2);
+  for (let k = 1; k <= half; k += 1) {
+    frequencies.push((k * sampleRate) / nfft);
+    amplitudes.push(Math.hypot(re[k], im[k]) / Math.max(windowSum, 1));
+  }
+  const medianAmplitude = median(amplitudes);
+  const peaks = [];
+  for (let index = 1; index < amplitudes.length - 1; index += 1) {
+    const amplitude = amplitudes[index];
+    if (amplitude > amplitudes[index - 1] && amplitude >= amplitudes[index + 1]) {
+      peaks.push({
+        frequency: frequencies[index],
+        amplitude,
+        bin: index + 1,
+        prominence: amplitude / Math.max(medianAmplitude, 1e-15),
+      });
+    }
+  }
+  peaks.sort((a, b) => b.amplitude - a.amplitude);
+  return {
+    frequencies,
+    amplitudes,
+    peaks,
+    medianAmplitude,
+    binWidth: sampleRate / nfft,
+    nfft,
+  };
+}
+
+function fitComplexAtFrequency(tau, iValues, qValues, frequency) {
+  const n = tau.length;
+  let sumCos = 0;
+  let sumSin = 0;
+  let sumI = 0;
+  let sumQ = 0;
+  let sumCosI = 0;
+  let sumSinQ = 0;
+  let sumSinI = 0;
+  let sumCosQ = 0;
+  const cosines = new Array(n);
+  const sines = new Array(n);
+  for (let index = 0; index < n; index += 1) {
+    const cosine = Math.cos(TAU * frequency * tau[index]);
+    const sine = Math.sin(TAU * frequency * tau[index]);
+    cosines[index] = cosine;
+    sines[index] = sine;
+    sumCos += cosine;
+    sumSin += sine;
+    sumI += iValues[index];
+    sumQ += qValues[index];
+    sumCosI += cosine * iValues[index];
+    sumSinQ += sine * qValues[index];
+    sumSinI += sine * iValues[index];
+    sumCosQ += cosine * qValues[index];
+  }
+  const normal = [
+    [n, 0, sumCos, -sumSin],
+    [0, n, sumSin, sumCos],
+    [sumCos, sumSin, n, 0],
+    [-sumSin, sumCos, 0, n],
+  ];
+  const rhs = [sumI, sumQ, sumCosI + sumSinQ, -sumSinI + sumCosQ];
+  const coefficients = solveLinear(normal, rhs);
+  const [cI, cQ, u, v] = coefficients;
+  const fittedI = new Array(n);
+  const fittedQ = new Array(n);
+  const residualI = new Array(n);
+  const residualQ = new Array(n);
+  let rss = 0;
+  for (let index = 0; index < n; index += 1) {
+    const predictionI = cI + u * cosines[index] - v * sines[index];
+    const predictionQ = cQ + u * sines[index] + v * cosines[index];
+    fittedI[index] = predictionI;
+    fittedQ[index] = predictionQ;
+    residualI[index] = iValues[index] - predictionI;
+    residualQ[index] = qValues[index] - predictionQ;
+    rss += residualI[index] ** 2 + residualQ[index] ** 2;
+  }
+  return { coefficients, fittedI, fittedQ, residualI, residualQ, rss };
+}
+
+export function analyzeIqSignal(time, iValues, qValues) {
+  if (iValues.length !== qValues.length || iValues.length !== time.length) {
+    throw new Error("时间、I、Q 的样本数必须一致。");
+  }
+  const { sampleRate, duration } = validateSignal(time, iValues);
+  if (!qValues.every(Number.isFinite)) throw new Error("Q 分量中存在 NaN 或 Infinity。");
+  const tau = time.map((value) => value - time[0]);
+  const spectrum = computeComplexSpectrum(iValues, qValues, sampleRate);
+  const health = inspectData(time, iValues, sampleRate, duration, spectrum);
+  const top = spectrum.peaks[0] ?? null;
+  let frequency = top?.frequency ?? null;
+  let fit = null;
+  if (top) {
+    const span = Math.max(spectrum.binWidth * 2, 0.5 / duration);
+    const lower = Math.max(0.5 / duration, top.frequency - span);
+    const upper = Math.min(sampleRate / 2 * 0.999, top.frequency + span);
+    try {
+      frequency = goldenMinimum((candidate) => {
+        try {
+          return fitComplexAtFrequency(tau, iValues, qValues, candidate).rss;
+        } catch {
+          return Number.POSITIVE_INFINITY;
+        }
+      }, lower, upper, 36);
+    } catch {}
+    fit = fitComplexAtFrequency(tau, iValues, qValues, frequency);
+  }
+  const n = iValues.length;
+  const meanI = mean(iValues);
+  const meanQ = mean(qValues);
+  const sst = iValues.reduce((sum, value, index) => sum + (value - meanI) ** 2 + (qValues[index] - meanQ) ** 2, 0);
+  const rss = fit?.rss ?? sst;
+  const r2 = sst > 0 && fit ? 1 - rss / sst : null;
+  const observations = 2 * n;
+  const freeParameters = 5;
+  const rssLog = Math.max(rss, 1e-30);
+  const metrics = {
+    rss,
+    rmse: Math.sqrt(rss / Math.max(1, observations)),
+    r2,
+    aic: observations * Math.log(rssLog / observations) + 2 * freeParameters,
+    bic: observations * Math.log(rssLog / observations) + freeParameters * Math.log(observations),
+    sampleCount: n,
+    freeParameters,
+  };
+  const residualI = fit?.residualI ?? iValues.map((value) => value - meanI);
+  const residualAnalysis = residualStatistics(residualI, sampleRate);
+  const residualRelative = Math.sqrt(rss / Math.max(sst, 1e-30));
+  const residualNegligible = residualRelative <= 0.005;
+  const highQuality = r2 != null && r2 >= 0.999 && residualRelative <= 0.02;
+  const whitenessStatus = residualNegligible
+    ? "pass"
+    : residualAnalysis.maxAcf <= 0.2 ? "pass" : residualAnalysis.maxAcf <= 0.35 ? "warn" : "fail";
+  const structureStatus = residualNegligible
+    ? "pass"
+    : residualAnalysis.prominence <= 8 || residualRelative <= 0.01
+      ? "pass"
+      : residualAnalysis.prominence <= 14 ? "warn" : "fail";
+  const evidence = [];
+  if (top) {
+    evidence.push({
+      id: "spectral_prominence",
+      label: "主谱峰显著度",
+      value: `${top.prominence.toFixed(1)}× 中位数`,
+      detail: `${top.frequency.toFixed(3)} Hz`,
+      status: top.prominence >= 8 ? "pass" : top.prominence >= 6 ? "warn" : "fail",
+    });
+    evidence.push({
+      id: "fit_quality",
+      label: "复指数拟合",
+      value: r2 == null ? "不可计算" : `R² ${r2.toFixed(4)}`,
+      detail: `RMSE ${metrics.rmse.toFixed(4)} a.u.`,
+      status: r2 != null && r2 >= 0.98 ? "pass" : r2 != null && r2 >= 0.85 ? "warn" : "fail",
+    });
+    evidence.push({
+      id: "residual_whiteness",
+      label: "I 残差自相关",
+      value: residualAnalysis.maxAcf.toFixed(3),
+      detail: residualNegligible
+        ? `残差能量仅 ${(residualRelative * 100).toFixed(3)}% 信号；ACF 不具实际意义`
+        : "最大绝对 ACF（滞后 1–100）",
+      status: highQuality && whitenessStatus === "fail" ? "warn" : whitenessStatus,
+    });
+    evidence.push({
+      id: "residual_structure",
+      label: "I 残余谱结构",
+      value: `${residualAnalysis.prominence.toFixed(1)}× 中位数`,
+      detail: residualAnalysis.frequency == null ? "无明显残余主频" : `残余主频 ${residualAnalysis.frequency.toFixed(3)} Hz`,
+      status: highQuality && structureStatus === "fail" ? "warn" : structureStatus,
+    });
+    evidence.push({
+      id: "frequency_resolution",
+      label: "观测频率分辨率",
+      value: `±${(1 / duration).toFixed(4)} Hz`,
+      detail: `观测时长 ${duration.toFixed(4)} s；${(top.frequency * duration).toFixed(1)} 个周期`,
+      status: top.frequency * duration >= 5 ? "pass" : top.frequency * duration >= 2 ? "warn" : "fail",
+    });
+  }
+  const healthIssues = health.checks.filter((check) => check.status !== "pass");
+  if (healthIssues.length) {
+    evidence.push({
+      id: "data_health",
+      label: "数据体检（I 分量）",
+      value: `${healthIssues.length} 项异常`,
+      detail: healthIssues.map((check) => check.label).join("、"),
+      status: health.status === "fail" ? "fail" : "warn",
+    });
+  }
+  const unknown = !top || top.prominence < 6 || r2 == null || r2 < 0.5;
+  let level = "reliable";
+  let levelLabel = "较高可信";
+  if (unknown) {
+    level = "insufficient_evidence";
+    levelLabel = "证据不足 / 未知信号";
+  } else if (evidence.some((item) => item.status === "fail")) {
+    level = "unreliable";
+    levelLabel = "不可靠";
+  } else if (evidence.some((item) => item.status === "warn")) {
+    level = "caution";
+    levelLabel = "需要谨慎";
+  }
+  const amplitude = fit ? Math.hypot(fit.coefficients[2], fit.coefficients[3]) : null;
+  const phase = fit ? Math.atan2(fit.coefficients[3], fit.coefficients[2]) : null;
+  const candidate = fit && top
+    ? {
+        id: "iq_single",
+        family: "iq",
+        label: "IQ 复指数模型",
+        count: 1,
+        frequencies: [frequency],
+        parameters: [
+          { id: "offset_i", label: "I 直流偏移", value: fit.coefficients[0], unit: "a.u." },
+          { id: "offset_q", label: "Q 直流偏移", value: fit.coefficients[1], unit: "a.u." },
+          { id: "frequency_1", label: "频率", value: frequency, unit: "Hz", sigma: 1 / duration, sigmaKind: "resolution" },
+          { id: "amplitude_1", label: "复幅值", value: amplitude, unit: "a.u." },
+          { id: "phase_1", label: "复相位", value: phase, unit: "rad", reference: "相对首样本" },
+        ],
+        metrics,
+        residualAnalysis,
+      }
+    : null;
+  const limitations = [
+    "当前 IQ 分析仅支持单分量复指数模型，不代表完整复数调制模型库。",
+    "IQ 模式的数据体检针对 I 分量；Q 分量未单独做削顶/漂移检查。",
+    ...health.limitations,
+  ];
+  if (residualNegligible) {
+    limitations.push("I 残差能量极低，ACF 与残余谱更适合视为数值效应，而非物理结构。");
+  }
+  if (highQuality && (whitenessStatus === "fail" || structureStatus === "fail")) {
+    limitations.push("拟合极好但 I 残差仍有结构，可信等级限制为需要谨慎，避免过度自信。");
+  }
+  if (unknown) limitations.unshift("当前数据没有形成足够稳定的复指数候选，系统拒绝给出参数结论。");
+  return {
+    createdAt: new Date().toISOString(),
+    kind: "iq",
+    sampleCount: n,
+    sampleRate,
+    duration,
+    nyquist: sampleRate / 2,
+    spectrum,
+    health,
+    candidates: candidate ? [candidate] : [],
+    best: candidate,
+    unknown,
+    recommendedId: unknown ? null : "iq_single",
+    reliability: {
+      level,
+      label: levelLabel,
+      evidence,
+      limitations,
+      nextSteps: ["提高信噪比或延长观测后重试。", "检查 I/Q 是否同相、正交以及采样是否同步。"],
+      bicGap: null,
+    },
+    series: {
+      time,
+      observed: iValues,
+      fitted: fit?.fittedI ?? iValues.map(() => meanI),
+      residual: residualI,
+    },
+    iq: {
+      q: qValues,
+      fittedQ: fit?.fittedQ ?? qValues.map(() => meanQ),
+      residualQ: fit?.residualQ ?? qValues.map((value) => value - meanQ),
+    },
+  };
+}
+
 export function templateExplanation(result) {
   if (result.unknown) {
     return {
@@ -1267,6 +1558,10 @@ export function templateExplanation(result) {
   } else if (best.family === "fm") {
     summary = `推荐 FM 调频模型。载频约 ${frequency.toFixed(4)} Hz，调制频率约 ${modulationFrequency.toFixed(4)} Hz，频偏约 ${deviation.toFixed(4)} Hz，调制指数约 ${modulationIndex.toFixed(3)}，R² 为 ${best.metrics.r2.toFixed(4)}。`;
     observations.unshift(`调制候选：FM，调制频率 ${modulationFrequency.toFixed(4)} Hz，频偏 ${deviation.toFixed(4)} Hz。`);
+  } else if (best.family === "iq") {
+    const phase = best.parameters.find((parameter) => parameter.id === "phase_1")?.value;
+    summary = `推荐 IQ 复指数模型。主频约 ${frequency.toFixed(4)} Hz，复幅值约 ${amplitude.toFixed(4)} a.u.，复相位约 ${phase.toFixed(4)} rad，R² 为 ${best.metrics.r2.toFixed(4)}。`;
+    observations.unshift("I/Q 使用同一个复系数；当前仅支持单分量复指数模型。");
   } else {
     summary = `推荐${best.label}。主频约 ${frequency.toFixed(4)} Hz，主幅值约 ${amplitude.toFixed(4)} a.u.，R² 为 ${best.metrics.r2.toFixed(4)}。`;
   }
