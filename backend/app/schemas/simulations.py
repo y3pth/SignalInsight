@@ -22,9 +22,15 @@ class SimulationSampling(ContractModel):
             raise ValueError("simulation sampling kind must be known")
         if self.kind == SamplingKind.UNIFORM and (self.jitter_ratio or self.dropout_ranges):
             raise ValueError("uniform sampling cannot define jitter or dropout ranges")
-        for start, end in self.dropout_ranges:
+        if self.kind == SamplingKind.NONUNIFORM and not (self.jitter_ratio or self.dropout_ranges):
+            raise ValueError("nonuniform sampling requires jitter or dropout ranges")
+        previous_end = 0
+        for start, end in sorted(self.dropout_ranges):
             if start < 0 or end <= start or end > self.sample_count:
                 raise ValueError("dropout ranges must be ordered and within sample_count")
+            if start < previous_end:
+                raise ValueError("dropout ranges must not overlap")
+            previous_end = end
         return self
 
 
