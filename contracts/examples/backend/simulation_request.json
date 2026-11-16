@@ -1,0 +1,22 @@
+{
+  "model_id": "single_tone",
+  "signal_kind": "real",
+  "parameters": {
+    "amplitude": 2.0,
+    "frequency": 100.0,
+    "phase": 0.3,
+    "offset": 0.1
+  },
+  "sampling": {
+    "kind": "uniform",
+    "sample_rate_hz": 1024.0,
+    "sample_count": 1024,
+    "time_start_s": 0.0,
+    "jitter_ratio": 0.0,
+    "dropout_ranges": []
+  },
+  "noise_model": "gaussian",
+  "snr_db": 20.0,
+  "random_seed": 42,
+  "amplitude_unit": "a.u."
+}

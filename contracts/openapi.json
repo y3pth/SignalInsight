@@ -1,0 +1,4646 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "SignalInsight API",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "summary": "Get service health",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/capabilities": {
+      "get": {
+        "summary": "Get runtime capabilities",
+        "operationId": "capabilities_api_v1_capabilities_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CapabilitiesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/models": {
+      "get": {
+        "summary": "List registered models",
+        "operationId": "list_models_api_v1_models_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ModelDefinition"
+                  },
+                  "type": "array",
+                  "title": "Response List Models Api V1 Models Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/datasets": {
+      "post": {
+        "summary": "Upload a dataset",
+        "operationId": "create_dataset_api_v1_datasets_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_dataset_api_v1_datasets_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetManifest"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          }
+        }
+      },
+      "get": {
+        "summary": "List datasets",
+        "operationId": "list_datasets_api_v1_datasets_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/datasets/{dataset_id}": {
+      "get": {
+        "summary": "Get dataset details",
+        "operationId": "get_dataset_api_v1_datasets__dataset_id__get",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetManifest"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a dataset",
+        "operationId": "delete_dataset_api_v1_datasets__dataset_id__delete",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/datasets/{dataset_id}/variables": {
+      "get": {
+        "summary": "List dataset variables",
+        "operationId": "get_dataset_variables_api_v1_datasets__dataset_id__variables_get",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/VariableDescriptor"
+                  },
+                  "title": "Response Get Dataset Variables Api V1 Datasets  Dataset Id  Variables Get"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/datasets/{dataset_id}/mapping": {
+      "put": {
+        "summary": "Confirm dataset mapping",
+        "operationId": "put_dataset_mapping_api_v1_datasets__dataset_id__mapping_put",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Dataset Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatasetMapping"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetManifest"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/datasets/{dataset_id}/series": {
+      "get": {
+        "summary": "Get dataset preview series",
+        "operationId": "get_dataset_series_api_v1_datasets__dataset_id__series_get",
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Dataset Id"
+            }
+          },
+          {
+            "name": "series_kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SeriesKind"
+            }
+          },
+          {
+            "name": "channel_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Channel Id"
+            }
+          },
+          {
+            "name": "max_points",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 5000,
+              "minimum": 1,
+              "default": 5000,
+              "title": "Max Points"
+            }
+          },
+          {
+            "name": "start_time_s",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Time S"
+            }
+          },
+          {
+            "name": "end_time_s",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Time S"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/analysis-runs": {
+      "post": {
+        "summary": "Create an analysis run",
+        "operationId": "create_analysis_run_api_v1_analysis_runs_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisRunAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      },
+      "get": {
+        "summary": "List analysis runs",
+        "operationId": "list_analysis_runs_api_v1_analysis_runs_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/AnalysisStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/analysis-runs/{analysis_id}": {
+      "get": {
+        "summary": "Get analysis run details",
+        "operationId": "get_analysis_run_api_v1_analysis_runs__analysis_id__get",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisRunDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/analysis-runs/{analysis_id}/cancel": {
+      "post": {
+        "summary": "Cancel an analysis run",
+        "operationId": "cancel_analysis_run_api_v1_analysis_runs__analysis_id__cancel_post",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisRunDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/analysis-runs/{analysis_id}/rerun": {
+      "post": {
+        "summary": "Clone an analysis configuration",
+        "operationId": "rerun_analysis_run_api_v1_analysis_runs__analysis_id__rerun_post",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RerunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisRunAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/analysis-runs/{analysis_id}/series": {
+      "get": {
+        "summary": "Get fitted or residual series",
+        "operationId": "get_analysis_series_api_v1_analysis_runs__analysis_id__series_get",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          },
+          {
+            "name": "series_kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SeriesKind"
+            }
+          },
+          {
+            "name": "model_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ModelId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Model Id"
+            }
+          },
+          {
+            "name": "max_points",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 5000,
+              "minimum": 1,
+              "default": 5000,
+              "title": "Max Points"
+            }
+          },
+          {
+            "name": "start_time_s",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start Time S"
+            }
+          },
+          {
+            "name": "end_time_s",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End Time S"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeriesResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/analysis-runs/{analysis_id}/export": {
+      "get": {
+        "summary": "Export an analysis result",
+        "operationId": "export_analysis_run_api_v1_analysis_runs__analysis_id__export_get",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ExportFormat"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/analysis-batches": {
+      "post": {
+        "summary": "Create a multichannel analysis batch",
+        "operationId": "create_analysis_batch_api_v1_analysis_batches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchAnalysisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisBatchAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/analysis-batches/{batch_id}": {
+      "get": {
+        "summary": "Get analysis batch details",
+        "operationId": "get_analysis_batch_api_v1_analysis_batches__batch_id__get",
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisBatchDetail"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        }
+      }
+    },
+    "/api/v1/analysis-runs/{analysis_id}/explanations": {
+      "post": {
+        "summary": "Create an analysis explanation",
+        "operationId": "create_explanation_api_v1_analysis_runs__analysis_id__explanations_post",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Analysis Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplanationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplanationAccepted"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/explanations/{explanation_id}": {
+      "get": {
+        "summary": "Get explanation details",
+        "operationId": "get_explanation_api_v1_explanations__explanation_id__get",
+        "parameters": [
+          {
+            "name": "explanation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Explanation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplanationRecord"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
+    "/api/v1/simulated-datasets": {
+      "post": {
+        "summary": "Generate a simulated dataset",
+        "operationId": "create_simulated_dataset_api_v1_simulated_datasets_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SimulationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SimulationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not Found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AIProviderCapability": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": [
+              "qoder",
+              "bailian",
+              "template"
+            ],
+            "title": "Provider"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider",
+          "available"
+        ],
+        "title": "AIProviderCapability"
+      },
+      "AnalysisBatchAccepted": {
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Batch Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "queued",
+            "title": "Status"
+          },
+          "analysis_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Analysis Ids"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "batch_id",
+          "status",
+          "analysis_ids",
+          "created_at"
+        ],
+        "title": "AnalysisBatchAccepted"
+      },
+      "AnalysisBatchDetail": {
+        "properties": {
+          "batch_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Batch Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AnalysisStatus"
+          },
+          "analysis_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Analysis Ids"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisRunSummary"
+            },
+            "type": "array",
+            "title": "Runs"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "batch_id",
+          "status",
+          "analysis_ids",
+          "runs",
+          "created_at"
+        ],
+        "title": "AnalysisBatchDetail"
+      },
+      "AnalysisConfig": {
+        "properties": {
+          "max_tones": {
+            "type": "integer",
+            "maximum": 32.0,
+            "minimum": 1.0,
+            "title": "Max Tones",
+            "default": 8
+          },
+          "random_seed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Random Seed"
+          },
+          "uncertainty_methods": {
+            "items": {
+              "$ref": "#/components/schemas/UncertaintyMethod"
+            },
+            "type": "array",
+            "title": "Uncertainty Methods"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "AnalysisConfig"
+      },
+      "AnalysisListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisRunSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Offset"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "AnalysisListResponse"
+      },
+      "AnalysisMode": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "specified"
+        ],
+        "title": "AnalysisMode"
+      },
+      "AnalysisRequest": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Dataset Id"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/AnalysisMode"
+          },
+          "candidate_models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelId"
+            },
+            "type": "array",
+            "title": "Candidate Models"
+          },
+          "preprocessing": {
+            "$ref": "#/components/schemas/PreprocessingConfig"
+          },
+          "analysis_config": {
+            "$ref": "#/components/schemas/AnalysisConfig"
+          },
+          "explanation_policy": {
+            "$ref": "#/components/schemas/ExplanationPolicy",
+            "default": "none"
+          },
+          "client_request_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Client Request Id"
+          },
+          "channel_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 1,
+            "minItems": 1,
+            "title": "Channel Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "mode",
+          "client_request_id",
+          "channel_ids"
+        ],
+        "title": "AnalysisRequest"
+      },
+      "AnalysisResult": {
+        "properties": {
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "input_manifest": {
+            "$ref": "#/components/schemas/DatasetManifest"
+          },
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256"
+          },
+          "algorithm_version": {
+            "type": "string",
+            "title": "Algorithm Version"
+          },
+          "features": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Features"
+          },
+          "candidate_results": {
+            "items": {
+              "$ref": "#/components/schemas/FitResult"
+            },
+            "type": "array",
+            "title": "Candidate Results"
+          },
+          "recommendation": {
+            "$ref": "#/components/schemas/ComparisonResult"
+          },
+          "reliability": {
+            "$ref": "#/components/schemas/ReliabilityReport"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisWarning"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRef"
+            },
+            "type": "array",
+            "title": "Artifacts"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "analysis_id",
+          "input_manifest",
+          "source_sha256",
+          "algorithm_version",
+          "features",
+          "candidate_results",
+          "recommendation",
+          "reliability",
+          "warnings",
+          "artifacts",
+          "created_at"
+        ],
+        "title": "AnalysisResult"
+      },
+      "AnalysisRunAccepted": {
+        "properties": {
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "queued",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "analysis_id",
+          "status",
+          "created_at"
+        ],
+        "title": "AnalysisRunAccepted"
+      },
+      "AnalysisRunDetail": {
+        "properties": {
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "dataset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Dataset Id"
+          },
+          "channel_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channel Ids"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AnalysisStatus"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisStage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "config": {
+            "$ref": "#/components/schemas/AnalysisRequest"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "analysis_id",
+          "dataset_id",
+          "channel_ids",
+          "status",
+          "stage",
+          "created_at",
+          "config"
+        ],
+        "title": "AnalysisRunDetail"
+      },
+      "AnalysisRunSummary": {
+        "properties": {
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "dataset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Dataset Id"
+          },
+          "channel_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Channel Ids"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AnalysisStatus"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalysisStage"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "analysis_id",
+          "dataset_id",
+          "channel_ids",
+          "status",
+          "stage",
+          "created_at"
+        ],
+        "title": "AnalysisRunSummary"
+      },
+      "AnalysisStage": {
+        "type": "string",
+        "enum": [
+          "validating_input",
+          "loading_signal",
+          "extracting_features",
+          "proposing_candidates",
+          "fitting_models",
+          "comparing_models",
+          "estimating_uncertainty",
+          "assessing_reliability",
+          "writing_results",
+          "completed"
+        ],
+        "title": "AnalysisStage"
+      },
+      "AnalysisStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "cancelling",
+          "cancelled",
+          "succeeded",
+          "failed",
+          "interrupted"
+        ],
+        "title": "AnalysisStatus"
+      },
+      "AnalysisWarning": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "AnalysisWarning"
+      },
+      "ArtifactRef": {
+        "properties": {
+          "artifact_id": {
+            "type": "string",
+            "title": "Artifact Id"
+          },
+          "artifact_type": {
+            "type": "string",
+            "title": "Artifact Type"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type"
+          },
+          "download_path": {
+            "type": "string",
+            "title": "Download Path"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Size Bytes"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "artifact_id",
+          "artifact_type",
+          "media_type",
+          "download_path",
+          "size_bytes",
+          "sha256"
+        ],
+        "title": "ArtifactRef"
+      },
+      "BatchAnalysisRequest": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Dataset Id"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/AnalysisMode"
+          },
+          "candidate_models": {
+            "items": {
+              "$ref": "#/components/schemas/ModelId"
+            },
+            "type": "array",
+            "title": "Candidate Models"
+          },
+          "preprocessing": {
+            "$ref": "#/components/schemas/PreprocessingConfig"
+          },
+          "analysis_config": {
+            "$ref": "#/components/schemas/AnalysisConfig"
+          },
+          "explanation_policy": {
+            "$ref": "#/components/schemas/ExplanationPolicy",
+            "default": "none"
+          },
+          "client_request_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Client Request Id"
+          },
+          "channel_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Channel Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "mode",
+          "client_request_id",
+          "channel_ids"
+        ],
+        "title": "BatchAnalysisRequest"
+      },
+      "Body_create_dataset_api_v1_datasets_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_create_dataset_api_v1_datasets_post"
+      },
+      "CapabilitiesResponse": {
+        "properties": {
+          "api_version": {
+            "type": "string",
+            "const": "v1",
+            "title": "Api Version"
+          },
+          "contract_version": {
+            "type": "string",
+            "title": "Contract Version"
+          },
+          "dataset_formats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dataset Formats"
+          },
+          "signal_kinds": {
+            "items": {
+              "$ref": "#/components/schemas/SignalKind"
+            },
+            "type": "array",
+            "title": "Signal Kinds"
+          },
+          "sampling_kinds": {
+            "items": {
+              "$ref": "#/components/schemas/SamplingKind"
+            },
+            "type": "array",
+            "title": "Sampling Kinds"
+          },
+          "analysis_tasks": {
+            "type": "boolean",
+            "title": "Analysis Tasks"
+          },
+          "batch_tasks": {
+            "type": "boolean",
+            "title": "Batch Tasks"
+          },
+          "ai_providers": {
+            "items": {
+              "$ref": "#/components/schemas/AIProviderCapability"
+            },
+            "type": "array",
+            "title": "Ai Providers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "api_version",
+          "contract_version",
+          "dataset_formats",
+          "signal_kinds",
+          "sampling_kinds",
+          "analysis_tasks",
+          "batch_tasks",
+          "ai_providers"
+        ],
+        "title": "CapabilitiesResponse"
+      },
+      "ChannelDescriptor": {
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "title": "Channel Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "sample_count": {
+            "type": "integer",
+            "maximum": 500000.0,
+            "minimum": 64.0,
+            "title": "Sample Count"
+          },
+          "signal_kind": {
+            "$ref": "#/components/schemas/SignalKind"
+          },
+          "sampling_kind": {
+            "$ref": "#/components/schemas/SamplingKind"
+          },
+          "sample_rate_hz": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Rate Hz"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "amplitude_unit": {
+            "type": "string",
+            "title": "Amplitude Unit"
+          },
+          "quality_flags": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Quality Flags"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "channel_id",
+          "label",
+          "sample_count",
+          "signal_kind",
+          "sampling_kind",
+          "amplitude_unit",
+          "quality_flags"
+        ],
+        "title": "ChannelDescriptor"
+      },
+      "ChannelMapping": {
+        "properties": {
+          "channel_id": {
+            "type": "string",
+            "title": "Channel Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "signal_kind": {
+            "$ref": "#/components/schemas/SignalKind"
+          },
+          "value": {
+            "$ref": "#/components/schemas/DataLocator"
+          },
+          "imaginary_value": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataLocator"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "complex_layout": {
+            "type": "string",
+            "enum": [
+              "single_complex_variable",
+              "separate_i_q"
+            ],
+            "title": "Complex Layout",
+            "default": "single_complex_variable"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "channel_id",
+          "label",
+          "signal_kind",
+          "value"
+        ],
+        "title": "ChannelMapping"
+      },
+      "ComparisonResult": {
+        "properties": {
+          "recommended_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unknown": {
+            "type": "boolean",
+            "title": "Unknown"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reason Codes"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Refs"
+          },
+          "rankings": {
+            "items": {
+              "$ref": "#/components/schemas/ModelRanking"
+            },
+            "type": "array",
+            "title": "Rankings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "recommended_model",
+          "unknown",
+          "reason_codes",
+          "evidence_refs",
+          "rankings"
+        ],
+        "title": "ComparisonResult"
+      },
+      "DataLocator": {
+        "properties": {
+          "variable_id": {
+            "type": "string",
+            "title": "Variable Id"
+          },
+          "column": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Column"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "variable_id"
+        ],
+        "title": "DataLocator"
+      },
+      "DatasetListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DatasetManifest"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Offset"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "DatasetListResponse"
+      },
+      "DatasetManifest": {
+        "properties": {
+          "dataset_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Dataset Id"
+          },
+          "original_filename": {
+            "type": "string",
+            "title": "Original Filename"
+          },
+          "media_type": {
+            "$ref": "#/components/schemas/DatasetMediaType"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/DatasetOrigin"
+          },
+          "source_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Source Sha256"
+          },
+          "file_size_bytes": {
+            "type": "integer",
+            "maximum": 52428800.0,
+            "exclusiveMinimum": 0.0,
+            "title": "File Size Bytes"
+          },
+          "total_numeric_count": {
+            "type": "integer",
+            "maximum": 2000000.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Total Numeric Count"
+          },
+          "variables": {
+            "items": {
+              "$ref": "#/components/schemas/VariableDescriptor"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Variables"
+          },
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelDescriptor"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Channels"
+          },
+          "detected_mappings": {
+            "items": {
+              "$ref": "#/components/schemas/MappingCandidate"
+            },
+            "type": "array",
+            "title": "Detected Mappings"
+          },
+          "confirmed_mapping": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DatasetMapping"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "validation_summary": {
+            "$ref": "#/components/schemas/ValidationSummary"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset_id",
+          "original_filename",
+          "media_type",
+          "origin",
+          "source_sha256",
+          "file_size_bytes",
+          "total_numeric_count",
+          "variables",
+          "channels",
+          "detected_mappings",
+          "confirmed_mapping",
+          "validation_summary",
+          "created_at"
+        ],
+        "title": "DatasetManifest"
+      },
+      "DatasetMapping": {
+        "properties": {
+          "time": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DataLocator"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sample_rate_hz": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Rate Hz"
+          },
+          "channels": {
+            "items": {
+              "$ref": "#/components/schemas/ChannelMapping"
+            },
+            "type": "array",
+            "maxItems": 32,
+            "minItems": 1,
+            "title": "Channels"
+          },
+          "sample_axis": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "enum": [
+                  0,
+                  1
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Axis"
+          },
+          "amplitude_unit": {
+            "type": "string",
+            "title": "Amplitude Unit",
+            "default": "a.u."
+          },
+          "phase_reference_s": {
+            "type": "number",
+            "title": "Phase Reference S",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "channels"
+        ],
+        "title": "DatasetMapping"
+      },
+      "DatasetMediaType": {
+        "type": "string",
+        "enum": [
+          "csv",
+          "mat",
+          "mat_v7_3"
+        ],
+        "title": "DatasetMediaType"
+      },
+      "DatasetOrigin": {
+        "type": "string",
+        "enum": [
+          "upload",
+          "simulation"
+        ],
+        "title": "DatasetOrigin"
+      },
+      "DownsamplingInfo": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "start_time_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time S"
+          },
+          "end_time_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Time S"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "method"
+        ],
+        "title": "DownsamplingInfo"
+      },
+      "ErrorBody": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "request_id"
+        ],
+        "title": "ErrorBody"
+      },
+      "ErrorResponse": {
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "title": "ErrorResponse"
+      },
+      "EvidenceItem": {
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "title": "Evidence Id"
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "sampling",
+              "feature",
+              "fit",
+              "residual",
+              "uncertainty",
+              "model_comparison",
+              "data_quality"
+            ],
+            "title": "Category"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "source_artifact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Artifact"
+          },
+          "description_key": {
+            "type": "string",
+            "title": "Description Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "category",
+          "code",
+          "value",
+          "description_key"
+        ],
+        "title": "EvidenceItem"
+      },
+      "ExplanationAccepted": {
+        "properties": {
+          "explanation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Explanation Id"
+          },
+          "status": {
+            "type": "string",
+            "const": "queued",
+            "title": "Status"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "explanation_id",
+          "status",
+          "created_at"
+        ],
+        "title": "ExplanationAccepted"
+      },
+      "ExplanationCreateRequest": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/ExplanationProvider",
+            "default": "auto"
+          },
+          "response_language": {
+            "type": "string",
+            "const": "zh-CN",
+            "title": "Response Language",
+            "default": "zh-CN"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ExplanationCreateRequest"
+      },
+      "ExplanationPolicy": {
+        "type": "string",
+        "enum": [
+          "none",
+          "after_analysis"
+        ],
+        "title": "ExplanationPolicy"
+      },
+      "ExplanationProvider": {
+        "type": "string",
+        "enum": [
+          "auto",
+          "qoder",
+          "bailian",
+          "template"
+        ],
+        "title": "ExplanationProvider"
+      },
+      "ExplanationRecord": {
+        "properties": {
+          "explanation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Explanation Id"
+          },
+          "analysis_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Analysis Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ExplanationStatus"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExplanationResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ErrorBody"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "explanation_id",
+          "analysis_id",
+          "status",
+          "created_at"
+        ],
+        "title": "ExplanationRecord"
+      },
+      "ExplanationResult": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "parameter_explanations": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterExplanation"
+            },
+            "type": "array",
+            "title": "Parameter Explanations"
+          },
+          "observations": {
+            "items": {
+              "$ref": "#/components/schemas/Observation"
+            },
+            "type": "array",
+            "title": "Observations"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          },
+          "recommended_next_steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recommended Next Steps"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "qoder",
+              "bailian",
+              "template"
+            ],
+            "title": "Provider"
+          },
+          "runtime_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runtime Model"
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "is_fallback": {
+            "type": "boolean",
+            "title": "Is Fallback"
+          },
+          "validation_report": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Validation Report"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "summary",
+          "parameter_explanations",
+          "observations",
+          "limitations",
+          "recommended_next_steps",
+          "provider",
+          "prompt_version",
+          "is_fallback",
+          "validation_report"
+        ],
+        "title": "ExplanationResult"
+      },
+      "ExplanationStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "title": "ExplanationStatus"
+      },
+      "ExportFormat": {
+        "type": "string",
+        "enum": [
+          "json",
+          "csv_bundle"
+        ],
+        "title": "ExportFormat"
+      },
+      "FitMetrics": {
+        "properties": {
+          "rss": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Rss"
+          },
+          "rmse": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Rmse"
+          },
+          "r2": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "R2"
+          },
+          "aic": {
+            "type": "number",
+            "title": "Aic"
+          },
+          "bic": {
+            "type": "number",
+            "title": "Bic"
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Sample Count"
+          },
+          "free_parameter_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Free Parameter Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rss",
+          "rmse",
+          "r2",
+          "aic",
+          "bic",
+          "sample_count",
+          "free_parameter_count"
+        ],
+        "title": "FitMetrics"
+      },
+      "FitResult": {
+        "properties": {
+          "model_id": {
+            "$ref": "#/components/schemas/ModelId"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "signal_kind": {
+            "$ref": "#/components/schemas/SignalKind"
+          },
+          "expression_id": {
+            "type": "string",
+            "title": "Expression Id"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ParameterEstimate"
+            },
+            "type": "array",
+            "title": "Parameters"
+          },
+          "free_parameter_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Free Parameter Count"
+          },
+          "optimizer": {
+            "$ref": "#/components/schemas/OptimizerReport"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/FitMetrics"
+          },
+          "residual_summary": {
+            "$ref": "#/components/schemas/ResidualSummary"
+          },
+          "uncertainty": {
+            "$ref": "#/components/schemas/UncertaintyReport"
+          },
+          "artifacts": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRef"
+            },
+            "type": "array",
+            "title": "Artifacts"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/AnalysisWarning"
+            },
+            "type": "array",
+            "title": "Warnings"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceItem"
+            },
+            "type": "array",
+            "title": "Evidence"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "model_version",
+          "signal_kind",
+          "expression_id",
+          "parameters",
+          "free_parameter_count",
+          "optimizer",
+          "metrics",
+          "residual_summary",
+          "uncertainty",
+          "artifacts",
+          "warnings",
+          "evidence"
+        ],
+        "title": "FitResult"
+      },
+      "HealthResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "ok",
+            "title": "Status"
+          },
+          "service": {
+            "type": "string",
+            "title": "Service"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "service",
+          "version",
+          "environment"
+        ],
+        "title": "HealthResponse"
+      },
+      "MappingCandidate": {
+        "properties": {
+          "mapping": {
+            "$ref": "#/components/schemas/DatasetMapping"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "requires_confirmation": {
+            "type": "boolean",
+            "title": "Requires Confirmation",
+            "default": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mapping",
+          "reasons"
+        ],
+        "title": "MappingCandidate"
+      },
+      "ModelDefinition": {
+        "properties": {
+          "model_id": {
+            "$ref": "#/components/schemas/ModelId"
+          },
+          "model_version": {
+            "type": "string",
+            "title": "Model Version"
+          },
+          "expression_id": {
+            "type": "string",
+            "title": "Expression Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "supported_signal_kinds": {
+            "items": {
+              "$ref": "#/components/schemas/SignalKind"
+            },
+            "type": "array",
+            "title": "Supported Signal Kinds"
+          },
+          "supported_sampling_kinds": {
+            "items": {
+              "$ref": "#/components/schemas/SamplingKind"
+            },
+            "type": "array",
+            "title": "Supported Sampling Kinds"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "parameters": {
+            "items": {
+              "$ref": "#/components/schemas/ModelParameterDefinition"
+            },
+            "type": "array",
+            "title": "Parameters"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "model_version",
+          "expression_id",
+          "display_name",
+          "supported_signal_kinds",
+          "supported_sampling_kinds",
+          "enabled",
+          "parameters"
+        ],
+        "title": "ModelDefinition"
+      },
+      "ModelId": {
+        "type": "string",
+        "enum": [
+          "single_tone",
+          "multi_tone",
+          "am",
+          "fm"
+        ],
+        "title": "ModelId"
+      },
+      "ModelParameterDefinition": {
+        "properties": {
+          "parameter_id": {
+            "type": "string",
+            "title": "Parameter Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "bounds": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Bounds"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "parameter_id",
+          "name",
+          "unit",
+          "description",
+          "bounds"
+        ],
+        "title": "ModelParameterDefinition"
+      },
+      "ModelRanking": {
+        "properties": {
+          "model_id": {
+            "$ref": "#/components/schemas/ModelId"
+          },
+          "rank": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Rank"
+          },
+          "rmse": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Rmse"
+          },
+          "aic": {
+            "type": "number",
+            "title": "Aic"
+          },
+          "bic": {
+            "type": "number",
+            "title": "Bic"
+          },
+          "eligible": {
+            "type": "boolean",
+            "title": "Eligible"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "rank",
+          "rmse",
+          "aic",
+          "bic",
+          "eligible"
+        ],
+        "title": "ModelRanking"
+      },
+      "Observation": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Evidence Refs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "text",
+          "evidence_refs"
+        ],
+        "title": "Observation"
+      },
+      "OptimizerReport": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "success": {
+            "type": "boolean",
+            "title": "Success"
+          },
+          "status_code": {
+            "type": "string",
+            "title": "Status Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "iterations": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Iterations"
+          },
+          "initial_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Initial Value"
+          },
+          "final_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Value"
+          },
+          "multistart_count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Multistart Count",
+            "default": 1
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "success",
+          "status_code",
+          "message",
+          "iterations"
+        ],
+        "title": "OptimizerReport"
+      },
+      "ParameterEstimate": {
+        "properties": {
+          "parameter_id": {
+            "type": "string",
+            "title": "Parameter Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit"
+          },
+          "standard_error": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Standard Error"
+          },
+          "ci95": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array",
+                "maxItems": 2,
+                "minItems": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ci95"
+          },
+          "estimable": {
+            "type": "boolean",
+            "title": "Estimable"
+          },
+          "bounds": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Bounds"
+          },
+          "at_bound": {
+            "type": "boolean",
+            "title": "At Bound"
+          },
+          "phase_reference_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phase Reference S"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Metadata"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "parameter_id",
+          "name",
+          "value",
+          "unit",
+          "estimable",
+          "bounds",
+          "at_bound"
+        ],
+        "title": "ParameterEstimate"
+      },
+      "ParameterExplanation": {
+        "properties": {
+          "parameter_id": {
+            "type": "string",
+            "title": "Parameter Id"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "parameter_id",
+          "text"
+        ],
+        "title": "ParameterExplanation"
+      },
+      "PreprocessingConfig": {
+        "properties": {
+          "missing_policy": {
+            "type": "string",
+            "enum": [
+              "reject",
+              "drop",
+              "interpolate"
+            ],
+            "title": "Missing Policy",
+            "default": "reject"
+          },
+          "detrend": {
+            "type": "string",
+            "enum": [
+              "none",
+              "constant",
+              "linear"
+            ],
+            "title": "Detrend",
+            "default": "none"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/PreprocessingStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "PreprocessingConfig"
+      },
+      "PreprocessingStep": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameters"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "PreprocessingStep"
+      },
+      "ReliabilityLevel": {
+        "type": "string",
+        "enum": [
+          "reliable",
+          "caution",
+          "unreliable",
+          "insufficient_evidence"
+        ],
+        "title": "ReliabilityLevel"
+      },
+      "ReliabilityReport": {
+        "properties": {
+          "level": {
+            "$ref": "#/components/schemas/ReliabilityLevel"
+          },
+          "is_unknown": {
+            "type": "boolean",
+            "title": "Is Unknown"
+          },
+          "reason_codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reason Codes"
+          },
+          "evidence_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Refs"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          },
+          "recommended_actions": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Recommended Actions"
+          },
+          "rule_set_version": {
+            "type": "string",
+            "title": "Rule Set Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "level",
+          "is_unknown",
+          "reason_codes",
+          "evidence_refs",
+          "limitations",
+          "recommended_actions",
+          "rule_set_version"
+        ],
+        "title": "ReliabilityReport"
+      },
+      "RerunRequest": {
+        "properties": {
+          "client_request_id": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Client Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "client_request_id"
+        ],
+        "title": "RerunRequest"
+      },
+      "ResidualSummary": {
+        "properties": {
+          "mean": {
+            "type": "number",
+            "title": "Mean"
+          },
+          "std": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Std"
+          },
+          "rms": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Rms"
+          },
+          "lag1_autocorr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lag1 Autocorr"
+          },
+          "max_abs_acf": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Abs Acf"
+          },
+          "dominant_residual_frequency_hz": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dominant Residual Frequency Hz"
+          },
+          "diagnostics": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Diagnostics"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "mean",
+          "std",
+          "rms"
+        ],
+        "title": "ResidualSummary"
+      },
+      "SamplingKind": {
+        "type": "string",
+        "enum": [
+          "uniform",
+          "nonuniform",
+          "unknown"
+        ],
+        "title": "SamplingKind"
+      },
+      "SeriesKind": {
+        "type": "string",
+        "enum": [
+          "time",
+          "spectrum",
+          "fit",
+          "residual",
+          "envelope",
+          "phase",
+          "instantaneous_frequency",
+          "constellation"
+        ],
+        "title": "SeriesKind"
+      },
+      "SeriesResponse": {
+        "properties": {
+          "series_kind": {
+            "$ref": "#/components/schemas/SeriesKind"
+          },
+          "x": {
+            "items": {
+              "type": "number"
+            },
+            "type": "array",
+            "title": "X"
+          },
+          "y_real": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Y Real"
+          },
+          "y_imag": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Y Imag"
+          },
+          "x_unit": {
+            "type": "string",
+            "title": "X Unit"
+          },
+          "y_unit": {
+            "type": "string",
+            "title": "Y Unit"
+          },
+          "input_count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Input Count"
+          },
+          "output_count": {
+            "type": "integer",
+            "maximum": 5000.0,
+            "minimum": 1.0,
+            "title": "Output Count"
+          },
+          "downsampling": {
+            "$ref": "#/components/schemas/DownsamplingInfo"
+          },
+          "source_artifact": {
+            "type": "string",
+            "title": "Source Artifact"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "series_kind",
+          "x",
+          "x_unit",
+          "y_unit",
+          "input_count",
+          "output_count",
+          "downsampling",
+          "source_artifact"
+        ],
+        "title": "SeriesResponse"
+      },
+      "Severity": {
+        "type": "string",
+        "enum": [
+          "info",
+          "warning",
+          "error"
+        ],
+        "title": "Severity"
+      },
+      "SignalKind": {
+        "type": "string",
+        "enum": [
+          "real",
+          "complex_analytic",
+          "complex_baseband"
+        ],
+        "title": "SignalKind"
+      },
+      "SimulationRequest": {
+        "properties": {
+          "model_id": {
+            "$ref": "#/components/schemas/ModelId"
+          },
+          "signal_kind": {
+            "$ref": "#/components/schemas/SignalKind"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Parameters"
+          },
+          "sampling": {
+            "$ref": "#/components/schemas/SimulationSampling"
+          },
+          "noise_model": {
+            "type": "string",
+            "const": "gaussian",
+            "title": "Noise Model",
+            "default": "gaussian"
+          },
+          "snr_db": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snr Db"
+          },
+          "random_seed": {
+            "type": "integer",
+            "title": "Random Seed"
+          },
+          "amplitude_unit": {
+            "type": "string",
+            "title": "Amplitude Unit",
+            "default": "a.u."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "model_id",
+          "signal_kind",
+          "parameters",
+          "sampling",
+          "random_seed"
+        ],
+        "title": "SimulationRequest"
+      },
+      "SimulationResponse": {
+        "properties": {
+          "simulation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Simulation Id"
+          },
+          "dataset": {
+            "$ref": "#/components/schemas/DatasetManifest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "simulation_id",
+          "dataset"
+        ],
+        "title": "SimulationResponse"
+      },
+      "SimulationSampling": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/SamplingKind"
+          },
+          "sample_rate_hz": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Sample Rate Hz"
+          },
+          "sample_count": {
+            "type": "integer",
+            "maximum": 500000.0,
+            "minimum": 64.0,
+            "title": "Sample Count"
+          },
+          "time_start_s": {
+            "type": "number",
+            "title": "Time Start S",
+            "default": 0
+          },
+          "jitter_ratio": {
+            "type": "number",
+            "maximum": 0.5,
+            "minimum": 0.0,
+            "title": "Jitter Ratio",
+            "default": 0
+          },
+          "dropout_ranges": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "title": "Dropout Ranges"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "sample_rate_hz",
+          "sample_count"
+        ],
+        "title": "SimulationSampling"
+      },
+      "UncertaintyMethod": {
+        "type": "string",
+        "enum": [
+          "asymptotic",
+          "multi_start",
+          "parametric_bootstrap",
+          "residual_bootstrap",
+          "block_bootstrap"
+        ],
+        "title": "UncertaintyMethod"
+      },
+      "UncertaintyReport": {
+        "properties": {
+          "methods": {
+            "items": {
+              "$ref": "#/components/schemas/UncertaintyMethod"
+            },
+            "type": "array",
+            "title": "Methods"
+          },
+          "covariance_artifact": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "condition_number": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Condition Number"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "methods",
+          "notes"
+        ],
+        "title": "UncertaintyReport"
+      },
+      "ValidationIssue": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "severity": {
+            "$ref": "#/components/schemas/Severity"
+          },
+          "details": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Details"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "severity"
+        ],
+        "title": "ValidationIssue"
+      },
+      "ValidationSummary": {
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "issues": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationIssue"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "valid",
+          "issues"
+        ],
+        "title": "ValidationSummary"
+      },
+      "VariableDescriptor": {
+        "properties": {
+          "variable_id": {
+            "type": "string",
+            "title": "Variable Id"
+          },
+          "variable_path": {
+            "type": "string",
+            "title": "Variable Path"
+          },
+          "data_type": {
+            "type": "string",
+            "title": "Data Type"
+          },
+          "shape": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Shape"
+          },
+          "is_complex": {
+            "type": "boolean",
+            "title": "Is Complex"
+          },
+          "estimated_numeric_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Estimated Numeric Count"
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported"
+          },
+          "unsupported_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unsupported Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "variable_id",
+          "variable_path",
+          "data_type",
+          "shape",
+          "is_complex",
+          "estimated_numeric_count",
+          "supported"
+        ],
+        "title": "VariableDescriptor"
+      }
+    }
+  }
+}
