@@ -63,6 +63,19 @@ const result = await response.json();
 assert.equal(result.ok, true);
 assert.equal(result.explanation.summary, "测试解释");
 
+response = await handler(
+  new Request("https://site.test/functions/v1/app/explain", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...validPayload,
+      candidates: [{ model: "测试模型", r2: 1, rmse: 1, bic: 1, parameters: [{ name: "参数", value: "not-a-number" }] }],
+    }),
+  }),
+);
+assert.equal(response.status, 400);
+assert.equal((await response.json()).error, "invalid_payload");
+
 env.set("RATE_LIMIT_MAX", "2");
 const limitedExplain = () => handler(
   new Request("https://site.test/functions/v1/app/explain", {

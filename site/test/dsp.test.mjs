@@ -49,6 +49,10 @@ const singlePayload = buildAiPayload(singleResult);
 assert.equal(singlePayload.unknown, false);
 assert.ok(singlePayload.candidates.length > 0);
 assert.ok(singlePayload.reliability.limitations.length > 0);
+assert.ok(singleResult.candidates.every((candidate) => !("fitted" in candidate) && !("residual" in candidate)));
+assert.ok(!("fitted" in singleResult.best) && !("residual" in singleResult.best));
+assert.equal(singleResult.series.fitted.length, singleResult.sampleCount);
+assert.equal(singleResult.series.residual.length, singleResult.sampleCount);
 
 const dual = buildSignal([
   { amplitude: 1.2, frequency: 80.5, phase: 0.1 },

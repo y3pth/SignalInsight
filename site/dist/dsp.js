@@ -1037,6 +1037,9 @@ export function analyzeSignal(time, values) {
   const nextSteps = unknown
     ? ["检查是否遗漏实验背景或采样单位。", "提高采样率或延长观测时长后重试。", "检查调制或非平稳证据是否不足。"]
     : ["用不同信噪比数据复核参数稳定性。", "检查残差是否符合测量噪声假设。", "若已知物理模型，加入模型约束后再比较。"];
+  const fittedSeries = best?.fitted ?? values.map(() => 0);
+  const residualSeries = best?.residual ?? values.map((value) => value - mean(values));
+  const stripCandidate = ({ fitted, residual, ...summary }) => summary;
   return {
     createdAt: new Date().toISOString(),
     sampleCount: values.length,
@@ -1044,16 +1047,16 @@ export function analyzeSignal(time, values) {
     duration,
     nyquist: sampleRate / 2,
     spectrum,
-    candidates: sortedCandidates,
-    best,
+    candidates: sortedCandidates.map(stripCandidate),
+    best: best ? stripCandidate(best) : null,
     unknown,
     recommendedId: unknown ? null : best?.id ?? null,
     reliability: { level, label: levelLabel, evidence, limitations, nextSteps, bicGap },
     series: {
       time,
       observed: values,
-      fitted: best?.fitted ?? values.map(() => 0),
-      residual: best?.residual ?? values.map((value) => value - mean(values)),
+      fitted: fittedSeries,
+      residual: residualSeries,
     },
   };
 }

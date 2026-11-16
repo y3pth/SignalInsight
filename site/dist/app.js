@@ -50,6 +50,10 @@ const state = {
   busy: false,
   aiConfigured: false,
   aiHealth: "checking",
+  dataVersion: 0,
+  resultVersion: -1,
+  resultStale: false,
+  aiRequestSequence: 0,
 };
 
 const AI_CACHE_LIMIT = 20;
@@ -167,6 +171,7 @@ function populateMapping(parsed, filename) {
   renderCsvPreview(parsed, filename);
   state.uploadedColumns = parsed.numericColumns;
   state.sourceLabel = `上传数据 · ${filename}`;
+  markDataChanged("CSV 已载入，请确认字段映射后运行分析。");
 }
 
 function escapeHtml(value) {
@@ -196,6 +201,7 @@ let analyzerWorker = null;
 let analyzerRequestId = 0;
 let analysisSequence = 0;
 const analyzerPending = new Map();
+const ANALYZER_TIMEOUT_MS = 90000;
 
 function getAnalyzerWorker() {
   if (analyzerWorker || typeof Worker === "undefined") return analyzerWorker;
@@ -206,12 +212,16 @@ function getAnalyzerWorker() {
       const pending = analyzerPending.get(id);
       if (!pending) return;
       analyzerPending.delete(id);
+      clearTimeout(pending.timeout);
       if (ok) pending.resolve(result);
       else pending.reject(new Error(error || "分析失败。"));
     });
     analyzerWorker.addEventListener("error", (event) => {
       const error = new Error(event.message || "分析 Worker 失败。");
-      for (const pending of analyzerPending.values()) pending.reject(error);
+      for (const pending of analyzerPending.values()) {
+        clearTimeout(pending.timeout);
+        pending.reject(error);
+      }
       analyzerPending.clear();
       analyzerWorker?.terminate();
       analyzerWorker = null;
@@ -225,11 +235,24 @@ function getAnalyzerWorker() {
 function analyzeInWorker(worker, time, values) {
   const id = ++analyzerRequestId;
   return new Promise((resolve, reject) => {
-    analyzerPending.set(id, { resolve, reject });
+    const timeout = setTimeout(() => {
+      const entries = [...analyzerPending.values()];
+      analyzerPending.clear();
+      analyzerWorker?.terminate();
+      analyzerWorker = null;
+      const error = new Error("分析超时，请降低样本量或重试。");
+      error.name = "AnalyzerTimeoutError";
+      for (const pending of entries) {
+        clearTimeout(pending.timeout);
+        pending.reject(error);
+      }
+    }, ANALYZER_TIMEOUT_MS);
+    analyzerPending.set(id, { resolve, reject, timeout });
     try {
       worker.postMessage({ id, time, values });
     } catch (error) {
       analyzerPending.delete(id);
+      clearTimeout(timeout);
       reject(error);
     }
   });
@@ -246,11 +269,32 @@ async function analyzeSignalSafely(time, values) {
     const result = await analyzeInWorker(worker, time, values);
     result.engine = "worker";
     return result;
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === "AnalyzerTimeoutError") throw error;
     const result = analyzeSignal(time, values);
     result.engine = "main";
     return result;
   }
+}
+
+function invalidateResult(message = "数据已变更，请重新运行分析。") {
+  state.resultStale = true;
+  state.resultVersion = -1;
+  state.aiRequestSequence += 1;
+  elements.download.disabled = true;
+  elements.aiButton.disabled = true;
+  elements.aiButton.textContent = "请先运行分析";
+  elements.aiStatus.textContent = message;
+  elements.aiSummary.textContent = "数据已变更，等待重新分析。";
+  elements.aiObservations.replaceChildren();
+  elements.aiLimitations.hidden = true;
+  elements.subtitle.textContent = message;
+  elements.resultAnnouncer.textContent = message;
+}
+
+function markDataChanged(message) {
+  state.dataVersion += 1;
+  invalidateResult(message);
 }
 
 function setBusy(busy) {
@@ -261,22 +305,30 @@ function setBusy(busy) {
 
 async function analyzeCurrent() {
   const sequence = ++analysisSequence;
+  const version = state.dataVersion;
   try {
     setBusy(true);
+    elements.download.disabled = true;
+    elements.aiButton.disabled = true;
+    elements.aiButton.textContent = "分析中…";
+    elements.aiStatus.textContent = "等待当前分析完成。";
     const data = selectedSignal();
     if (data.values.length > 100000) {
       showToast("大样本分析已转入 Worker，可能需要数十秒。");
     }
     const started = performance.now();
     const result = await analyzeSignalSafely(data.time, data.values);
-    if (sequence !== analysisSequence) return;
+    if (sequence !== analysisSequence || version !== state.dataVersion) return;
     result.elapsedMs = performance.now() - started;
     state.result = result;
+    state.resultVersion = version;
+    state.resultStale = false;
     state.sourceLabel = data.label;
     render(result);
     showToast(`分析完成 · ${Math.round(result.elapsedMs)} ms · ${result.engine === "worker" ? "Worker" : "主线程"} · ${data.label}`);
   } catch (error) {
     if (sequence === analysisSequence) {
+      invalidateResult("分析失败；请检查数据后重试。");
       showToast(error instanceof Error ? error.message : "分析失败。", true);
     }
   } finally {
@@ -664,7 +716,7 @@ async function checkAiAvailability() {
     state.aiConfigured = false;
     state.aiHealth = "unreachable";
   }
-  if (state.result) renderLocalExplanation(state.result);
+  if (state.result && !state.resultStale) renderLocalExplanation(state.result);
 }
 
 const AI_ERROR_MESSAGES = {
@@ -680,12 +732,16 @@ const AI_ERROR_MESSAGES = {
 };
 
 async function requestQwenExplanation() {
-  if (!state.result || state.busy || !state.aiConfigured) return;
+  if (!state.result || state.resultStale || state.busy || !state.aiConfigured) return;
+  const requestId = ++state.aiRequestSequence;
+  const version = state.resultVersion;
   const payload = buildAiPayload(state.result);
   const cacheKey = JSON.stringify(payload);
   const cached = aiCache.get(cacheKey);
   if (cached) {
-    renderQwenExplanation(cached, "使用本次会话缓存；数值未重新计算。");
+    if (requestId === state.aiRequestSequence && version === state.resultVersion && !state.resultStale) {
+      renderQwenExplanation(cached, "使用本次会话缓存；数值未重新计算。");
+    }
     return;
   }
   elements.aiButton.disabled = true;
@@ -702,23 +758,27 @@ async function requestQwenExplanation() {
     if (!response.ok || !data?.ok || !data?.explanation) {
       throw new Error(AI_ERROR_MESSAGES[data?.error] ?? "Qwen 暂不可用，继续显示确定性规则解释。");
     }
+    if (requestId !== state.aiRequestSequence || version !== state.resultVersion || state.resultStale) return;
     const explanation = data.explanation;
     aiCache.set(cacheKey, explanation);
     if (aiCache.size > AI_CACHE_LIMIT) aiCache.delete(aiCache.keys().next().value);
     renderQwenExplanation(explanation);
   } catch (error) {
+    if (requestId !== state.aiRequestSequence || version !== state.resultVersion || state.resultStale) return;
     const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
     elements.aiStatus.textContent = timedOut
       ? "Qwen 响应超时，请重试。"
       : error instanceof Error ? error.message : "Qwen 暂不可用。";
     elements.aiButton.textContent = "重试 Qwen 解释";
   } finally {
-    elements.aiButton.disabled = false;
+    if (requestId === state.aiRequestSequence && !state.resultStale) {
+      elements.aiButton.disabled = false;
+    }
   }
 }
 
 function downloadReport() {
-  if (!state.result) return;
+  if (!state.result || state.resultStale) return;
   const result = state.result;
   const report = {
     product: "SignalInsight",
@@ -761,6 +821,7 @@ function bindEvents() {
       elements.mapping.hidden = true;
       elements.csvPreview.hidden = true;
       state.data = buildExample(tab.dataset.example);
+      markDataChanged("已切换示例，正在分析…");
       analyzeCurrent();
     });
   });
@@ -782,6 +843,7 @@ function bindEvents() {
       elements.mapping.hidden = true;
       elements.csvPreview.hidden = true;
       state.uploadedColumns = null;
+      markDataChanged("CSV 解析失败，请检查文件。");
       showToast(error instanceof Error ? error.message : "CSV 解析失败。", true);
     } finally {
       event.target.value = "";
@@ -791,6 +853,8 @@ function bindEvents() {
   elements.analyze.addEventListener("click", analyzeCurrent);
   elements.download.addEventListener("click", downloadReport);
   elements.aiButton.addEventListener("click", requestQwenExplanation);
+  elements.timeColumn.addEventListener("change", () => markDataChanged("字段映射已变更，请重新运行分析。"));
+  elements.signalColumn.addEventListener("change", () => markDataChanged("字段映射已变更，请重新运行分析。"));
 
   let resizeTimer = null;
   window.addEventListener("resize", () => {
