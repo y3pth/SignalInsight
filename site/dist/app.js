@@ -3,11 +3,13 @@ import {
   buildAiPayload,
   templateExplanation,
 } from "./dsp.js";
+import { parseCsv } from "./csv.js";
 
 const elements = {
   tabs: [...document.querySelectorAll(".source-tab")],
   file: document.querySelector("#csv-file"),
   mapping: document.querySelector("#mapping-panel"),
+  csvPreview: document.querySelector("#csv-preview"),
   timeColumn: document.querySelector("#time-column"),
   signalColumn: document.querySelector("#signal-column"),
   analyze: document.querySelector("#analyze-button"),
@@ -37,6 +39,7 @@ const elements = {
   aiStatus: document.querySelector("#ai-status"),
   timeLegend: document.querySelector("#time-legend"),
   toast: document.querySelector("#toast"),
+  resultAnnouncer: document.querySelector("#result-announcer"),
 };
 
 const state = {
@@ -47,6 +50,9 @@ const state = {
   busy: false,
   aiConfigured: false,
 };
+
+const AI_CACHE_LIMIT = 20;
+const aiCache = new Map();
 
 let toastTimer = null;
 
@@ -121,74 +127,31 @@ function buildExample(kind) {
   return { time, values, label: definition.label };
 }
 
-function parseDelimitedLine(line, delimiter) {
-  const values = [];
-  let current = "";
-  let quoted = false;
-  for (let index = 0; index < line.length; index += 1) {
-    const character = line[index];
-    if (character === '"') {
-      if (quoted && line[index + 1] === '"') {
-        current += '"';
-        index += 1;
-      } else {
-        quoted = !quoted;
-      }
-    } else if (character === delimiter && !quoted) {
-      values.push(current);
-      current = "";
-    } else {
-      current += character;
-    }
+function renderCsvPreview(parsed, filename) {
+  const table = document.createElement("table");
+  const caption = table.createCaption();
+  caption.textContent = `${filename} · 预览前 ${Math.min(3, parsed.rows.length)} 行 · 共 ${parsed.rows.length} 行`;
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const header of parsed.headers) {
+    const th = document.createElement("th");
+    th.textContent = header;
+    headRow.append(th);
   }
-  values.push(current);
-  return values;
-}
-
-function detectDelimiter(line) {
-  const candidates = [",", "\t", ";"];
-  const counts = candidates.map((delimiter) => ({
-    delimiter,
-    count: parseDelimitedLine(line, delimiter).length,
-  }));
-  counts.sort((a, b) => b.count - a.count);
-  return counts[0].count > 1 ? counts[0].delimiter : null;
-}
-
-function parseCsv(text) {
-  const normalized = text.replace(/^\uFEFF/, "");
-  const lines = normalized.split(/\r?\n/).filter((line) => line.trim() !== "");
-  if (lines.length < 3) throw new Error("CSV 至少需要表头和两行数据。");
-  const delimiter = detectDelimiter(lines[0]);
-  if (!delimiter) throw new Error("无法识别 CSV 分隔符，请使用逗号、制表符或分号。");
-  const headers = parseDelimitedLine(lines[0], delimiter).map((header) => header.trim());
-  if (headers.some((header) => !header)) throw new Error("CSV 存在空表头。");
-  if (new Set(headers).size !== headers.length) throw new Error("CSV 存在重复表头。");
-  const rows = lines.slice(1).map((line, index) => {
-    const row = parseDelimitedLine(line, delimiter);
-    if (row.length !== headers.length) {
-      throw new Error(`第 ${index + 2} 行字段数与表头不一致。`);
+  thead.append(headRow);
+  const tbody = document.createElement("tbody");
+  for (const row of parsed.rows.slice(0, 3)) {
+    const tr = document.createElement("tr");
+    for (const cell of row) {
+      const td = document.createElement("td");
+      td.textContent = cell;
+      tr.append(td);
     }
-    return row;
-  });
-  const numericColumns = [];
-  headers.forEach((header, columnIndex) => {
-    const values = rows.map((row) => Number(row[columnIndex]));
-    if (values.every((value) => Number.isFinite(value) && rowNotEmpty(rows, columnIndex))) {
-      numericColumns.push({ header, values });
-    }
-  });
-  if (numericColumns.length < 2) throw new Error("未找到两个以上完整数值列。");
-  const timeCandidate =
-    numericColumns.find((column) =>
-      column.values.every((value, index) => index === 0 || value > column.values[index - 1]),
-    ) ?? numericColumns[0];
-  const signalCandidate = numericColumns.find((column) => column !== timeCandidate);
-  return { headers, numericColumns, timeCandidate, signalCandidate };
-}
-
-function rowNotEmpty(rows, columnIndex) {
-  return rows.every((row) => String(row[columnIndex] ?? "").trim() !== "");
+    tbody.append(tr);
+  }
+  table.append(thead, tbody);
+  elements.csvPreview.replaceChildren(table);
+  elements.csvPreview.hidden = false;
 }
 
 function populateMapping(parsed, filename) {
@@ -200,6 +163,7 @@ function populateMapping(parsed, filename) {
   elements.timeColumn.value = parsed.timeCandidate.header;
   elements.signalColumn.value = parsed.signalCandidate.header;
   elements.mapping.hidden = false;
+  renderCsvPreview(parsed, filename);
   state.uploadedColumns = parsed.numericColumns;
   state.sourceLabel = `上传数据 · ${filename}`;
 }
@@ -227,27 +191,92 @@ function selectedSignal() {
   };
 }
 
+let analyzerWorker = null;
+let analyzerRequestId = 0;
+let analysisSequence = 0;
+const analyzerPending = new Map();
+
+function getAnalyzerWorker() {
+  if (analyzerWorker || typeof Worker === "undefined") return analyzerWorker;
+  try {
+    analyzerWorker = new Worker(new URL("./analyzer-worker.js", import.meta.url), { type: "module" });
+    analyzerWorker.addEventListener("message", (event) => {
+      const { id, ok, result, error } = event.data ?? {};
+      const pending = analyzerPending.get(id);
+      if (!pending) return;
+      analyzerPending.delete(id);
+      if (ok) pending.resolve(result);
+      else pending.reject(new Error(error || "分析失败。"));
+    });
+    analyzerWorker.addEventListener("error", (event) => {
+      const error = new Error(event.message || "分析 Worker 失败。");
+      for (const pending of analyzerPending.values()) pending.reject(error);
+      analyzerPending.clear();
+      analyzerWorker?.terminate();
+      analyzerWorker = null;
+    });
+  } catch {
+    analyzerWorker = null;
+  }
+  return analyzerWorker;
+}
+
+function analyzeInWorker(worker, time, values) {
+  const id = ++analyzerRequestId;
+  return new Promise((resolve, reject) => {
+    analyzerPending.set(id, { resolve, reject });
+    try {
+      worker.postMessage({ id, time, values });
+    } catch (error) {
+      analyzerPending.delete(id);
+      reject(error);
+    }
+  });
+}
+
+async function analyzeSignalSafely(time, values) {
+  const worker = getAnalyzerWorker();
+  if (!worker) {
+    const result = analyzeSignal(time, values);
+    result.engine = "main";
+    return result;
+  }
+  try {
+    const result = await analyzeInWorker(worker, time, values);
+    result.engine = "worker";
+    return result;
+  } catch {
+    const result = analyzeSignal(time, values);
+    result.engine = "main";
+    return result;
+  }
+}
+
 function setBusy(busy) {
   state.busy = busy;
   elements.analyze.disabled = busy;
   elements.analyze.querySelector("span").textContent = busy ? "正在拟合与比较…" : "运行可信分析";
 }
 
-function analyzeCurrent() {
+async function analyzeCurrent() {
+  const sequence = ++analysisSequence;
   try {
     setBusy(true);
     const data = selectedSignal();
     const started = performance.now();
-    const result = analyzeSignal(data.time, data.values);
+    const result = await analyzeSignalSafely(data.time, data.values);
+    if (sequence !== analysisSequence) return;
     result.elapsedMs = performance.now() - started;
     state.result = result;
     state.sourceLabel = data.label;
     render(result);
-    showToast(`分析完成 · ${Math.round(result.elapsedMs)} ms · ${data.label}`);
+    showToast(`分析完成 · ${Math.round(result.elapsedMs)} ms · ${result.engine === "worker" ? "Worker" : "主线程"} · ${data.label}`);
   } catch (error) {
-    showToast(error instanceof Error ? error.message : "分析失败。", true);
+    if (sequence === analysisSequence) {
+      showToast(error instanceof Error ? error.message : "分析失败。", true);
+    }
   } finally {
-    setBusy(false);
+    if (sequence === analysisSequence) setBusy(false);
   }
 }
 
@@ -268,7 +297,10 @@ function render(result) {
   }`;
   elements.subtitle.textContent = result.unknown
     ? "主谱峰不足或候选模型无法解释数据；系统拒绝强行给出结论。"
-    : `${result.reliability.evidence.filter((item) => item.status === "pass").length}/${result.reliability.evidence.length} 项证据通过 · 模型只在候选库内竞争 · ${Math.round(result.elapsedMs)} ms`;
+    : `${result.reliability.evidence.filter((item) => item.status === "pass").length}/${result.reliability.evidence.length} 项证据通过 · 模型只在候选库内竞争 · ${Math.round(result.elapsedMs)} ms · ${result.engine === "worker" ? "Worker" : "主线程"}`;
+  elements.resultAnnouncer.textContent = result.unknown
+    ? "分析完成：证据不足，暂不推荐模型。"
+    : `分析完成：推荐${best.label}，可信等级${result.reliability.label}。`;
   elements.metricSamples.textContent = `${result.sampleCount.toLocaleString()} 点`;
   elements.metricRate.textContent = `${result.sampleRate.toFixed(2)} Hz · Nyq ${result.nyquist.toFixed(1)} Hz`;
   elements.metricR2.textContent = best?.metrics.r2 == null ? "—" : `R² ${best.metrics.r2.toFixed(4)}`;
@@ -381,6 +413,19 @@ function renderAiLimitations(limitations) {
     return paragraph;
   }));
   elements.aiLimitations.hidden = items.length === 0;
+}
+
+function renderQwenExplanation(explanation, statusText = "Qwen 仅解释已计算证据，未修改任何数值结论。") {
+  elements.aiSummary.textContent = String(explanation.summary ?? "").slice(0, 2200);
+  const observations = Array.isArray(explanation.observations) ? explanation.observations : [];
+  elements.aiObservations.replaceChildren(...observations.slice(0, 6).map((text) => {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = String(text).slice(0, 500);
+    return paragraph;
+  }));
+  renderAiLimitations(explanation.limitations);
+  elements.aiStatus.textContent = statusText;
+  elements.aiButton.textContent = "重新生成解释";
 }
 
 function renderLocalExplanation(result) {
@@ -607,10 +652,18 @@ const AI_ERROR_MESSAGES = {
   payload_too_large: "发送给 Qwen 的摘要过大，请减少数据量。",
   invalid_payload: "发送给 Qwen 的摘要格式无效。",
   invalid_json: "请求格式错误。",
+  rate_limited: "请求过于频繁，请稍后再试。",
 };
 
 async function requestQwenExplanation() {
   if (!state.result || state.busy || !state.aiConfigured) return;
+  const payload = buildAiPayload(state.result);
+  const cacheKey = JSON.stringify(payload);
+  const cached = aiCache.get(cacheKey);
+  if (cached) {
+    renderQwenExplanation(cached, "使用本次会话缓存；数值未重新计算。");
+    return;
+  }
   elements.aiButton.disabled = true;
   elements.aiButton.textContent = "Qwen 正在解释…";
   elements.aiStatus.textContent = "正在发送结构化数值摘要，不包含原始序列。";
@@ -618,7 +671,7 @@ async function requestQwenExplanation() {
     const response = await fetch("/functions/v1/app/explain", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(buildAiPayload(state.result)),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(30000),
     });
     const data = await response.json().catch(() => null);
@@ -626,16 +679,9 @@ async function requestQwenExplanation() {
       throw new Error(AI_ERROR_MESSAGES[data?.error] ?? "Qwen 暂不可用，继续显示确定性规则解释。");
     }
     const explanation = data.explanation;
-    elements.aiSummary.textContent = String(explanation.summary ?? "").slice(0, 2200);
-    const observations = Array.isArray(explanation.observations) ? explanation.observations : [];
-    elements.aiObservations.replaceChildren(...observations.slice(0, 6).map((text) => {
-      const paragraph = document.createElement("p");
-      paragraph.textContent = String(text).slice(0, 500);
-      return paragraph;
-    }));
-    renderAiLimitations(explanation.limitations);
-    elements.aiStatus.textContent = "Qwen 仅解释已计算证据，未修改任何数值结论。";
-    elements.aiButton.textContent = "重新生成解释";
+    aiCache.set(cacheKey, explanation);
+    if (aiCache.size > AI_CACHE_LIMIT) aiCache.delete(aiCache.keys().next().value);
+    renderQwenExplanation(explanation);
   } catch (error) {
     const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
     elements.aiStatus.textContent = timedOut
@@ -689,6 +735,7 @@ function bindEvents() {
       elements.tabs.forEach((item) => item.classList.toggle("active", item === tab));
       state.uploadedColumns = null;
       elements.mapping.hidden = true;
+      elements.csvPreview.hidden = true;
       state.data = buildExample(tab.dataset.example);
       analyzeCurrent();
     });
@@ -701,12 +748,16 @@ function bindEvents() {
       showToast("CSV 文件超过 10 MB。", true);
       return;
     }
+    elements.csvPreview.hidden = true;
     try {
       const parsed = parseCsv(await file.text());
       elements.tabs.forEach((tab) => tab.classList.remove("active"));
       populateMapping(parsed, file.name);
       showToast("CSV 已载入，请确认字段映射后运行分析。");
     } catch (error) {
+      elements.mapping.hidden = true;
+      elements.csvPreview.hidden = true;
+      state.uploadedColumns = null;
       showToast(error instanceof Error ? error.message : "CSV 解析失败。", true);
     } finally {
       event.target.value = "";

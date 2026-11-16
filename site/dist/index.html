@@ -44,6 +44,7 @@
           <div id="mapping-panel" class="mapping-panel" hidden>
             <label>时间列<select id="time-column"></select></label>
             <label>信号列<select id="signal-column"></select></label>
+            <div id="csv-preview" class="csv-preview" hidden></div>
           </div>
         </section>
 
@@ -149,6 +150,7 @@
       </section>
     </main>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <p id="result-announcer" class="sr-only" role="status" aria-live="polite"></p>
     <script type="module" src="./app.js"></script>
   </body>
 </html>

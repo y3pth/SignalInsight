@@ -65,6 +65,10 @@ site/.SignalInsight.qoder.site
   - Qwen 返回的 `limitations` 展示
   - health 8 秒超时、explain 30 秒超时
   - `service_not_configured`、`upstream_error` 等错误细分
+- DSP 已移入 Web Worker，失败时自动回退主线程
+- AI 结果按 payload 做会话缓存；Qwen 端点增加 60 次/分钟/IP 的软限流，可用 `RATE_LIMIT_MAX` 调整
+- CSV 解析抽成 `csv.js`，支持引号内换行、自动识别分隔符、前 3 行预览
+- 分析结果增加 `aria-live` 播报
 
 ---
 
@@ -265,6 +269,7 @@ DASHSCOPE_BASE_URL    默认 https://dashscope.aliyuncs.com/compatible-mode/v1
 
 ```bash
 node site/test/dsp.test.mjs
+node site/test/csv.test.mjs
 node site/test/function.test.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
@@ -311,11 +316,11 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 
 ### P1：质量与架构
 
-1. DSP 移入 Web Worker，避免大样本阻塞 UI。
-2. AI 结果缓存 + 数字一致性校验；限流不能影响正常使用。
-3. CSV 解析边界、数据预览、可访问性（aria-live、图表替代表格）。
-4. 浏览器 E2E 回归与真实 CSV fixtures。
-5. 拆分 `app.js` / `dsp.js`，引入静态检查。
+1. [已完成] DSP 移入 Web Worker，失败回退主线程。
+2. [已完成] AI 结果缓存 + 60 次/分钟/IP 软限流；数字一致性审计仍待补。
+3. [已完成] CSV 引号换行、数据预览、aria-live 播报。
+4. [进行中] 浏览器 E2E 回归与真实 CSV fixtures。
+5. [部分完成] 已抽离 `csv.js`；`app.js` / `dsp.js` 仍较大，静态检查待补。
 
 ### P2：模型扩展
 

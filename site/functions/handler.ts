@@ -15,6 +15,34 @@ function clip(value: unknown, max = 500): string {
   return String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_DEFAULT_MAX = 60;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function clientKey(request: Request): string {
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) return forwarded.split(",")[0]?.trim() || "anonymous";
+  return request.headers.get("x-real-ip") || request.headers.get("cf-connecting-ip") || "anonymous";
+}
+
+function isRateLimited(key: string): boolean {
+  const configured = Number(Deno.env.get("RATE_LIMIT_MAX") ?? RATE_LIMIT_DEFAULT_MAX);
+  const max = Number.isFinite(configured) && configured > 0 ? configured : RATE_LIMIT_DEFAULT_MAX;
+  const now = Date.now();
+  const bucket = rateBuckets.get(key);
+  if (!bucket || now >= bucket.resetAt) {
+    rateBuckets.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    if (rateBuckets.size > 2048) {
+      for (const [bucketKey, value] of rateBuckets) {
+        if (now >= value.resetAt) rateBuckets.delete(bucketKey);
+      }
+    }
+    return false;
+  }
+  bucket.count += 1;
+  return bucket.count > max;
+}
+
 function validatePayload(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const payload = value as Record<string, unknown>;
@@ -73,6 +101,7 @@ export async function handler(request: Request): Promise<Response> {
   }
   if (!url.pathname.endsWith("/explain")) return json({ ok: false, error: "not_found" }, 404);
   if (request.method !== "POST") return json({ ok: false, error: "method_not_allowed" }, 405);
+  if (isRateLimited(clientKey(request))) return json({ ok: false, error: "rate_limited" }, 429);
 
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (contentLength > MAX_BODY_BYTES) return json({ ok: false, error: "payload_too_large" }, 413);

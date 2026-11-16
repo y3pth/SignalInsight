@@ -63,6 +63,24 @@ const result = await response.json();
 assert.equal(result.ok, true);
 assert.equal(result.explanation.summary, "测试解释");
 
+env.set("RATE_LIMIT_MAX", "2");
+const limitedExplain = () => handler(
+  new Request("https://site.test/functions/v1/app/explain", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-forwarded-for": "203.0.113.9",
+    },
+    body: JSON.stringify(validPayload),
+  }),
+);
+assert.equal((await limitedExplain()).status, 200);
+assert.equal((await limitedExplain()).status, 200);
+const limitedResponse = await limitedExplain();
+assert.equal(limitedResponse.status, 429);
+assert.equal((await limitedResponse.json()).error, "rate_limited");
+env.delete("RATE_LIMIT_MAX");
+
 response = await handler(
   new Request("https://site.test/functions/v1/app/explain", {
     method: "POST",
