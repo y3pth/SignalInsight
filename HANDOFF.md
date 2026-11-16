@@ -365,7 +365,7 @@ P1/P2 已发布并完成线上回归：
 ## 9. Git 状态与分支
 
 - 当前分支：`feat/trust-lab`
-- 最新提交：`48ad325 feat: add multi-channel, MAT and IQ data modes`
+- 最新提交：`9f9cb4a docs: record the trust lab publication`
 - 信任实验室提交：
   - `e45afb0 fix: harden result and AI data flow`
   - `d5d7834 feat: add a deterministic trust conclusion card`
