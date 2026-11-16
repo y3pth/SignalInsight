@@ -1,7 +1,7 @@
 # SignalInsight 新对话交接书
 
 > 更新日期：2026-11-17
-> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；P1/P2 已实现，待最终发布
+> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；P1/P2 已发布并完成线上回归
 > 这是新对话的首要入口。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
 
 ---
@@ -25,8 +25,9 @@ SignalInsight 最初规划为 Vue + FastAPI + SQLite 的完整信号分析平台
 - 生命周期：active
 - Site ID：`01a1e4bb-ea05-7b36-88f4-72a743ddb34d`
 - Project ID：`01a1e4bb-ea05-7036-8eea-6bdc90a0ab26`
-- 当前线上发布 action：`41485a58-2169-4c64-bb96-05cced35d199`
+- 当前线上发布 action：`24f51917-9c66-4ea1-b600-1c2c6027a595`
 - 当前 Function：`app`，edge runtime，已发布
+- Function `required_secret_names`：`["DASHSCOPE_API_KEY"]`
 - 站点 Secret：`DASHSCOPE_API_KEY` 已配置
 - Function `/functions/v1/app/health` 返回：`{"ok":true,"configured":true,"provider":"dashscope-compatible"}`
 - 线上 Qwen 已真实调用成功：单频、双频、噪声 unknown、CSV 上传均已验证
@@ -302,7 +303,14 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 - 无噪声 FM 因残差结构显示“需要谨慎”
 - 线上 Qwen 对 AM payload 返回结构化解释
 
-当前线上仍是 AI UI 版本；P1/P2 待最终发布后需要重新做线上回归。
+P1/P2 已发布并完成线上回归：
+
+- 线上 Worker 生效（副标题显示 Worker）
+- 线上 AM CSV：120 Hz / 5 Hz / 调制指数 0.6002，较高可信
+- 线上 AM 参数表显示不确定度；Qwen 解释包含 AM 机制与不确定度限制
+- 线上单频 Qwen 正常，并主动提到 AM 候选与 BIC 区分度
+- `app.js`、`dsp.js`、`csv.js`、`analyzer-worker.js` 均 200
+- `/explain` 请求 200；默认软限流未影响正常演示
 
 ---
 
