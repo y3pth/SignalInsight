@@ -1,7 +1,7 @@
 # SignalInsight 新对话交接书
 
 > 更新日期：2026-11-17
-> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；信任实验室功能已实现，待最终发布
+> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；信任实验室功能已发布并完成线上回归
 > 这是新对话的首要入口。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
 
 ---
@@ -25,7 +25,7 @@ SignalInsight 最初规划为 Vue + FastAPI + SQLite 的完整信号分析平台
 - 生命周期：active
 - Site ID：`01a1e4bb-ea05-7b36-88f4-72a743ddb34d`
 - Project ID：`01a1e4bb-ea05-7036-8eea-6bdc90a0ab26`
-- 当前线上发布 action：`07cb76cc-cb4b-4bed-a9a4-4de907a621c8`
+- 当前线上发布 action：`2751a5c0-6fea-48f6-9a4b-887c1e95c0bb`
 - 当前 Function：`app`，edge runtime，已发布
 - Function `required_secret_names`：`["DASHSCOPE_API_KEY"]`
 - 站点 Secret：`DASHSCOPE_API_KEY` 已配置
@@ -336,6 +336,15 @@ P1/P2 已发布并完成线上回归：
 - IQ：120 Hz/幅值 2/相位 0.3 的复指数正确识别，Worker 运行；噪声 IQ 输出 unknown
 - 结果过期会禁用 AI/导出；旧 AI 响应不会覆盖新结果
 
+线上信任实验室回归（2026-11-17）：
+
+- 结论卡 4 个依据 chips；数据体检/实验设计正常
+- 压力测试 4 个场景全部稳定；结论翻转标识可用
+- IQ CSV：120 Hz / 复幅值 2 / 复相位 0.3，Worker 运行
+- 多通道 CSV：3 个通道均返回单频模型，较高可信
+- 单频 Qwen 正常返回解释，Function 使用重建后的安全 payload
+- 页面控制台无 error/warning；健康检查 `configured:true`
+
 边界与极限测试（已发布并完成线上回归）：
 
 - 63 样本：正确拒绝“至少需要 64 个样本”
@@ -420,7 +429,7 @@ P1/P2 已发布并完成线上回归：
 4. [已完成] AM/FM 调制解构视图。
 5. [已完成] 反事实压力测试。
 6. [已完成] 多通道、MAT v5、IQ 单分量数据模式。
-7. [待发布] 信任实验室最终版本尚未发布到公开站点。
+7. [已发布] 信任实验室最终版本已上线并完成回归。
 
 ### 比赛
 
