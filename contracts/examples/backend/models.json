@@ -1,0 +1,226 @@
+[
+  {
+    "model_id": "single_tone",
+    "model_version": "1.0.0",
+    "expression_id": "real_single_tone_v1",
+    "display_name": "Single Tone",
+    "supported_signal_kinds": [
+      "real"
+    ],
+    "supported_sampling_kinds": [
+      "uniform",
+      "nonuniform"
+    ],
+    "enabled": true,
+    "parameters": [
+      {
+        "parameter_id": "amplitude",
+        "name": "Amplitude",
+        "unit": "a.u.",
+        "description": "Estimated amplitude.",
+        "bounds": [
+          null,
+          null
+        ]
+      },
+      {
+        "parameter_id": "frequency",
+        "name": "Frequency",
+        "unit": "Hz",
+        "description": "Estimated frequency.",
+        "bounds": [
+          null,
+          null
+        ]
+      },
+      {
+        "parameter_id": "phase",
+        "name": "Phase",
+        "unit": "rad",
+        "description": "Estimated phase.",
+        "bounds": [
+          null,
+          null
+        ]
+      },
+      {
+        "parameter_id": "offset",
+        "name": "Offset",
+        "unit": "a.u.",
+        "description": "Estimated offset.",
+        "bounds": [
+          null,
+          null
+        ]
+      }
+    ]
+  },
+  {
+    "model_id": "multi_tone",
+    "model_version": "1.0.0",
+    "expression_id": "real_multi_tone_v1",
+    "display_name": "Multi Tone",
+    "supported_signal_kinds": [
+      "real"
+    ],
+    "supported_sampling_kinds": [
+      "uniform",
+      "nonuniform"
+    ],
+    "enabled": true,
+    "parameters": [
+      {
+        "parameter_id": "frequencies",
+        "name": "Frequencies",
+        "unit": "Hz",
+        "description": "Estimated frequencies.",
+        "bounds": [
+          null,
+          null
+        ]
+      },
+      {
+        "parameter_id": "amplitudes",
+        "name": "Amplitudes",
+        "unit": "a.u.",
+        "description": "Estimated amplitudes.",
+        "bounds": [
+          null,
+          null
+        ]
+      },
+      {
+        "parameter_id": "phases",
+        "name": "Phases",
+        "unit": "rad",
+        "description": "Estimated phases.",
+        "bounds": [
+          null,
+          null
+        ]
+      },
+      {
+        "parameter_id": "offset",
+        "name": "Offset",
+        "unit": "a.u.",
+        "description": "Estimated offset.",
+        "bounds": [
+          null,
+          null
+        ]
+      }
+    ]
+  },
+  {
+    "model_id": "am",
+    "model_version": "1.0.0",
+    "expression_id": "real_am_v1",
+    "display_name": "Am",
+    "supported_signal_kinds": [
+      "real"
+    ],
+    "supported_sampling_kinds": [
+      "uniform",
+      "nonuniform"
+    ],
+    "enabled": true,
+    "parameters": [
+      {
+        "parameter_id": "carrier_amplitude",
+        "name": "Carrier Amplitude",
+        "unit": "a.u.",
+        "description": "Estimated carrier amplitude.",
+        "bounds": [
+          null,
+          null
+        ]
+      },
+      {
+        "parameter_id": "carrier_frequency",
+        "name": "Carrier Frequency",
+        "unit": "Hz",
+        "description": "Estimated carrier frequency.",
+        "bounds": [
+          null,
+          null
+        ]
+      },
+      {
+        "parameter_id": "modulation_frequency",
+        "name": "Modulation Frequency",
+        "unit": "Hz",
+        "description": "Estimated modulation frequency.",
+        "bounds": [
+          null,
+          null
+        ]
+      },
+      {
+        "parameter_id": "modulation_index",
+        "name": "Modulation Index",
+        "unit": "ratio",
+        "description": "Estimated modulation index.",
+        "bounds": [
+          null,
+          null
+        ]
+      }
+    ]
+  },
+  {
+    "model_id": "fm",
+    "model_version": "1.0.0",
+    "expression_id": "real_fm_v1",
+    "display_name": "Fm",
+    "supported_signal_kinds": [
+      "real"
+    ],
+    "supported_sampling_kinds": [
+      "uniform",
+      "nonuniform"
+    ],
+    "enabled": true,
+    "parameters": [
+      {
+        "parameter_id": "carrier_amplitude",
+        "name": "Carrier Amplitude",
+        "unit": "a.u.",
+        "description": "Estimated carrier amplitude.",
+        "bounds": [
+          null,
+          null
+        ]
+      },
+      {
+        "parameter_id": "carrier_frequency",
+        "name": "Carrier Frequency",
+        "unit": "Hz",
+        "description": "Estimated carrier frequency.",
+        "bounds": [
+          null,
+          null
+        ]
+      },
+      {
+        "parameter_id": "modulation_frequency",
+        "name": "Modulation Frequency",
+        "unit": "Hz",
+        "description": "Estimated modulation frequency.",
+        "bounds": [
+          null,
+          null
+        ]
+      },
+      {
+        "parameter_id": "frequency_deviation",
+        "name": "Frequency Deviation",
+        "unit": "Hz",
+        "description": "Estimated frequency deviation.",
+        "bounds": [
+          null,
+          null
+        ]
+      }
+    ]
+  }
+]

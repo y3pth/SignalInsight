@@ -1,9 +1,9 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from app.schemas.base import ContractModel
 
 
-class HealthResponse(BaseModel):
+class HealthResponse(ContractModel):
     status: Literal["ok"]
     service: str
     version: str

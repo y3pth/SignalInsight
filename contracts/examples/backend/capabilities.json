@@ -1,0 +1,38 @@
+{
+  "api_version": "v1",
+  "contract_version": "1.0.0",
+  "dataset_formats": [
+    "csv",
+    "mat",
+    "mat_v7_3"
+  ],
+  "signal_kinds": [
+    "real",
+    "complex_analytic",
+    "complex_baseband"
+  ],
+  "sampling_kinds": [
+    "uniform",
+    "nonuniform",
+    "unknown"
+  ],
+  "analysis_tasks": false,
+  "batch_tasks": false,
+  "ai_providers": [
+    {
+      "provider": "qoder",
+      "available": false,
+      "reason": "not_configured"
+    },
+    {
+      "provider": "bailian",
+      "available": false,
+      "reason": "not_configured"
+    },
+    {
+      "provider": "template",
+      "available": true,
+      "reason": null
+    }
+  ]
+}

@@ -13,6 +13,12 @@
 - Implemented:
 - Explicitly not included:
 
+## Core Functions and Contract Compliance
+
+- Core functions and modules:
+- Interface standards verified:
+- Contract deviations and reasons:
+
 ## Verification
 
 - Test commands and results:
