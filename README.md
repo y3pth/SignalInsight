@@ -12,6 +12,7 @@
 - **数据模式：** 实数单/多通道 CSV、MAT v5 实数矩阵、IQ CSV（单分量复指数）
 - **立项背景：** [立项确定书.md](立项确定书.md)
 - **新对话交接：** [HANDOFF.md](HANDOFF.md)
+- **工程转接：** [TRANSFER.md](TRANSFER.md)
 - **协作规则：** [AGENTS.md](AGENTS.md)
 
 ## 结构
