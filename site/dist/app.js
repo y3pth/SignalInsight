@@ -1,6 +1,7 @@
 import {
   analyzeSignal,
   buildAiPayload,
+  buildDecision,
   templateExplanation,
 } from "./dsp.js";
 import { parseCsv } from "./csv.js";
@@ -17,6 +18,11 @@ const elements = {
   recommendation: document.querySelector("#recommended-model"),
   reliability: document.querySelector("#reliability-badge"),
   subtitle: document.querySelector("#result-subtitle"),
+  conclusionTitle: document.querySelector("#conclusion-title"),
+  conclusionConfidence: document.querySelector("#conclusion-confidence"),
+  conclusionSummary: document.querySelector("#conclusion-summary"),
+  conclusionEvidence: document.querySelector("#conclusion-evidence"),
+  conclusionChange: document.querySelector("#conclusion-change"),
   metricSamples: document.querySelector("#metric-samples"),
   metricRate: document.querySelector("#metric-rate"),
   metricR2: document.querySelector("#metric-r2"),
@@ -290,6 +296,11 @@ function invalidateResult(message = "数据已变更，请重新运行分析。"
   elements.aiLimitations.hidden = true;
   elements.subtitle.textContent = message;
   elements.resultAnnouncer.textContent = message;
+  elements.conclusionTitle.textContent = "等待重新分析";
+  elements.conclusionConfidence.textContent = "—";
+  elements.conclusionSummary.textContent = message;
+  elements.conclusionEvidence.replaceChildren();
+  elements.conclusionChange.replaceChildren();
 }
 
 function markDataChanged(message) {
@@ -312,6 +323,11 @@ async function analyzeCurrent() {
     elements.aiButton.disabled = true;
     elements.aiButton.textContent = "分析中…";
     elements.aiStatus.textContent = "等待当前分析完成。";
+    elements.conclusionTitle.textContent = "正在分析…";
+    elements.conclusionConfidence.textContent = "—";
+    elements.conclusionSummary.textContent = "Worker 正在做模型竞争与证据检查。";
+    elements.conclusionEvidence.replaceChildren();
+    elements.conclusionChange.replaceChildren();
     const data = selectedSignal();
     if (data.values.length > 100000) {
       showToast("大样本分析已转入 Worker，可能需要数十秒。");
@@ -336,6 +352,53 @@ async function analyzeCurrent() {
   }
 }
 
+const EVIDENCE_CHARTS = {
+  spectral_prominence: "spectrum-chart",
+  residual_structure: "residual-chart",
+  residual_whiteness: "residual-chart",
+  fit_quality: "time-chart",
+  frequency_resolution: "time-chart",
+  modulation_structure: "time-chart",
+};
+
+function focusEvidence(id) {
+  const row = document.querySelector(`[data-evidence-id="${id}"]`);
+  if (row) {
+    row.scrollIntoView({ behavior: "smooth", block: "center" });
+    row.classList.add("evidence-flash");
+    setTimeout(() => row.classList.remove("evidence-flash"), 1800);
+  }
+  const chartId = EVIDENCE_CHARTS[id];
+  const card = chartId ? document.getElementById(chartId)?.closest(".chart-card") : null;
+  if (card) {
+    card.classList.add("chart-flash");
+    setTimeout(() => card.classList.remove("chart-flash"), 1800);
+  }
+}
+
+function renderConclusion(result) {
+  const decision = buildDecision(result);
+  elements.conclusionTitle.textContent = decision.title;
+  elements.conclusionConfidence.textContent = decision.confidence;
+  elements.conclusionSummary.textContent = decision.summary;
+  const chips = decision.evidenceIds.map((id) => {
+    const item = result.reliability.evidence.find((entry) => entry.id === id);
+    if (!item) return null;
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `evidence-chip ${item.status}`;
+    chip.textContent = `${item.label} · ${item.value}`;
+    chip.addEventListener("click", () => focusEvidence(item.id));
+    return chip;
+  }).filter(Boolean);
+  elements.conclusionEvidence.replaceChildren(...chips);
+  elements.conclusionChange.replaceChildren(...decision.whatWouldChange.map((text) => {
+    const item = document.createElement("li");
+    item.textContent = text;
+    return item;
+  }));
+}
+
 function render(result) {
   const best = result.best;
   elements.recommendation.textContent = result.unknown
@@ -357,6 +420,7 @@ function render(result) {
   elements.resultAnnouncer.textContent = result.unknown
     ? "分析完成：证据不足，暂不推荐模型。"
     : `分析完成：推荐${best.label}，可信等级${result.reliability.label}。`;
+  renderConclusion(result);
   elements.metricSamples.textContent = `${result.sampleCount.toLocaleString()} 点`;
   elements.metricRate.textContent = `${result.sampleRate.toFixed(2)} Hz · Nyq ${result.nyquist.toFixed(1)} Hz`;
   elements.metricR2.textContent = best?.metrics.r2 == null ? "—" : `R² ${best.metrics.r2.toFixed(4)}`;
@@ -440,6 +504,7 @@ function renderEvidence(result) {
   for (const item of result.reliability.evidence) {
     const row = document.createElement("div");
     row.className = "evidence-item";
+    row.dataset.evidenceId = item.id;
     const dot = document.createElement("span");
     dot.className = `evidence-dot ${item.status === "pass" ? "" : item.status}`;
     const copy = document.createElement("div");

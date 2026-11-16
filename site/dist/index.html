@@ -79,6 +79,22 @@
           <button id="download-button" class="ghost-button" type="button" disabled>导出报告</button>
         </div>
 
+        <article id="conclusion-card" class="conclusion-card" aria-label="可信结论卡">
+          <div class="conclusion-main">
+            <p class="eyebrow">00 / TRUST SUMMARY</p>
+            <div class="conclusion-title-row">
+              <h2 id="conclusion-title">正在分析…</h2>
+              <span id="conclusion-confidence" class="conclusion-confidence">—</span>
+            </div>
+            <p id="conclusion-summary" class="conclusion-summary">正在准备模型竞争与证据链。</p>
+            <div id="conclusion-evidence" class="conclusion-evidence" aria-label="结论依据"></div>
+          </div>
+          <div class="conclusion-side">
+            <strong>什么会改变结论</strong>
+            <ul id="conclusion-change"></ul>
+          </div>
+        </article>
+
         <div class="metric-row" aria-label="核心指标">
           <article class="metric-card"><span>样本 / 采样率</span><strong id="metric-samples">—</strong><small id="metric-rate">—</small></article>
           <article class="metric-card"><span>拟合解释能力</span><strong id="metric-r2">—</strong><small id="metric-rmse">—</small></article>

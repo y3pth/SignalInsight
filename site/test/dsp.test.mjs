@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { analyzeSignal, buildAiPayload, templateExplanation } from "../dist/dsp.js";
+import { analyzeSignal, buildAiPayload, buildDecision, templateExplanation } from "../dist/dsp.js";
 
 function seededNoise(seed) {
   let state = seed >>> 0;
@@ -53,6 +53,10 @@ assert.ok(singleResult.candidates.every((candidate) => !("fitted" in candidate) 
 assert.ok(!("fitted" in singleResult.best) && !("residual" in singleResult.best));
 assert.equal(singleResult.series.fitted.length, singleResult.sampleCount);
 assert.equal(singleResult.series.residual.length, singleResult.sampleCount);
+const singleDecision = buildDecision(singleResult);
+assert.ok(singleDecision.title.includes("单频"));
+assert.ok(singleDecision.evidenceIds.length > 0);
+assert.ok(singleDecision.whatWouldChange.length > 0);
 
 const dual = buildSignal([
   { amplitude: 1.2, frequency: 80.5, phase: 0.1 },
@@ -72,6 +76,7 @@ const noisePayload = buildAiPayload(noiseResult);
 assert.equal(noisePayload.unknown, true);
 assert.equal(noisePayload.recommendedModel, null);
 assert.ok(noisePayload.reliability.limitations.length > 0);
+assert.equal(buildDecision(noiseResult).title, "暂不推荐模型");
 
 function buildAmSignal() {
   const fs = 1024;
@@ -108,6 +113,8 @@ const amFrequency = amResult.best.parameters.find((item) => item.id === "modulat
 const amIndex = amResult.best.parameters.find((item) => item.id === "modulation_index").value;
 assert.ok(Math.abs(amFrequency - 5) < 0.2, `AM modulation frequency ${amFrequency}`);
 assert.ok(Math.abs(amIndex - 0.6) < 0.08, `AM modulation index ${amIndex}`);
+assert.ok(amResult.reliability.evidence.some((item) => item.id === "modulation_structure"));
+assert.ok(buildDecision(amResult).evidenceIds.includes("modulation_structure"));
 
 const fm = buildFmSignal();
 const fmResult = analyzeSignal(fm.time, fm.values);
@@ -118,6 +125,8 @@ const fmFrequency = fmResult.best.parameters.find((item) => item.id === "modulat
 const fmIndex = fmResult.best.parameters.find((item) => item.id === "modulation_index").value;
 assert.ok(Math.abs(fmFrequency - 4) < 0.2, `FM modulation frequency ${fmFrequency}`);
 assert.ok(Math.abs(fmIndex - 2) < 0.15, `FM modulation index ${fmIndex}`);
+assert.ok(fmResult.reliability.evidence.some((item) => item.id === "modulation_structure"));
+assert.ok(buildDecision(fmResult).evidenceIds.includes("modulation_structure"));
 
 console.log("DSP tests passed", {
   singleFrequency: frequency,

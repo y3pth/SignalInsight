@@ -1001,6 +1001,18 @@ export function analyzeSignal(time, values) {
       status: cycles >= 5 ? "pass" : cycles >= 2 ? "warn" : "fail",
     },
   ];
+  if (best?.family === "am" || best?.family === "fm") {
+    const modulation = best.modulationEvidence;
+    if (modulation) {
+      evidence.push({
+        id: "modulation_structure",
+        label: "调制结构",
+        value: `${best.family.toUpperCase()} · ${modulation.frequency.toFixed(3)} Hz · 指数 ${modulation.index.toFixed(3)}`,
+        detail: `边带/瞬时频率显著度 ${modulation.prominence.toFixed(1)}×`,
+        status: modulation.index >= (best.family === "am" ? 0.08 : 0.1) && modulation.prominence >= 6 ? "pass" : "warn",
+      });
+    }
+  }
   let level = "reliable";
   let levelLabel = "较高可信";
   if (unknown) {
@@ -1125,5 +1137,66 @@ export function buildAiPayload(result) {
       })),
       limitations: result.reliability.limitations,
     },
+  };
+}
+
+export function buildDecision(result) {
+  const evidence = result.reliability?.evidence ?? [];
+  const ranked = [...(result.candidates ?? [])].sort((a, b) => a.metrics.bic - b.metrics.bic);
+  if (!result.best || result.unknown) {
+    return {
+      title: "暂不推荐模型",
+      confidence: result.reliability?.label ?? "证据不足",
+      summary: "主谱峰不足或候选模型无法解释数据；系统拒绝给出参数结论。",
+      evidenceIds: evidence.map((item) => item.id),
+      whatWouldChange: [
+        "提高信噪比或延长观测时长后重试。",
+        "检查是否存在削顶、漂移、非平稳或单位错误。",
+        "若信号含调制，确认 AM/FM 证据是否足够。",
+      ],
+      alternatives: [],
+    };
+  }
+
+  const best = result.best;
+  const runnerUp = ranked.find((candidate) => candidate.id !== best.id) ?? null;
+  const gap = result.reliability?.bicGap ?? (runnerUp ? runnerUp.metrics.bic - best.metrics.bic : null);
+  const gapText = gap == null ? "" : `，领先次优 ${gap.toFixed(1)} BIC`;
+  const isModulation = best.family === "am" || best.family === "fm";
+  const preferred = isModulation
+    ? ["spectral_prominence", "fit_quality", "modulation_structure", "residual_whiteness", "frequency_resolution"]
+    : ["spectral_prominence", "fit_quality", "residual_whiteness", "residual_structure", "frequency_resolution"];
+  const evidenceIds = preferred
+    .filter((id) => evidence.some((item) => item.id === id))
+    .slice(0, 4);
+
+  const whatWouldChange = [];
+  if (gap != null && gap < 10) {
+    whatWouldChange.push("增加观测时长或降低噪声，使最优与次优的 BIC 差距超过 10。");
+  }
+  if (evidence.some((item) => item.id === "residual_whiteness" && item.status !== "pass")) {
+    whatWouldChange.push("若残差结构来自未建模成分，加入相应候选后结论可能改变。");
+  }
+  if (evidence.some((item) => item.id === "frequency_resolution" && item.status !== "pass")) {
+    whatWouldChange.push("延长观测时长可提高频率分辨率。");
+  }
+  if (isModulation) {
+    whatWouldChange.push("若调制边带或瞬时频率证据不足，AM/FM 会降级为音调模型。");
+  }
+  whatWouldChange.push("若数据存在削顶、漂移或非平稳，当前结论不适用。");
+
+  return {
+    title: `推荐：${best.label}`,
+    confidence: result.reliability.label,
+    summary: isModulation
+      ? `${best.label} 在当前候选库中 BIC 最低${gapText}；调制证据通过后才进入推荐。`
+      : `${best.label} 在当前候选库中 BIC 最低${gapText}；结论仅覆盖当前候选模型。`,
+    evidenceIds,
+    whatWouldChange,
+    alternatives: ranked.slice(0, 3).map((candidate) => ({
+      label: candidate.label,
+      bic: candidate.metrics.bic,
+      gap: candidate.id === best.id ? 0 : candidate.metrics.bic - best.metrics.bic,
+    })),
   };
 }
