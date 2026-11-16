@@ -353,7 +353,7 @@ function renderParameters(result) {
   if (!parameters.length) {
     const row = document.createElement("tr");
     const cell = document.createElement("td");
-    cell.colSpan = 3;
+    cell.colSpan = 4;
     cell.textContent = "无可靠参数估计";
     row.append(cell);
     elements.parameterBody.append(row);
@@ -368,7 +368,13 @@ function renderParameters(result) {
     value.textContent = formatNumber(parameter.value);
     const unit = document.createElement("td");
     unit.textContent = parameter.unit;
-    row.append(label, value, unit);
+    const uncertainty = document.createElement("td");
+    uncertainty.textContent = parameter.sigma == null
+      ? "—"
+      : parameter.sigmaKind === "resolution"
+        ? `±${formatNumber(parameter.sigma)}（分辨率）`
+        : `±${formatNumber(parameter.sigma)}`;
+    row.append(label, value, unit, uncertainty);
     elements.parameterBody.append(row);
   }
 }

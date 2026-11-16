@@ -151,7 +151,523 @@ function fitAtFrequencies(tau, values, frequencies) {
     fitted[i] = prediction;
     rss += (values[i] - prediction) ** 2;
   }
-  return { coefficients, fitted, rss };
+  return { coefficients, fitted, rss, normal };
+}
+
+function residualStatistics(residual, sampleRate) {
+  const residualSpectrum = computeSpectrum(residual, sampleRate);
+  const strongestResidual = residualSpectrum.peaks[0] ?? null;
+  return {
+    rms: rms(residual),
+    lag1: autocorrelation(residual, 1),
+    maxAcf: maxAbsAutocorrelation(residual),
+    strongestPeak: strongestResidual,
+    prominence: strongestResidual?.prominence ?? 0,
+    frequency: strongestResidual?.frequency ?? null,
+  };
+}
+
+function evaluateCandidate(values, fitted, freeParameters, sampleRate) {
+  const n = values.length;
+  const residual = values.map((value, index) => value - fitted[index]);
+  const rss = residual.reduce((sum, value) => sum + value * value, 0);
+  const baseline = mean(values);
+  const sst = values.reduce((sum, value) => sum + (value - baseline) ** 2, 0);
+  const r2 = sst > 0 ? 1 - rss / sst : null;
+  const rssLog = Math.max(rss, 1e-30);
+  const aic = n * Math.log(rssLog / n) + 2 * freeParameters;
+  const bic = n * Math.log(rssLog / n) + freeParameters * Math.log(n);
+  return {
+    residual,
+    metrics: {
+      rss,
+      rmse: Math.sqrt(rss / n),
+      r2,
+      aic,
+      bic,
+      sampleCount: n,
+      freeParameters,
+    },
+    residualAnalysis: residualStatistics(residual, sampleRate),
+  };
+}
+
+function inverseFft(re, im) {
+  const n = re.length;
+  for (let i = 0; i < n; i += 1) im[i] = -im[i];
+  fft(re, im);
+  for (let i = 0; i < n; i += 1) {
+    re[i] /= n;
+    im[i] = -im[i] / n;
+  }
+}
+
+function analyticSignal(values) {
+  const n = values.length;
+  const nfft = nextPowerOfTwo(n);
+  const re = new Float64Array(nfft);
+  const im = new Float64Array(nfft);
+  const center = mean(values);
+  for (let i = 0; i < n; i += 1) re[i] = values[i] - center;
+  fft(re, im);
+  const half = nfft / 2;
+  for (let k = 1; k < half; k += 1) {
+    re[k] *= 2;
+    im[k] *= 2;
+  }
+  for (let k = half + 1; k < nfft; k += 1) {
+    re[k] = 0;
+    im[k] = 0;
+  }
+  inverseFft(re, im);
+  const envelope = new Array(n);
+  const phase = new Array(n);
+  let previous = 0;
+  let unwrapped = 0;
+  for (let i = 0; i < n; i += 1) {
+    envelope[i] = Math.hypot(re[i], im[i]);
+    const current = Math.atan2(im[i], re[i]);
+    if (i === 0) {
+      unwrapped = current;
+    } else {
+      let delta = current - previous;
+      while (delta > Math.PI) delta -= TAU;
+      while (delta < -Math.PI) delta += TAU;
+      unwrapped += delta;
+    }
+    phase[i] = unwrapped;
+    previous = current;
+  }
+  return { envelope, phase };
+}
+
+function fitThreeBasis(values, first, second) {
+  const n = values.length;
+  let s11 = 0;
+  let s12 = 0;
+  let s22 = 0;
+  let s1 = 0;
+  let s2 = 0;
+  let sy = 0;
+  let s1y = 0;
+  let s2y = 0;
+  for (let i = 0; i < n; i += 1) {
+    const x1 = first[i];
+    const x2 = second[i];
+    const y = values[i];
+    s11 += x1 * x1;
+    s12 += x1 * x2;
+    s22 += x2 * x2;
+    s1 += x1;
+    s2 += x2;
+    sy += y;
+    s1y += x1 * y;
+    s2y += x2 * y;
+  }
+  const normal = [
+    [n, s1, s2],
+    [s1, s11, s12],
+    [s2, s12, s22],
+  ];
+  const coefficients = solveLinear(normal.map((row) => [...row]), [sy, s1y, s2y]);
+  const fitted = new Array(n);
+  let rss = 0;
+  for (let i = 0; i < n; i += 1) {
+    const prediction = coefficients[0] + coefficients[1] * first[i] + coefficients[2] * second[i];
+    fitted[i] = prediction;
+    rss += (values[i] - prediction) ** 2;
+  }
+  return { coefficients, fitted, rss, normal };
+}
+
+function downsampleArrays(arrays, maxPoints = 8192) {
+  const length = arrays[0]?.length ?? 0;
+  const step = Math.max(1, Math.ceil(length / maxPoints));
+  const indices = [];
+  for (let i = 0; i < length; i += step) indices.push(i);
+  if (indices.at(-1) !== length - 1) indices.push(length - 1);
+  return arrays.map((array) => indices.map((index) => array[index]));
+}
+
+function instantaneousFrequency(phase, tau, sampleRate) {
+  const dt = 1 / sampleRate;
+  const start = Math.max(1, Math.floor(phase.length * 0.05));
+  const end = Math.min(phase.length - 1, Math.ceil(phase.length * 0.95));
+  const time = [];
+  const values = [];
+  for (let i = start; i < end; i += 1) {
+    time.push(tau[i]);
+    values.push((phase[i + 1] - phase[i]) / (TAU * dt));
+  }
+  return { time, values, mean: values.length ? mean(values) : 0 };
+}
+
+function fitAmCandidate(values, tau, sampleRate, spectrum, analytic, inst, duration) {
+  const n = values.length;
+  const envelope = analytic.envelope;
+  const envelopeSpectrum = computeSpectrum(envelope, sampleRate);
+  const minModulation = Math.max(1 / duration, spectrum.binWidth * 0.75);
+  const carrierGuess = Number.isFinite(inst.mean) && inst.mean > 0 ? inst.mean : spectrum.peaks[0]?.frequency;
+  if (!carrierGuess) return null;
+  const modulationPeak = envelopeSpectrum.peaks.find(
+    (peak) => peak.frequency >= minModulation && peak.frequency < carrierGuess * 0.9 && peak.prominence >= 4,
+  );
+  if (!modulationPeak) return null;
+
+  const fcFloor = Math.max(spectrum.binWidth, carrierGuess * 0.98);
+  const fcCeil = Math.min(sampleRate / 2 * 0.999, carrierGuess * 1.02);
+  const fmFloor = Math.max(minModulation, modulationPeak.frequency - spectrum.binWidth * 2);
+  const fmCeil = Math.min(carrierGuess * 0.9, modulationPeak.frequency + spectrum.binWidth * 2);
+  if (fcCeil <= fcFloor || fmCeil <= fmFloor) return null;
+
+  const [tauS, valuesS, envelopeS] = downsampleArrays([tau, values, envelope], 8192);
+  const amAt = (fc, fm) => {
+    try {
+      const envFit = fitAtFrequencies(tauS, envelopeS, [fm]);
+      const a0 = envFit.coefficients[0];
+      const a = envFit.coefficients[1];
+      const b = envFit.coefficients[2];
+      if (!Number.isFinite(a0) || a0 <= 0) return null;
+      const first = new Array(tauS.length);
+      const second = new Array(tauS.length);
+      for (let i = 0; i < tauS.length; i += 1) {
+        const modulation = a * Math.cos(TAU * fm * tauS[i]) + b * Math.sin(TAU * fm * tauS[i]);
+        const env = a0 + modulation;
+        first[i] = env * Math.cos(TAU * fc * tauS[i]);
+        second[i] = env * Math.sin(TAU * fc * tauS[i]);
+      }
+      return fitThreeBasis(valuesS, first, second);
+    } catch {
+      return null;
+    }
+  };
+
+  let fc = Math.min(fcCeil, Math.max(fcFloor, carrierGuess));
+  let fm = Math.min(fmCeil, Math.max(fmFloor, modulationPeak.frequency));
+  for (let sweep = 0; sweep < 2; sweep += 1) {
+    fm = goldenMinimum((candidate) => amAt(fc, candidate)?.rss ?? Number.POSITIVE_INFINITY, fmFloor, fmCeil, 32);
+    fc = goldenMinimum((candidate) => amAt(candidate, fm)?.rss ?? Number.POSITIVE_INFINITY, fcFloor, fcCeil, 32);
+  }
+
+  const envFit = fitAtFrequencies(tau, envelope, [fm]);
+  const a0 = envFit.coefficients[0];
+  const a = envFit.coefficients[1];
+  const b = envFit.coefficients[2];
+  if (!Number.isFinite(a0) || a0 <= 0) return null;
+  const first = new Array(n);
+  const second = new Array(n);
+  for (let i = 0; i < n; i += 1) {
+    const modulation = a * Math.cos(TAU * fm * tau[i]) + b * Math.sin(TAU * fm * tau[i]);
+    const env = a0 + modulation;
+    first[i] = env * Math.cos(TAU * fc * tau[i]);
+    second[i] = env * Math.sin(TAU * fc * tau[i]);
+  }
+  const fit = fitThreeBasis(values, first, second);
+  const modulationIndex = Math.hypot(a, b) / a0;
+  const evaluated = evaluateCandidate(values, fit.fitted, 7, sampleRate);
+  const edgeTrim = Math.max(1, Math.floor(n * 0.05));
+  const trimmedAnalysis = residualStatistics(evaluated.residual.slice(edgeTrim, n - edgeTrim), sampleRate);
+  const u = fit.coefficients[1];
+  const v = fit.coefficients[2];
+  let signalCov = null;
+  try {
+    signalCov = {
+      variance: evaluated.metrics.rss / Math.max(1, n - 7),
+      inverse: inverseMatrix(fit.normal),
+    };
+  } catch {}
+  let envCov = null;
+  try {
+    envCov = {
+      variance: envFit.rss / Math.max(1, n - 3),
+      inverse: inverseMatrix(envFit.normal),
+    };
+  } catch {}
+  const carrierCov = signalCov ? coefficientCovariance(signalCov.inverse, signalCov.variance, 1, 2) : null;
+  const carrierSigmas = carrierCov ? amplitudePhaseSigma(u, v, carrierCov) : {};
+  const modulationCov = envCov ? coefficientCovariance(envCov.inverse, envCov.variance, 1, 2) : null;
+  const modulationSigmas = modulationCov ? amplitudePhaseSigma(a, b, modulationCov) : {};
+  const resolution = 1 / Math.max(tau.at(-1) || 1, 1e-12);
+  return {
+    id: "am",
+    family: "am",
+    label: "AM 调幅模型",
+    count: 1,
+    frequencies: [fc],
+    parameters: [
+      {
+        id: "offset",
+        label: "直流偏移",
+        value: fit.coefficients[0],
+        unit: "a.u.",
+        sigma: signalCov ? Math.sqrt(Math.max(0, signalCov.variance * signalCov.inverse[0][0])) : undefined,
+      },
+      { id: "frequency_1", label: "载频", value: fc, unit: "Hz", sigma: resolution, sigmaKind: "resolution" },
+      {
+        id: "amplitude_1",
+        label: "载波幅值",
+        value: a0 * Math.hypot(u, v),
+        unit: "a.u.",
+        sigma: carrierSigmas.sigmaAmplitude == null ? undefined : a0 * carrierSigmas.sigmaAmplitude,
+      },
+      {
+        id: "phase_1",
+        label: "载波相位",
+        value: Math.atan2(u, v),
+        unit: "rad",
+        reference: "相对首样本",
+        sigma: carrierSigmas.sigmaPhase,
+      },
+      { id: "modulation_frequency", label: "调制频率", value: fm, unit: "Hz", sigma: resolution, sigmaKind: "resolution" },
+      {
+        id: "modulation_index",
+        label: "调制指数",
+        value: modulationIndex,
+        unit: "",
+        sigma: modulationIndexSigma(envCov, a0, a, b),
+      },
+      {
+        id: "modulation_phase",
+        label: "调制相位",
+        value: Math.atan2(a, b),
+        unit: "rad",
+        reference: "相对首样本",
+        sigma: modulationSigmas.sigmaPhase,
+      },
+    ],
+    fitted: fit.fitted,
+    residual: evaluated.residual,
+    metrics: evaluated.metrics,
+    residualAnalysis: trimmedAnalysis,
+    modulationEvidence: {
+      frequency: fm,
+      index: modulationIndex,
+      prominence: modulationPeak.prominence,
+      carrierFrequency: fc,
+    },
+  };
+}
+
+function fmModelFit(fc, fm, deviation, modulationPhase, tauX, valuesX) {
+  const beta = deviation / fm;
+  const cosPhase = new Array(tauX.length);
+  const sinPhase = new Array(tauX.length);
+  for (let i = 0; i < tauX.length; i += 1) {
+    const phase = TAU * fc * tauX[i] + beta * Math.sin(TAU * fm * tauX[i] + modulationPhase);
+    cosPhase[i] = Math.cos(phase);
+    sinPhase[i] = Math.sin(phase);
+  }
+  return fitThreeBasis(valuesX, cosPhase, sinPhase);
+}
+
+function fitFmCandidate(values, tau, sampleRate, spectrum, inst, duration) {
+  const n = values.length;
+  const carrierGuess = Number.isFinite(inst.mean) && inst.mean > 0 ? inst.mean : spectrum.peaks[0]?.frequency;
+  if (!carrierGuess) return null;
+  const instSpectrum = computeSpectrum(inst.values, sampleRate);
+  const minModulation = Math.max(1 / duration, spectrum.binWidth * 0.75);
+  const modulationPeak = instSpectrum.peaks.find(
+    (peak) => peak.frequency >= minModulation && peak.frequency < carrierGuess * 0.9 && peak.prominence >= 4,
+  );
+  if (!modulationPeak) return null;
+
+  const fmFloor = Math.max(minModulation, modulationPeak.frequency - spectrum.binWidth * 2);
+  const fmCeil = Math.min(carrierGuess * 0.9, modulationPeak.frequency + spectrum.binWidth * 2);
+  if (fmCeil <= fmFloor) return null;
+
+  const fm = Math.min(fmCeil, Math.max(fmFloor, modulationPeak.frequency));
+  const fInstFit = fitAtFrequencies(inst.time, inst.values, [fm]);
+  const fc = fInstFit.coefficients[0];
+  const modulationCos = fInstFit.coefficients[1];
+  const modulationSin = fInstFit.coefficients[2];
+  const deviation = Math.hypot(modulationCos, modulationSin);
+  const modulationPhase = Math.atan2(-modulationSin, modulationCos);
+  if (!Number.isFinite(fc) || !Number.isFinite(deviation) || deviation <= 0 || fm <= 0) return null;
+  const [tauS, valuesS] = downsampleArrays([tau, values], 8192);
+  const fcSpan = Math.max(spectrum.binWidth, 0.5);
+  const fcLower = Math.max(spectrum.binWidth, fc - fcSpan);
+  const fcUpper = Math.min(sampleRate / 2 * 0.999, fc + fcSpan);
+  const evaluateFm = (fcCandidate, deviationCandidate, phaseCandidate) => {
+    try {
+      return fmModelFit(fcCandidate, fm, deviationCandidate, phaseCandidate, tauS, valuesS).rss;
+    } catch {
+      return Number.POSITIVE_INFINITY;
+    }
+  };
+  let fcFinal = fc;
+  let deviationFinal = deviation;
+  let modulationPhaseFinal = modulationPhase;
+  for (let sweep = 0; sweep < 2; sweep += 1) {
+    fcFinal = goldenMinimum(
+      (candidate) => evaluateFm(candidate, deviationFinal, modulationPhaseFinal),
+      fcLower,
+      fcUpper,
+      32,
+    );
+    deviationFinal = goldenMinimum(
+      (candidate) => evaluateFm(fcFinal, candidate, modulationPhaseFinal),
+      Math.max(1e-6, deviation * 0.9),
+      deviation * 1.1,
+      32,
+    );
+    modulationPhaseFinal = goldenMinimum(
+      (candidate) => evaluateFm(fcFinal, deviationFinal, candidate),
+      modulationPhase - 0.6,
+      modulationPhase + 0.6,
+      32,
+    );
+  }
+  if (!Number.isFinite(fcFinal)) fcFinal = fc;
+  if (!Number.isFinite(deviationFinal)) deviationFinal = deviation;
+  if (!Number.isFinite(modulationPhaseFinal)) modulationPhaseFinal = modulationPhase;
+  const beta = deviationFinal / fm;
+  const cosPhase = new Array(n);
+  const sinPhase = new Array(n);
+  for (let i = 0; i < n; i += 1) {
+    const phase = TAU * fcFinal * tau[i] + beta * Math.sin(TAU * fm * tau[i] + modulationPhaseFinal);
+    cosPhase[i] = Math.cos(phase);
+    sinPhase[i] = Math.sin(phase);
+  }
+  const fit = fitThreeBasis(values, cosPhase, sinPhase);
+  const evaluated = evaluateCandidate(values, fit.fitted, 7, sampleRate);
+  const edgeTrim = Math.max(1, Math.floor(n * 0.05));
+  const trimmedAnalysis = residualStatistics(evaluated.residual.slice(edgeTrim, n - edgeTrim), sampleRate);
+  const u = fit.coefficients[1];
+  const v = fit.coefficients[2];
+  let signalCov = null;
+  try {
+    signalCov = {
+      variance: evaluated.metrics.rss / Math.max(1, n - 7),
+      inverse: inverseMatrix(fit.normal),
+    };
+  } catch {}
+  let fInstCov = null;
+  try {
+    fInstCov = {
+      variance: fInstFit.rss / Math.max(1, inst.time.length - 3),
+      inverse: inverseMatrix(fInstFit.normal),
+    };
+  } catch {}
+  const carrierCov = signalCov ? coefficientCovariance(signalCov.inverse, signalCov.variance, 1, 2) : null;
+  const carrierSigmas = carrierCov ? amplitudePhaseSigma(u, v, carrierCov) : {};
+  const fInstCoeffCov = fInstCov ? coefficientCovariance(fInstCov.inverse, fInstCov.variance, 1, 2) : null;
+  const fInstSigmas = fInstCoeffCov ? amplitudePhaseSigma(modulationCos, modulationSin, fInstCoeffCov) : {};
+  const resolution = 1 / Math.max(tau.at(-1) || 1, 1e-12);
+  const deviationSigma = Math.max(fInstSigmas.sigmaAmplitude ?? 0, resolution);
+  return {
+    id: "fm",
+    family: "fm",
+    label: "FM 调频模型",
+    count: 1,
+    frequencies: [fc],
+    parameters: [
+      {
+        id: "offset",
+        label: "直流偏移",
+        value: fit.coefficients[0],
+        unit: "a.u.",
+        sigma: signalCov ? Math.sqrt(Math.max(0, signalCov.variance * signalCov.inverse[0][0])) : undefined,
+      },
+      { id: "frequency_1", label: "载频", value: fcFinal, unit: "Hz", sigma: resolution, sigmaKind: "resolution" },
+      {
+        id: "amplitude_1",
+        label: "载波幅值",
+        value: Math.hypot(u, v),
+        unit: "a.u.",
+        sigma: carrierSigmas.sigmaAmplitude,
+      },
+      {
+        id: "phase_1",
+        label: "载波相位",
+        value: Math.atan2(u, v),
+        unit: "rad",
+        reference: "相对首样本",
+        sigma: carrierSigmas.sigmaPhase,
+      },
+      { id: "modulation_frequency", label: "调制频率", value: fm, unit: "Hz", sigma: resolution, sigmaKind: "resolution" },
+      {
+        id: "frequency_deviation",
+        label: "频偏",
+        value: deviationFinal,
+        unit: "Hz",
+        sigma: deviationSigma,
+      },
+      {
+        id: "modulation_index",
+        label: "调制指数",
+        value: beta,
+        unit: "",
+        sigma: deviationSigma / fm,
+      },
+      {
+        id: "modulation_phase",
+        label: "调制相位",
+        value: modulationPhaseFinal,
+        unit: "rad",
+        reference: "相对首样本",
+        sigma: Math.max(fInstSigmas.sigmaPhase ?? 0, 0.01),
+      },
+    ],
+    fitted: fit.fitted,
+    residual: evaluated.residual,
+    metrics: evaluated.metrics,
+    residualAnalysis: trimmedAnalysis,
+    modulationEvidence: {
+      frequency: fm,
+      index: beta,
+      prominence: modulationPeak.prominence,
+      carrierFrequency: fcFinal,
+    },
+  };
+}
+
+function inverseMatrix(matrix) {
+  const n = matrix.length;
+  const inverse = Array.from({ length: n }, () => new Array(n).fill(0));
+  for (let i = 0; i < n; i += 1) {
+    const rhs = new Array(n).fill(0);
+    rhs[i] = 1;
+    const column = solveLinear(matrix.map((row) => [...row]), rhs);
+    for (let j = 0; j < n; j += 1) inverse[j][i] = column[j];
+  }
+  return inverse;
+}
+
+function coefficientCovariance(inverse, variance, cosIndex, sinIndex) {
+  return {
+    varC: variance * inverse[cosIndex][cosIndex],
+    varS: variance * inverse[sinIndex][sinIndex],
+    cov: variance * inverse[cosIndex][sinIndex],
+  };
+}
+
+function amplitudePhaseSigma(cosValue, sinValue, covariance) {
+  const amplitude = Math.hypot(cosValue, sinValue);
+  if (!amplitude) return {};
+  const sigmaAmplitude = Math.sqrt(Math.max(0,
+    (cosValue ** 2 * covariance.varC + sinValue ** 2 * covariance.varS + 2 * cosValue * sinValue * covariance.cov) / amplitude ** 2,
+  ));
+  const sigmaPhase = Math.sqrt(Math.max(0,
+    (sinValue ** 2 * covariance.varC + cosValue ** 2 * covariance.varS - 2 * sinValue * cosValue * covariance.cov) / amplitude ** 4,
+  ));
+  return { sigmaAmplitude, sigmaPhase };
+}
+
+function modulationIndexSigma(envCovariance, a0, a, b) {
+  const amplitude = Math.hypot(a, b);
+  if (!a0 || !amplitude || !envCovariance) return undefined;
+  const d0 = -amplitude / a0 ** 2;
+  const da = a / (amplitude * a0);
+  const db = b / (amplitude * a0);
+  const { variance, inverse } = envCovariance;
+  const value =
+    d0 * d0 * variance * inverse[0][0] +
+    da * da * variance * inverse[1][1] +
+    db * db * variance * inverse[2][2] +
+    2 * d0 * da * variance * inverse[0][1] +
+    2 * d0 * db * variance * inverse[0][2] +
+    2 * da * db * variance * inverse[1][2];
+  return Math.sqrt(Math.max(0, value));
 }
 
 function goldenMinimum(fn, left, right, iterations = 48) {
@@ -220,36 +736,41 @@ function fitCandidate(values, tau, sampleRate, initialFrequencies, count, spectr
   const frequencies = optimizeFrequencies(tau, values, initialFrequencies, nyquist, span);
   const solved = fitAtFrequencies(tau, values, frequencies);
   const components = sortComponents(frequencies, solved.coefficients);
-  const n = values.length;
   const freeParameters = 1 + 3 * count;
-  const rss = Math.max(solved.rss, 1e-30);
-  const baseline = mean(values);
-  const sst = values.reduce((sum, value) => sum + (value - baseline) ** 2, 0);
-  const r2 = sst > 0 ? 1 - solved.rss / sst : null;
-  const aic = n * Math.log(rss / n) + 2 * freeParameters;
-  const bic = n * Math.log(rss / n) + freeParameters * Math.log(n);
-  const residual = values.map((value, index) => value - solved.fitted[index]);
-  const residualSpectrum = computeSpectrum(residual, sampleRate);
-  const strongestResidual = residualSpectrum.peaks[0] ?? null;
-  const lag1 = autocorrelation(residual, 1);
+  const evaluated = evaluateCandidate(values, solved.fitted, freeParameters, sampleRate);
+  let variance = null;
+  let inverse = null;
+  try {
+    variance = evaluated.metrics.rss / Math.max(1, values.length - freeParameters);
+    inverse = inverseMatrix(solved.normal);
+  } catch {}
+  const resolution = 1 / Math.max(tau.at(-1) || 1, 1e-12);
+  const offsetSigma = inverse ? Math.sqrt(Math.max(0, variance * inverse[0][0])) : undefined;
   const parameters = [
-    { id: "offset", label: "直流偏移", value: solved.coefficients[0], unit: "a.u." },
+    { id: "offset", label: "直流偏移", value: solved.coefficients[0], unit: "a.u.", sigma: offsetSigma },
   ];
   components.forEach((component, index) => {
     const amplitude = Math.hypot(component.cosine, component.sine);
     const phase = Math.atan2(component.cosine, component.sine);
+    const covariance = inverse
+      ? coefficientCovariance(inverse, variance, 1 + 2 * index, 2 + 2 * index)
+      : null;
+    const sigmas = covariance ? amplitudePhaseSigma(component.cosine, component.sine, covariance) : {};
     parameters.push(
       {
         id: `frequency_${index + 1}`,
         label: count === 1 ? "频率" : `频率 ${index + 1}`,
         value: component.frequency,
         unit: "Hz",
+        sigma: resolution,
+        sigmaKind: "resolution",
       },
       {
         id: `amplitude_${index + 1}`,
         label: count === 1 ? "幅值" : `幅值 ${index + 1}`,
         value: amplitude,
         unit: "a.u.",
+        sigma: sigmas.sigmaAmplitude,
       },
       {
         id: `phase_${index + 1}`,
@@ -257,34 +778,21 @@ function fitCandidate(values, tau, sampleRate, initialFrequencies, count, spectr
         value: phase,
         unit: "rad",
         reference: "相对首样本",
+        sigma: sigmas.sigmaPhase,
       },
     );
   });
   return {
     id: count === 1 ? "single_tone" : `multi_tone_${count}`,
+    family: "tone",
     label: count === 1 ? "单频模型" : `${count} 频模型`,
     count,
     frequencies: components.map((component) => component.frequency),
     parameters,
     fitted: solved.fitted,
-    residual,
-    metrics: {
-      rss: solved.rss,
-      rmse: Math.sqrt(solved.rss / n),
-      r2,
-      aic,
-      bic,
-      sampleCount: n,
-      freeParameters,
-    },
-    residualAnalysis: {
-      rms: rms(residual),
-      lag1,
-      maxAcf: maxAbsAutocorrelation(residual),
-      strongestPeak: strongestResidual,
-      prominence: strongestResidual?.prominence ?? 0,
-      frequency: strongestResidual?.frequency ?? null,
-    },
+    residual: evaluated.residual,
+    metrics: evaluated.metrics,
+    residualAnalysis: evaluated.residualAnalysis,
   };
 }
 
@@ -356,15 +864,48 @@ export function analyzeSignal(time, values) {
       } catch {}
     }
   }
+  const baseline = mean(values);
+  const sst = values.reduce((sum, value) => sum + (value - baseline) ** 2, 0);
+  const numericalFloor = Math.max(sst * 1e-6, 1e-18);
+  const toneCandidates = candidates.filter((candidate) => candidate.family === "tone");
+  if (chosenPeaks.length >= 2 && chosenPeaks[0].prominence >= 6 && chosenPeaks[0].frequency * duration >= 5) {
+    try {
+      const analytic = analyticSignal(values);
+      const inst = instantaneousFrequency(analytic.phase, tau, sampleRate);
+      const am = fitAmCandidate(values, tau, sampleRate, spectrum, analytic, inst, duration);
+      if (am) candidates.push(am);
+      const fm = fitFmCandidate(values, tau, sampleRate, spectrum, inst, duration);
+      if (fm) candidates.push(fm);
+    } catch {}
+  }
   candidates.sort((a, b) => a.metrics.bic - b.metrics.bic);
-  let best = candidates[0] ?? null;
-  if (best?.count > 1) {
-    const single = candidates.find((candidate) => candidate.count === 1);
-    const rssReduction = single ? 1 - best.metrics.rss / Math.max(single.metrics.rss, 1e-30) : 0;
-    if (!single || best.metrics.bic > single.metrics.bic - 10 || rssReduction < 0.1) best = single;
+  const modulationCandidates = candidates.filter((candidate) => candidate.family !== "tone");
+  let bestTone = [...toneCandidates].sort((a, b) => a.metrics.bic - b.metrics.bic)[0] ?? null;
+  if (bestTone?.count > 1) {
+    const single = toneCandidates.find((candidate) => candidate.count === 1);
+    const rssReduction = single ? 1 - bestTone.metrics.rss / Math.max(single.metrics.rss, 1e-30) : 0;
+    if (!single || bestTone.metrics.bic > single.metrics.bic - 10 || rssReduction < 0.1) bestTone = single;
+  }
+  let best = bestTone;
+  const singleTone = toneCandidates.find((candidate) => candidate.id === "single_tone") ?? null;
+  for (const candidate of modulationCandidates) {
+    const evidence = candidate.modulationEvidence;
+    const gate = evidence && evidence.index >= (candidate.family === "am" ? 0.08 : 0.1) && evidence.prominence >= 6;
+    if (!gate) continue;
+    if (!bestTone) {
+      best = candidate;
+    } else {
+      const numericallyExact =
+        candidate.metrics.rss <= numericalFloor && bestTone.metrics.rss <= numericalFloor;
+      const rssReduction = 1 - candidate.metrics.rss / Math.max((singleTone ?? bestTone).metrics.rss, 1e-30);
+      if (numericallyExact || (candidate.metrics.bic <= bestTone.metrics.bic && rssReduction >= 0.1)) {
+        best = candidate;
+      }
+    }
+    break;
   }
   const maxProminence = spectrum.peaks[0]?.prominence ?? 0;
-  const signalRms = rms(values.map((value) => value - mean(values)));
+  const signalRms = rms(values.map((value) => value - baseline));
   const unknown = !best || maxProminence < 6 || best.metrics.r2 === null || best.metrics.r2 < 0.5;
   const topPeak = spectrum.peaks[0] ?? null;
   const cycles = best ? best.frequencies[0] * duration : 0;
@@ -372,6 +913,16 @@ export function analyzeSignal(time, values) {
   const residualProminence = best?.residualAnalysis.prominence ?? 0;
   const residualRms = best?.residualAnalysis.rms ?? signalRms;
   const residualRelative = signalRms > 0 ? residualRms / signalRms : 1;
+  const highQuality = Boolean(
+    best && best.metrics.r2 != null && best.metrics.r2 >= 0.999 && residualRelative <= 0.02,
+  );
+  const whitenessStatus = residualRelative <= 0.005
+    ? "pass"
+    : residualAcf <= 0.2 ? "pass" : residualAcf <= 0.35 ? "warn" : "fail";
+  const structureStatus =
+    residualProminence <= 8 || residualRelative <= 0.01
+      ? "pass"
+      : residualProminence <= 14 ? "warn" : "fail";
   const evidence = [
     {
       id: "spectral_prominence",
@@ -391,8 +942,10 @@ export function analyzeSignal(time, values) {
       id: "residual_whiteness",
       label: "残差自相关",
       value: residualAcf.toFixed(3),
-      detail: "最大绝对 ACF（滞后 1–100）",
-      status: residualAcf <= 0.2 ? "pass" : residualAcf <= 0.35 ? "warn" : "fail",
+      detail: residualRelative <= 0.005
+        ? `残差能量仅 ${(residualRelative * 100).toFixed(3)}% 信号；ACF 不具实际意义`
+        : "最大绝对 ACF（滞后 1–100）",
+      status: highQuality && whitenessStatus === "fail" ? "warn" : whitenessStatus,
     },
     {
       id: "residual_structure",
@@ -401,7 +954,7 @@ export function analyzeSignal(time, values) {
       detail: best?.residualAnalysis.frequency
         ? `残余主频 ${best.residualAnalysis.frequency.toFixed(3)} Hz`
         : "无明显残余主频",
-      status: residualProminence <= 8 || residualRelative <= 0.01 ? "pass" : residualProminence <= 14 ? "warn" : "fail",
+      status: highQuality && structureStatus === "fail" ? "warn" : structureStatus,
     },
     {
       id: "frequency_resolution",
@@ -427,14 +980,25 @@ export function analyzeSignal(time, values) {
   const runnerUp = sortedCandidates.find((candidate) => candidate !== best);
   const bicGap = runnerUp && best ? runnerUp.metrics.bic - best.metrics.bic : null;
   const limitations = [
-    "候选模型仅包含单频与多频正弦模型，不代表物理模型唯一正确。",
+    "候选模型包含单频、多频正弦与 AM/FM 调制候选，不代表物理模型唯一正确。",
     "可信等级是确定性证据汇总，不是统计概率。",
+    "参数不确定度为线性拟合近似；频率行标注 1/T 分辨率，不是严格置信区间。",
     "CSV 首版仅分析单通道、近似均匀采样的实数信号。",
   ];
   if (unknown) limitations.unshift("当前数据未提供足够证据支持任何候选模型。");
   if (bicGap !== null && bicGap < 10) limitations.push("最优与次优候选的 BIC 差距小于 10，模型区分度有限。");
+  if (best?.family === "am" || best?.family === "fm") {
+    limitations.push("AM/FM 结论来自包络与瞬时频率的整体拟合，不等价于物理调制机制。");
+    limitations.push("AM/FM 的残差证据使用中间 90% 样本，以规避解析信号的边缘效应。");
+  }
+  if (best && residualRelative <= 0.005) {
+    limitations.push("残差能量极低，ACF 与残余谱更适合视为数值或边缘效应，而非物理结构。");
+  }
+  if (highQuality && (whitenessStatus === "fail" || structureStatus === "fail")) {
+    limitations.push("拟合极好但残差仍有结构，可信等级限制为需要谨慎，避免过度自信。");
+  }
   const nextSteps = unknown
-    ? ["检查是否遗漏实验背景或采样单位。", "提高采样率或延长观测时长后重试。", "扩展模型库以覆盖调幅、调频或非平稳信号。"]
+    ? ["检查是否遗漏实验背景或采样单位。", "提高采样率或延长观测时长后重试。", "检查调制或非平稳证据是否不足。"]
     : ["用不同信噪比数据复核参数稳定性。", "检查残差是否符合测量噪声假设。", "若已知物理模型，加入模型约束后再比较。"];
   return {
     createdAt: new Date().toISOString(),
@@ -469,9 +1033,23 @@ export function templateExplanation(result) {
   const best = result.best;
   const frequency = best.parameters.find((parameter) => parameter.id === "frequency_1")?.value;
   const amplitude = best.parameters.find((parameter) => parameter.id === "amplitude_1")?.value;
+  const modulationFrequency = best.parameters.find((parameter) => parameter.id === "modulation_frequency")?.value;
+  const modulationIndex = best.parameters.find((parameter) => parameter.id === "modulation_index")?.value;
+  const deviation = best.parameters.find((parameter) => parameter.id === "frequency_deviation")?.value;
+  const observations = result.reliability.evidence.map((item) => `${item.label}：${item.value}；${item.detail}`);
+  let summary;
+  if (best.family === "am") {
+    summary = `推荐 AM 调幅模型。载频约 ${frequency.toFixed(4)} Hz，调制频率约 ${modulationFrequency.toFixed(4)} Hz，调制指数约 ${modulationIndex.toFixed(3)}，R² 为 ${best.metrics.r2.toFixed(4)}。`;
+    observations.unshift(`调制候选：AM，调制频率 ${modulationFrequency.toFixed(4)} Hz，调制指数 ${modulationIndex.toFixed(3)}。`);
+  } else if (best.family === "fm") {
+    summary = `推荐 FM 调频模型。载频约 ${frequency.toFixed(4)} Hz，调制频率约 ${modulationFrequency.toFixed(4)} Hz，频偏约 ${deviation.toFixed(4)} Hz，调制指数约 ${modulationIndex.toFixed(3)}，R² 为 ${best.metrics.r2.toFixed(4)}。`;
+    observations.unshift(`调制候选：FM，调制频率 ${modulationFrequency.toFixed(4)} Hz，频偏 ${deviation.toFixed(4)} Hz。`);
+  } else {
+    summary = `推荐${best.label}。主频约 ${frequency.toFixed(4)} Hz，主幅值约 ${amplitude.toFixed(4)} a.u.，R² 为 ${best.metrics.r2.toFixed(4)}。`;
+  }
   return {
-    summary: `推荐${best.label}。主频约 ${frequency.toFixed(4)} Hz，主幅值约 ${amplitude.toFixed(4)} a.u.，R² 为 ${best.metrics.r2.toFixed(4)}。`,
-    observations: result.reliability.evidence.map((item) => `${item.label}：${item.value}；${item.detail}`),
+    summary,
+    observations,
     limitations: result.reliability.limitations,
     nextSteps: result.reliability.nextSteps,
   };
@@ -493,6 +1071,8 @@ export function buildAiPayload(result) {
         name: parameter.label,
         value: parameter.value,
         unit: parameter.unit,
+        uncertainty: parameter.sigma ?? null,
+        uncertaintyKind: parameter.sigma == null ? null : (parameter.sigmaKind ?? "standard"),
       })),
     })),
     reliability: {

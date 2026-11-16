@@ -69,8 +69,58 @@ assert.equal(noisePayload.unknown, true);
 assert.equal(noisePayload.recommendedModel, null);
 assert.ok(noisePayload.reliability.limitations.length > 0);
 
+function buildAmSignal() {
+  const fs = 1024;
+  const n = 4096;
+  const random = seededNoise(99);
+  const time = Array.from({ length: n }, (_, index) => index / fs);
+  const values = time.map((t) =>
+    0.1 +
+    2 * (1 + 0.6 * Math.cos(2 * Math.PI * 5 * t + 0.3)) * Math.cos(2 * Math.PI * 120 * t + 0.2) +
+    0.02 * gaussianPair(random),
+  );
+  return { time, values };
+}
+
+function buildFmSignal() {
+  const fs = 1024;
+  const n = 4096;
+  const random = seededNoise(123);
+  const time = Array.from({ length: n }, (_, index) => index / fs);
+  const values = time.map((t) =>
+    0.1 +
+    2 * Math.cos(2 * Math.PI * 150 * t + 2 * Math.sin(2 * Math.PI * 4 * t + 0.4) + 0.1) +
+    0.02 * gaussianPair(random),
+  );
+  return { time, values };
+}
+
+const am = buildAmSignal();
+const amResult = analyzeSignal(am.time, am.values);
+assert.equal(amResult.recommendedId, "am");
+assert.ok(amResult.best.metrics.r2 > 0.99, `AM R2 ${amResult.best.metrics.r2}`);
+assert.notEqual(amResult.reliability.level, "unreliable");
+const amFrequency = amResult.best.parameters.find((item) => item.id === "modulation_frequency").value;
+const amIndex = amResult.best.parameters.find((item) => item.id === "modulation_index").value;
+assert.ok(Math.abs(amFrequency - 5) < 0.2, `AM modulation frequency ${amFrequency}`);
+assert.ok(Math.abs(amIndex - 0.6) < 0.08, `AM modulation index ${amIndex}`);
+
+const fm = buildFmSignal();
+const fmResult = analyzeSignal(fm.time, fm.values);
+assert.equal(fmResult.recommendedId, "fm");
+assert.ok(fmResult.best.metrics.r2 > 0.99, `FM R2 ${fmResult.best.metrics.r2}`);
+assert.notEqual(fmResult.reliability.level, "unreliable");
+const fmFrequency = fmResult.best.parameters.find((item) => item.id === "modulation_frequency").value;
+const fmIndex = fmResult.best.parameters.find((item) => item.id === "modulation_index").value;
+assert.ok(Math.abs(fmFrequency - 4) < 0.2, `FM modulation frequency ${fmFrequency}`);
+assert.ok(Math.abs(fmIndex - 2) < 0.15, `FM modulation index ${fmIndex}`);
+
 console.log("DSP tests passed", {
   singleFrequency: frequency,
   dualFrequencies: dualResult.best.frequencies,
   noiseReliability: noiseResult.reliability.level,
+  amFrequency,
+  amIndex,
+  fmFrequency,
+  fmIndex,
 });
