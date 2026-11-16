@@ -1,7 +1,7 @@
 # SignalInsight 新对话交接书
 
 > 更新日期：2026-11-17
-> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；P1/P2 已发布；边界/极限修复待最终发布
+> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；P1/P2 与边界/极限修复均已发布
 > 这是新对话的首要入口。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
 
 ---
@@ -25,7 +25,7 @@ SignalInsight 最初规划为 Vue + FastAPI + SQLite 的完整信号分析平台
 - 生命周期：active
 - Site ID：`01a1e4bb-ea05-7b36-88f4-72a743ddb34d`
 - Project ID：`01a1e4bb-ea05-7036-8eea-6bdc90a0ab26`
-- 当前线上发布 action：`24f51917-9c66-4ea1-b600-1c2c6027a595`
+- 当前线上发布 action：`07cb76cc-cb4b-4bed-a9a4-4de907a621c8`
 - 当前 Function：`app`，edge runtime，已发布
 - Function `required_secret_names`：`["DASHSCOPE_API_KEY"]`
 - 站点 Secret：`DASHSCOPE_API_KEY` 已配置
@@ -315,7 +315,7 @@ P1/P2 已发布并完成线上回归：
 - `app.js`、`dsp.js`、`csv.js`、`analyzer-worker.js` 均 200
 - `/explain` 请求 200；默认软限流未影响正常演示
 
-边界与极限测试（本次修复，待发布）：
+边界与极限测试（已发布并完成线上回归）：
 
 - 63 样本：正确拒绝“至少需要 64 个样本”
 - 64 样本：可完成分析，可信等级“需要谨慎”
@@ -328,14 +328,14 @@ P1/P2 已发布并完成线上回归：
 - 10 万行 CSV 解析：约 66–151 ms
 - 本地静态预览：AI 显示“AI 服务不可达”；公开站点：AI 正常启用
 
-当前线上仍是上一版 P1/P2；本次边界修复待最终发布后需要重新做线上回归。
+本次边界修复已发布：公开站点 AI 按钮正常启用，单频与 AM CSV + Qwen 均通过；本地静态预览会显示“AI 服务不可达”，这是预期行为，因为本地没有 Function。
 
 ---
 
 ## 9. Git 状态与分支
 
 - 当前分支：`feat/ai-explanations`
-- 最新提交：`50a6b98 docs: record final P1/P2 publication`
+- 最新提交：`9c02b05 fix: harden large-input analysis and clarify AI status`
 - AI UI 提交：`43c941f feat: surface AI limitations and harden Qwen requests`
 - P1 提交：`7874c50 feat: move analysis to a worker and harden AI delivery`
 - `main` 仍为 `ff2b226 refactor: reduce repository to deployed Qoder Sites deliverable`
