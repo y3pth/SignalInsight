@@ -21,7 +21,7 @@ from app.persistence.models import (
 from app.schemas.analysis import AnalysisRequest
 from app.schemas.common import ErrorBody
 from app.schemas.datasets import DatasetManifest, DatasetMapping
-from app.schemas.enums import AnalysisStage, AnalysisStatus
+from app.schemas.enums import AnalysisStage, AnalysisStatus, DatasetMediaType
 from app.schemas.simulations import SimulationRequest
 
 
@@ -73,6 +73,35 @@ class DatasetRepository:
             )
             for channel in manifest.channels
         ]
+        self.session.add(dataset)
+        self.session.commit()
+        self.session.refresh(dataset)
+        return dataset
+
+    def create_upload(
+        self,
+        *,
+        dataset_id: UUID,
+        original_filename: str,
+        media_type: DatasetMediaType,
+        source_sha256: str,
+        file_size_bytes: int,
+        upload_path: str,
+    ) -> Dataset:
+        dataset = Dataset(
+            id=str(dataset_id),
+            original_filename=original_filename,
+            media_type=media_type.value,
+            origin="upload",
+            source_sha256=source_sha256,
+            file_size_bytes=file_size_bytes,
+            total_numeric_count=0,
+            confirmed_mapping=None,
+            validation_summary=None,
+            extra={},
+            upload_path=upload_path,
+            status="uploaded",
+        )
         self.session.add(dataset)
         self.session.commit()
         self.session.refresh(dataset)

@@ -40,6 +40,12 @@ class DatasetOrigin(StrEnum):
     SIMULATION = "simulation"
 
 
+class DatasetStatus(StrEnum):
+    UPLOADED = "uploaded"
+    PARSED = "parsed"
+    FAILED = "failed"
+
+
 class ExplanationPolicy(StrEnum):
     NONE = "none"
     AFTER_ANALYSIS = "after_analysis"

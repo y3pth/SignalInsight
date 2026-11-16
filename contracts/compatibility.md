@@ -62,6 +62,22 @@ Approvals:
 Merged SHA:
 ```
 
+## Change log
+
+### CCR-20261116-001
+
+- Task: SI-P1-02.
+- Writer: BE; reviewer: FE pending.
+- Baseline: OpenAPI 1.0.0.
+- Change: dataset upload flow responses.
+  - `POST /datasets` response changed from `DatasetManifest` to new `DatasetUploadAccepted` because manifest variables and channels are produced by later parsing tasks.
+  - `GET /datasets` response changed to new `DatasetSummaryListResponse`.
+  - `GET /datasets/{id}` response changed to new `DatasetDetail`, which adds optional `manifest` for later parsed datasets.
+- Compatibility: additive schemas; endpoints were contract-only and not yet consumed by FE.
+- Contract version: bumped to 1.1.0.
+- Examples: added dataset_summary, dataset_summary_list, dataset_upload_accepted, dataset_detail.
+- Migration strategy: DB adds `datasets.upload_path` via migration 20261116_0002.
+
 ## Required review
 
 1. BE updates contract definitions and generated artifacts.

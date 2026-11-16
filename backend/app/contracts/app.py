@@ -2,7 +2,7 @@ from fastapi import FastAPI
 
 from app.contracts.routes import contract_router
 
-CONTRACT_VERSION = "1.0.0"
+CONTRACT_VERSION = "1.1.0"
 
 
 def create_contract_app() -> FastAPI:

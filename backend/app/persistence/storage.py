@@ -1,4 +1,6 @@
+import hashlib
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -8,6 +10,8 @@ from app.persistence.exceptions import (
     ArtifactConflictError,
     ArtifactHashMismatchError,
     ArtifactNotFoundError,
+    EmptyUploadError,
+    UploadTooLargeError,
 )
 
 
@@ -80,3 +84,54 @@ class ArtifactStore:
             except OSError:
                 continue
         return removed
+
+
+class UploadStore:
+    def __init__(self, root: Path, max_bytes: int) -> None:
+        self.root = root.resolve()
+        self.max_bytes = max_bytes
+
+    def store_stream(self, relative_path: str, stream: Iterator[bytes]) -> StoredArtifact:
+        path = resolve_within(self.root, relative_path)
+        if path.exists():
+            raise ArtifactConflictError(f"upload already exists: {relative_path}")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        digest = hashlib.sha256()
+        size = 0
+        try:
+            with path.open("xb") as output:
+                for chunk in stream:
+                    if not chunk:
+                        continue
+                    size += len(chunk)
+                    if size > self.max_bytes:
+                        raise UploadTooLargeError(size, self.max_bytes)
+                    digest.update(chunk)
+                    output.write(chunk)
+        except Exception:
+            if path.exists():
+                path.unlink()
+            raise
+        if size == 0:
+            path.unlink()
+            raise EmptyUploadError("uploaded file is empty")
+        try:
+            path.chmod(path.stat().st_mode & ~0o222)
+        except OSError:
+            pass
+        return StoredArtifact(
+            relative_path=relative_path,
+            size_bytes=size,
+            sha256=digest.hexdigest(),
+        )
+
+    def delete(self, relative_path: str) -> bool:
+        path = resolve_within(self.root, relative_path)
+        if not path.exists():
+            return False
+        try:
+            path.chmod(path.stat().st_mode | 0o222)
+        except OSError:
+            pass
+        path.unlink()
+        return True

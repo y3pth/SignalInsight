@@ -16,9 +16,11 @@ from app.schemas.analysis import (
 from app.schemas.capabilities import CapabilitiesResponse, ModelDefinition
 from app.schemas.common import ErrorResponse
 from app.schemas.datasets import (
-    DatasetListResponse,
+    DatasetDetail,
     DatasetManifest,
     DatasetMapping,
+    DatasetSummaryListResponse,
+    DatasetUploadAccepted,
     VariableDescriptor,
 )
 from app.schemas.enums import AnalysisStatus, ExportFormat, ModelId, SeriesKind
@@ -76,7 +78,7 @@ def list_models() -> None:
 
 @contract_router.post(
     "/api/v1/datasets",
-    response_model=DatasetManifest,
+    response_model=DatasetUploadAccepted,
     status_code=201,
     responses=UPLOAD_ERRORS,
     summary="Upload a dataset",
@@ -87,7 +89,7 @@ def create_dataset(file: Annotated[UploadFile, File()]) -> None:
 
 @contract_router.get(
     "/api/v1/datasets",
-    response_model=DatasetListResponse,
+    response_model=DatasetSummaryListResponse,
     responses=DEFAULT_ERRORS,
     summary="List datasets",
 )
@@ -100,7 +102,7 @@ def list_datasets(
 
 @contract_router.get(
     "/api/v1/datasets/{dataset_id}",
-    response_model=DatasetManifest,
+    response_model=DatasetDetail,
     responses=DEFAULT_ERRORS,
     summary="Get dataset details",
 )
