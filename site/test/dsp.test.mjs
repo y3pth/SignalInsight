@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { analyzeSignal, buildAiPayload, buildDecision, templateExplanation } from "../dist/dsp.js";
+import {
+  analyzeSignal,
+  buildAiPayload,
+  buildDecision,
+  buildExperimentPlan,
+  templateExplanation,
+} from "../dist/dsp.js";
 
 function seededNoise(seed) {
   let state = seed >>> 0;
@@ -57,6 +63,8 @@ const singleDecision = buildDecision(singleResult);
 assert.ok(singleDecision.title.includes("单频"));
 assert.ok(singleDecision.evidenceIds.length > 0);
 assert.ok(singleDecision.whatWouldChange.length > 0);
+assert.equal(singleResult.health.status, "ok");
+assert.ok(buildExperimentPlan(singleResult).items.length > 0);
 
 const dual = buildSignal([
   { amplitude: 1.2, frequency: 80.5, phase: 0.1 },
@@ -115,6 +123,9 @@ assert.ok(Math.abs(amFrequency - 5) < 0.2, `AM modulation frequency ${amFrequenc
 assert.ok(Math.abs(amIndex - 0.6) < 0.08, `AM modulation index ${amIndex}`);
 assert.ok(amResult.reliability.evidence.some((item) => item.id === "modulation_structure"));
 assert.ok(buildDecision(amResult).evidenceIds.includes("modulation_structure"));
+const amPlan = buildExperimentPlan(amResult);
+assert.ok(amPlan.items.some((item) => item.id === "modulation_cycles"));
+assert.ok(amPlan.items.some((item) => item.id === "sample_rate"));
 
 const fm = buildFmSignal();
 const fmResult = analyzeSignal(fm.time, fm.values);

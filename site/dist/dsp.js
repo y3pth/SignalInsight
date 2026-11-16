@@ -858,10 +858,127 @@ export function validateSignal(time, values) {
   return { dt, sampleRate: 1 / dt, duration: time.at(-1) - time[0] };
 }
 
+export function inspectData(time, values, sampleRate, duration, spectrum) {
+  const n = values.length;
+  const checks = [];
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+  for (const value of values) {
+    if (value < min) min = value;
+    if (value > max) max = value;
+  }
+  const range = max - min;
+  const tolerance = Math.max(range * 1e-9, 1e-12);
+  let low = 0;
+  let high = 0;
+  for (const value of values) {
+    if (value <= min + tolerance) low += 1;
+    if (value >= max - tolerance) high += 1;
+  }
+  const clippedCount = Math.max(low, high);
+  const clippedFraction = clippedCount / n;
+  checks.push({
+    id: "clipping",
+    label: "削顶/饱和",
+    status: clippedCount > 3 && clippedFraction > 0.01
+      ? "fail"
+      : clippedCount > 2 && clippedFraction > 0.002 ? "warn" : "pass",
+    detail: clippedCount > 2 && clippedFraction > 0.002
+      ? `${(clippedFraction * 100).toFixed(2)}% 样本贴近极值`
+      : "未发现明显削顶",
+  });
+
+  const baseline = mean(values);
+  const centeredRms = rms(values.map((value) => value - baseline));
+  const edge = Math.max(1, Math.floor(n * 0.1));
+  const firstMean = mean(values.slice(0, edge));
+  const lastMean = mean(values.slice(n - edge));
+  const drift = centeredRms > 0 ? Math.abs(lastMean - firstMean) / centeredRms : 0;
+  checks.push({
+    id: "drift",
+    label: "直流漂移",
+    status: drift > 0.9 ? "fail" : drift > 0.5 ? "warn" : "pass",
+    detail: drift > 0.5 ? `首尾均值差为信号 RMS 的 ${(drift * 100).toFixed(0)}%` : "首尾基线稳定",
+  });
+
+  const diffStep = Math.max(1, Math.floor(n / 20000));
+  const diffs = [];
+  let maxJump = 0;
+  for (let index = 1; index < n; index += 1) {
+    const jump = Math.abs(values[index] - values[index - 1]);
+    if (jump > maxJump) maxJump = jump;
+    if (index % diffStep === 0) diffs.push(jump);
+  }
+  const typicalJump = diffs.length ? median(diffs) : 0;
+  const jumpRatio = typicalJump > 1e-12 ? maxJump / typicalJump : maxJump > 1e-9 ? 100 : 0;
+  checks.push({
+    id: "jump",
+    label: "跳变/不连续",
+    status: jumpRatio > 80 ? "fail" : jumpRatio > 25 ? "warn" : "pass",
+    detail: jumpRatio > 25 ? `最大相邻跳变为典型值的 ${jumpRatio.toFixed(0)}×` : "未发现异常跳变",
+  });
+
+  const third = Math.max(1, Math.floor(n / 3));
+  const segmentRms = [];
+  for (let segment = 0; segment < 3; segment += 1) {
+    const start = segment * third;
+    const end = segment === 2 ? n : start + third;
+    const segmentValues = values.slice(start, end);
+    const segmentMean = mean(segmentValues);
+    segmentRms.push(rms(segmentValues.map((value) => value - segmentMean)));
+  }
+  const meanSegmentRms = mean(segmentRms);
+  const rmsVariation = meanSegmentRms > 0
+    ? (Math.max(...segmentRms) - Math.min(...segmentRms)) / meanSegmentRms
+    : 0;
+  checks.push({
+    id: "stationarity",
+    label: "振幅平稳性",
+    status: rmsVariation > 0.9 ? "fail" : rmsVariation > 0.5 ? "warn" : "pass",
+    detail: rmsVariation > 0.5 ? `分段 RMS 变化 ${(rmsVariation * 100).toFixed(0)}%` : "分段能量稳定",
+  });
+
+  const uniqueStep = Math.max(1, Math.floor(n / 5000));
+  const unique = new Set();
+  for (let index = 0; index < n; index += uniqueStep) unique.add(values[index]);
+  checks.push({
+    id: "quantization",
+    label: "量化级数",
+    status: n > 256 && unique.size < 6 ? "fail" : n > 256 && unique.size < 16 ? "warn" : "pass",
+    detail: n > 256 && unique.size < 16 ? `抽样仅 ${unique.size} 个不同取值` : "量化级数充足",
+  });
+
+  const top = spectrum?.peaks?.[0];
+  if (top) {
+    const nyquistRatio = top.frequency / (sampleRate / 2);
+    checks.push({
+      id: "nyquist",
+      label: "Nyquist 边界",
+      status: nyquistRatio > 0.98 ? "fail" : nyquistRatio > 0.9 ? "warn" : "pass",
+      detail: nyquistRatio > 0.9 ? `主峰位于 Nyquist 的 ${(nyquistRatio * 100).toFixed(0)}%` : "主峰远离 Nyquist",
+    });
+    checks.push({
+      id: "cycles",
+      label: "观测周期数",
+      status: top.frequency * duration < 1 ? "fail" : top.frequency * duration < 3 ? "warn" : "pass",
+      detail: top.frequency * duration < 3 ? `仅 ${(top.frequency * duration).toFixed(1)} 个周期` : `${(top.frequency * duration).toFixed(0)} 个周期`,
+    });
+  }
+
+  const failures = checks.filter((check) => check.status === "fail");
+  const warnings = checks.filter((check) => check.status === "warn");
+  return {
+    status: failures.length ? "fail" : warnings.length ? "warn" : "ok",
+    checks,
+    limitations: failures.concat(warnings).slice(0, 3).map((check) => `${check.label}：${check.detail}`),
+  };
+}
+
 export function analyzeSignal(time, values) {
   const { sampleRate, duration } = validateSignal(time, values);
   const tau = time.map((value) => value - time[0]);
   const spectrum = computeSpectrum(values, sampleRate);
+  const health = inspectData(time, values, sampleRate, duration, spectrum);
   const chosenPeaks = [];
   for (const peak of spectrum.peaks) {
     if (chosenPeaks.every((other) => Math.abs(other.frequency - peak.frequency) > spectrum.binWidth * 1.5)) {
@@ -1001,6 +1118,16 @@ export function analyzeSignal(time, values) {
       status: cycles >= 5 ? "pass" : cycles >= 2 ? "warn" : "fail",
     },
   ];
+  const healthIssues = health.checks.filter((item) => item.status !== "pass");
+  if (healthIssues.length) {
+    evidence.push({
+      id: "data_health",
+      label: "数据体检",
+      value: `${healthIssues.length} 项异常`,
+      detail: healthIssues.map((item) => item.label).join("、"),
+      status: health.status === "fail" ? "fail" : "warn",
+    });
+  }
   if (best?.family === "am" || best?.family === "fm") {
     const modulation = best.modulationEvidence;
     if (modulation) {
@@ -1046,6 +1173,7 @@ export function analyzeSignal(time, values) {
   if (highQuality && (whitenessStatus === "fail" || structureStatus === "fail")) {
     limitations.push("拟合极好但残差仍有结构，可信等级限制为需要谨慎，避免过度自信。");
   }
+  limitations.push(...health.limitations);
   const nextSteps = unknown
     ? ["检查是否遗漏实验背景或采样单位。", "提高采样率或延长观测时长后重试。", "检查调制或非平稳证据是否不足。"]
     : ["用不同信噪比数据复核参数稳定性。", "检查残差是否符合测量噪声假设。", "若已知物理模型，加入模型约束后再比较。"];
@@ -1059,6 +1187,7 @@ export function analyzeSignal(time, values) {
     duration,
     nyquist: sampleRate / 2,
     spectrum,
+    health,
     candidates: sortedCandidates.map(stripCandidate),
     best: best ? stripCandidate(best) : null,
     unknown,
@@ -1164,13 +1293,17 @@ export function buildDecision(result) {
   const gapText = gap == null ? "" : `，领先次优 ${gap.toFixed(1)} BIC`;
   const isModulation = best.family === "am" || best.family === "fm";
   const preferred = isModulation
-    ? ["spectral_prominence", "fit_quality", "modulation_structure", "residual_whiteness", "frequency_resolution"]
-    : ["spectral_prominence", "fit_quality", "residual_whiteness", "residual_structure", "frequency_resolution"];
+    ? ["data_health", "spectral_prominence", "fit_quality", "modulation_structure", "residual_whiteness", "frequency_resolution"]
+    : ["data_health", "spectral_prominence", "fit_quality", "residual_whiteness", "residual_structure", "frequency_resolution"];
   const evidenceIds = preferred
     .filter((id) => evidence.some((item) => item.id === id))
     .slice(0, 4);
 
   const whatWouldChange = [];
+  const healthIssue = evidence.find((item) => item.id === "data_health");
+  if (healthIssue) {
+    whatWouldChange.push(`先处理数据体检：${healthIssue.detail}。`);
+  }
   if (gap != null && gap < 10) {
     whatWouldChange.push("增加观测时长或降低噪声，使最优与次优的 BIC 差距超过 10。");
   }
@@ -1198,5 +1331,82 @@ export function buildDecision(result) {
       bic: candidate.metrics.bic,
       gap: candidate.id === best.id ? 0 : candidate.metrics.bic - best.metrics.bic,
     })),
+  };
+}
+
+export function buildExperimentPlan(result) {
+  const items = [];
+  const duration = result.duration;
+  const sampleRate = result.sampleRate;
+  const peaks = [...(result.spectrum?.peaks ?? [])]
+    .filter((peak) => peak.prominence >= 6)
+    .slice(0, 4);
+  if (peaks.length >= 2) {
+    const sorted = [...peaks].sort((a, b) => a.frequency - b.frequency);
+    let closest = Number.POSITIVE_INFINITY;
+    for (let index = 1; index < sorted.length; index += 1) {
+      closest = Math.min(closest, sorted[index].frequency - sorted[index - 1].frequency);
+    }
+    if (Number.isFinite(closest) && closest > 0) {
+      const required = 3 / closest;
+      items.push({
+        id: "separation",
+        label: "频率分离",
+        value: `T ≥ ${required.toFixed(2)} s`,
+        detail: `最近峰间距 ${closest.toFixed(3)} Hz；当前 ${duration.toFixed(2)} s`,
+        status: duration >= required ? "pass" : "warn",
+      });
+    }
+  }
+
+  const best = result.best;
+  const modulation = best?.modulationEvidence;
+  if (modulation) {
+    const requiredDuration = 10 / modulation.frequency;
+    items.push({
+      id: "modulation_cycles",
+      label: "调制周期",
+      value: `T ≥ ${requiredDuration.toFixed(2)} s`,
+      detail: `调制频率 ${modulation.frequency.toFixed(3)} Hz；建议至少 10 个周期`,
+      status: duration >= requiredDuration ? "pass" : "warn",
+    });
+    const deviation = best.parameters.find((item) => item.id === "frequency_deviation")?.value ?? 0;
+    const maxFrequency = modulation.carrierFrequency + deviation + modulation.frequency;
+    const requiredRate = 2.5 * maxFrequency;
+    items.push({
+      id: "sample_rate",
+      label: "采样率",
+      value: `fs ≥ ${requiredRate.toFixed(0)} Hz`,
+      detail: "载频、频偏和调制边带需低于 Nyquist",
+      status: sampleRate >= requiredRate ? "pass" : "warn",
+    });
+  }
+
+  if (result.health?.status !== "ok") {
+    const issue = result.health?.checks?.find((check) => check.status !== "pass");
+    items.push({
+      id: "health",
+      label: "先处理数据体检",
+      value: issue?.label ?? "存在异常",
+      detail: issue?.detail ?? "先消除削顶、漂移或跳变再分析",
+      status: "warn",
+    });
+  }
+
+  if (!items.length) {
+    items.push({
+      id: "baseline",
+      label: "当前数据",
+      value: "可直接演示",
+      detail: "未发现明显的时长或采样率不足。",
+      status: "pass",
+    });
+  }
+  const warnings = items.filter((item) => item.status !== "pass").length;
+  return {
+    items,
+    summary: warnings
+      ? `${warnings} 条建议需要处理，再扩大样本或提高信噪比。`
+      : "当前采样条件足以支撑本页演示；若要区分更近的模型，可继续延长观测。",
   };
 }

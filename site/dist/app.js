@@ -2,6 +2,7 @@ import {
   analyzeSignal,
   buildAiPayload,
   buildDecision,
+  buildExperimentPlan,
   templateExplanation,
 } from "./dsp.js";
 import { parseCsv } from "./csv.js";
@@ -23,6 +24,9 @@ const elements = {
   conclusionSummary: document.querySelector("#conclusion-summary"),
   conclusionEvidence: document.querySelector("#conclusion-evidence"),
   conclusionChange: document.querySelector("#conclusion-change"),
+  healthStatus: document.querySelector("#health-status"),
+  healthList: document.querySelector("#health-list"),
+  designList: document.querySelector("#design-list"),
   metricSamples: document.querySelector("#metric-samples"),
   metricRate: document.querySelector("#metric-rate"),
   metricR2: document.querySelector("#metric-r2"),
@@ -301,6 +305,10 @@ function invalidateResult(message = "数据已变更，请重新运行分析。"
   elements.conclusionSummary.textContent = message;
   elements.conclusionEvidence.replaceChildren();
   elements.conclusionChange.replaceChildren();
+  elements.healthStatus.textContent = "—";
+  elements.healthStatus.className = "health-status";
+  elements.healthList.replaceChildren();
+  elements.designList.replaceChildren();
 }
 
 function markDataChanged(message) {
@@ -328,6 +336,10 @@ async function analyzeCurrent() {
     elements.conclusionSummary.textContent = "Worker 正在做模型竞争与证据检查。";
     elements.conclusionEvidence.replaceChildren();
     elements.conclusionChange.replaceChildren();
+    elements.healthStatus.textContent = "检查中…";
+    elements.healthStatus.className = "health-status";
+    elements.healthList.replaceChildren();
+    elements.designList.replaceChildren();
     const data = selectedSignal();
     if (data.values.length > 100000) {
       showToast("大样本分析已转入 Worker，可能需要数十秒。");
@@ -399,6 +411,48 @@ function renderConclusion(result) {
   }));
 }
 
+function renderHealth(result) {
+  const health = result.health;
+  const status = health?.status ?? "warn";
+  elements.healthStatus.textContent = status === "ok" ? "通过" : status === "warn" ? "有警告" : "有异常";
+  elements.healthStatus.className = `health-status ${status}`;
+  const healthRows = (health?.checks ?? []).map((check) => {
+    const row = document.createElement("div");
+    row.className = "health-item";
+    const dot = document.createElement("span");
+    dot.className = `evidence-dot ${check.status === "pass" ? "" : check.status}`;
+    const copy = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = check.label;
+    const detail = document.createElement("small");
+    detail.textContent = check.detail;
+    copy.append(title, detail);
+    row.append(dot, copy);
+    return row;
+  });
+  elements.healthList.replaceChildren(...healthRows);
+
+  const plan = buildExperimentPlan(result);
+  const summary = document.createElement("p");
+  summary.className = "design-summary";
+  summary.textContent = plan.summary;
+  const designRows = plan.items.map((item) => {
+    const row = document.createElement("div");
+    row.className = `design-item ${item.status}`;
+    const copy = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = item.label;
+    const detail = document.createElement("small");
+    detail.textContent = item.detail;
+    copy.append(title, detail);
+    const value = document.createElement("span");
+    value.textContent = item.value;
+    row.append(copy, value);
+    return row;
+  });
+  elements.designList.replaceChildren(summary, ...designRows);
+}
+
 function render(result) {
   const best = result.best;
   elements.recommendation.textContent = result.unknown
@@ -421,6 +475,7 @@ function render(result) {
     ? "分析完成：证据不足，暂不推荐模型。"
     : `分析完成：推荐${best.label}，可信等级${result.reliability.label}。`;
   renderConclusion(result);
+  renderHealth(result);
   elements.metricSamples.textContent = `${result.sampleCount.toLocaleString()} 点`;
   elements.metricRate.textContent = `${result.sampleRate.toFixed(2)} Hz · Nyq ${result.nyquist.toFixed(1)} Hz`;
   elements.metricR2.textContent = best?.metrics.r2 == null ? "—" : `R² ${best.metrics.r2.toFixed(4)}`;
@@ -856,6 +911,8 @@ function downloadReport() {
     recommendedModel: result.recommendedId,
     unknown: result.unknown,
     reliability: result.reliability,
+    health: result.health,
+    experimentPlan: buildExperimentPlan(result),
     candidates: result.candidates.map((candidate) => ({
       id: candidate.id,
       label: candidate.label,

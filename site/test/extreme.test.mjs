@@ -43,6 +43,11 @@ assert.throws(() => analyzeSignal(nonFinite.time, nonFinite.values), /NaN|Infini
 const constant = makeSignal(1024, fs, () => 0.1);
 assert.equal(analyzeSignal(constant.time, constant.values).unknown, true);
 
+const clipped = makeSignal(1024, fs, (t) =>
+  Math.max(-1, Math.min(1, 2 * Math.sin(2 * Math.PI * 50 * t))),
+);
+assert.notEqual(analyzeSignal(clipped.time, clipped.values).health.status, "ok");
+
 const weakNoise = seededNoise(11);
 const weakAm = makeSignal(2048, fs, (t) =>
   0.1 +
@@ -76,6 +81,7 @@ const largeResult = analyzeSignal(large.time, large.values);
 const elapsed = Date.now() - started;
 assert.equal(largeResult.recommendedId, "single_tone");
 assert.ok(largeResult.best.metrics.r2 > 0.9999, `large R2 ${largeResult.best.metrics.r2}`);
+assert.ok(elapsed < 30000, `large analysis ${elapsed}ms`);
 
 console.log("Extreme tests passed", {
   largeSampleCount: largeResult.sampleCount,
