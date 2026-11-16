@@ -365,7 +365,8 @@ P1/P2 已发布并完成线上回归：
 ## 9. Git 状态与分支
 
 - 当前分支：`feat/trust-lab`
-- 最近功能提交：`0373577 docs: add the engineering transfer guide`
+- 最近代码提交：`48ad325 feat: add multi-channel, MAT and IQ data modes`
+- 转接文档：`TRANSFER.md`
 - 信任实验室提交：
   - `e45afb0 fix: harden result and AI data flow`
   - `d5d7834 feat: add a deterministic trust conclusion card`
