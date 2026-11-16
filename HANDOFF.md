@@ -1,7 +1,7 @@
 # SignalInsight 新对话交接书
 
-> 生成日期：2026-11-16  
-> 状态：Qoder Sites 公开提交版已发布；Python 后端方向暂停并从工作区移除  
+> 更新日期：2026-11-17
+> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；新版 AI UI 已提交，待发布
 > 这是新对话的首要入口。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
 
 ---
@@ -14,9 +14,7 @@ SignalInsight 最初规划为 Vue + FastAPI + SQLite 的完整信号分析平台
 
 > 在 Qoder Sites 上发布一个可用于天池比赛提交的浏览器端信号可信分析演示。
 
-现在的实现不再依赖 Python 后端，所有核心数值计算在浏览器本地完成，Qoder Sites Edge Function 只负责可选的 Qwen 解释。
-
-`立项确定书.md` 继续保留，作为原始动机、研究问题和比赛背景依据；它不是当前技术实现说明。
+所有核心数值计算在浏览器本地完成，Qoder Sites Edge Function 只负责可选的 Qwen 解释。`立项确定书.md` 继续保留，作为原始动机、研究问题和比赛背景依据；它不是当前技术实现说明。
 
 ---
 
@@ -27,10 +25,13 @@ SignalInsight 最初规划为 Vue + FastAPI + SQLite 的完整信号分析平台
 - 生命周期：active
 - Site ID：`01a1e4bb-ea05-7b36-88f4-72a743ddb34d`
 - Project ID：`01a1e4bb-ea05-7036-8eea-6bdc90a0ab26`
-- 当前发布 action：`0ce2bc13-f6ea-49d2-a9ba-775b9ae53345`
+- 当前线上发布 action：`0ce2bc13-f6ea-49d2-a9ba-775b9ae53345`
 - 当前 Function：`app`，edge runtime，已发布
-- 当前站点 Secrets：空
-- Function `/functions/v1/app/health` 返回：`configured:false`
+- 站点 Secret：`DASHSCOPE_API_KEY` 已配置
+- Function `/functions/v1/app/health` 返回：`{"ok":true,"configured":true,"provider":"dashscope-compatible"}`
+- 线上 Qwen 已真实调用成功：单频、双频、噪声 unknown、CSV 上传均已验证
+
+当前线上仍是**旧版 AI UI**。新版 AI UI（限制展示、请求超时、错误细分）已提交到分支 `feat/ai-explanations`，提交 `43c941f`，尚未发布。
 
 本地发布描述：
 
@@ -59,10 +60,17 @@ site/.SignalInsight.qoder.site
 - 时域、频谱、残差 Canvas 图
 - JSON 报告导出
 - Qwen 解释代理及确定性规则降级
+- Qwen 解释已在线可用
+- 新版 AI UI 已实现但待发布：
+  - Qwen 返回的 `limitations` 展示
+  - health 8 秒超时、explain 30 秒超时
+  - `service_not_configured`、`upstream_error` 等错误细分
 
 ---
 
 ## 4. 明确未实现
+
+当前不能宣称支持：
 
 - AM、FM 自动辨识
 - MAT 文件
@@ -71,9 +79,8 @@ site/.SignalInsight.qoder.site
 - 非均匀采样
 - Python FastAPI/SQLite 线上部署
 - 用户系统、历史持久化、共享报告
-- Qwen 真实调用（Secret 未配置）
 
-不能把浏览器 MVP 描述为完整 Python 后端；不能把未实现模型说成已支持。
+P2 会优先做 AM/FM 候选模型与参数不确定性；MAT、IQ、非均匀采样、多通道另立阶段。不能把浏览器 MVP 描述为完整 Python 后端；不能把未实现模型说成已支持。
 
 ---
 
@@ -102,9 +109,7 @@ SignalInsight/
         └── function.test.mjs
 ```
 
-已删除：`backend/`、`backend/.venv`、`contracts/`、`fixtures/`、`docs/`、旧审计会话、缓存、旧根设计文档。
-
-保留 `site/test/` 是因为它直接验证线上算法和 Function，不是无关文件。
+`site/test/` 直接验证线上算法和 Function，不是无关文件。
 
 ---
 
@@ -170,80 +175,93 @@ y(t) = c + Σ Aᵢ sin(2πfᵢ(t-t₀)+φᵢ)
 
 ---
 
-## 7. Qwen 配置现状
+## 7. Qwen 配置与发布流程
 
-当前 Secret 为空，AI 按钮禁用并显示“Qwen 尚未配置”。
+当前账号：Qoder CN，用户名 `mathcrazy`。
 
-Qoder CLI 已安装到：
+### 7.1 CLI 位置
 
-```text
-C:\Users\y\.qoder-cli
-```
-
-版本：`1.1.89`，尚未加入系统 PATH。
-
-启动：
-
-```powershell
-& "$HOME\.qoder-cli\qoder.cmd"
-```
-
-登录：
+中国版 CLI（npm 安装，用户目录）：
 
 ```text
-/login
+C:\Users\y\.qodercn-cli\qodercn.cmd
 ```
 
-打开站点面板：
+国际版 CLI：
 
 ```text
-/sites
+C:\Users\y\AppData\Roaming\SPB_Data\.qoder-cli\qoder.cmd
 ```
 
-选择 `SignalInsight`，进入环境变量/Secrets，添加：
+两者不要混用。CN 站点必须用 `qodercn` / Qoder CN 桌面端。CLI 配置目录为 `~/.qoder-cn`。
+
+### 7.2 Secret
+
+Secret 名称：
 
 ```text
-名称：DASHSCOPE_API_KEY
-值：百炼 API Key
+DASHSCOPE_API_KEY
 ```
 
-不要把密钥放入聊天、源码、Git 或命令行参数。
+通过 Qoder CN 桌面端站点设置 → 环境变量/Secrets 输入。不要放入聊天、源码、Git 或命令行参数。
 
-旧 Qwen draft `44149eab-d4f3-4dca-8da6-583ca2447c18` 早于后续 CSS 和健康检查修改，必须视为过期。Secret 同步后应基于最新 `site/` 新建 action，声明 `secretNames: ["DASHSCOPE_API_KEY"]`，再发布并验证：
+当前 Secret 是站点级配置。已发布的 Function 会在运行时读取它，因此新增 Secret 后 health 立即变为 `configured:true`，不需要为此重新发布。但以后重新发布 Function 时，建议显式传：
 
-1. `get_site(include:["secrets"])`
-2. `prepare_site`
-3. `publish_site`
-4. `/functions/v1/app/health` 返回 `configured:true`
-5. 点击 AI 解释，确认返回结构化解释
+```json
+"secretNames": ["DASHSCOPE_API_KEY"]
+```
 
-默认模型和端点：
+可选配置：
 
 ```text
-qwen-plus
-https://dashscope.aliyuncs.com/compatible-mode/v1
+QWEN_MODEL            默认 qwen-plus
+DASHSCOPE_BASE_URL    默认 https://dashscope.aliyuncs.com/compatible-mode/v1
 ```
 
-如账号不支持，需发布声明 `QWEN_MODEL` 的新版本。
+只有使用国际站 Key 时才需要改 `DASHSCOPE_BASE_URL`。
+
+### 7.3 发布路径
+
+**优先使用 Qoder CN 桌面端的 Sites 面板 / Sites MCP 发布。**
+
+原因：CN CLI 1.1.89 只接受旧版扁平 `.qoder.site` 描述文件（顶层 actionId/projectId/siteId/deploymentId/artifactSha256/indexSha256/indexHtml），当前描述文件是国际版生成的 `design + publication` 嵌套格式。CN CLI 的 `get_context` / `prepare_site` 会报 `sites_document_invalid` 或 `sites_invalid_request`。
+
+不要为了迁就 CN CLI 手工改发布描述文件。需要发布时使用桌面端 MCP：
+
+1. `get_context`
+2. `prepare_site`（projectRoot=`F:/SignalInsight`，webDirectory=`site/dist`，functionDirectory=`site/functions`，projectId 如上，secretNames 含 `DASHSCOPE_API_KEY`）
+3. `get_publish_status` 直到 `artifactReady` / `dependenciesReady` / `canPublish`
+4. `publish_site`
+5. 验证 health、单频/双频/噪声/CSV、AI、导出
+
+发布是公网可见操作，执行前要得到用户明确确认。发布后不要手改 `site/.SignalInsight.qoder.site`。
+
+### 7.4 AI 防滥用约束
+
+`/functions/v1/app/explain` 是公开端点。任何限流/缓存方案都必须满足：
+
+- 正常单用户连续点击、单频/双频/噪声/CSV 切换不受影响
+- 优先用结果哈希缓存相同请求，减少重复 token
+- 只对异常高频请求做软限制，不阻断正常演示
+- 在百炼侧设置预算/告警，避免额度被刷
 
 ---
 
 ## 8. 验证基线
 
-清理前最后验证：
+2026-11-17 线上试运行：
 
-- DSP Node 测试通过
-- Function Node 测试通过
-- 单频 93.7001 Hz
-- 双频 80.4999 / 173.2000 Hz
-- 纯噪声 unknown
-- 公开站点单频/双频/unknown/CSV 均通过
-- 未上传时映射面板隐藏
-- AI 未配置时按钮禁用
-- 线上 Function health HTTP 200
-- 浏览器控制台无应用错误
+- 单频 93.7002 Hz，较高可信
+- 双频 80.50 / 173.20 Hz
+- 纯噪声 unknown / 证据不足
+- CSV 上传 50 Hz 测试数据：50.0000 Hz，幅值 2.0001，相位 0.1999，R² 1.0000
+- Qwen 对单频、双频、噪声、CSV 均返回结构化解释
+- 报告导出 JSON 含 3 个候选模型、可靠性和方法边界
+- 浏览器控制台无 error/warning
+- `/explain` 网络请求 200
+- 516px 窄视口无横向溢出
 
-清理后只需保留并重新运行：
+本地验证：
 
 ```bash
 node site/test/dsp.test.mjs
@@ -251,43 +269,18 @@ node site/test/function.test.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
 
+新版 AI UI 已用本地 mock 验证：限制展示、超时提示、上游错误提示均正常。
+
 ---
 
-## 9. Git 历史与远端
+## 9. Git 状态与分支
 
-历史已找到，没有删除或重建。
-
-- 历史提交数：43（清理提交之前）
-- 最早提交：`91025b5 chore: establish project documentation baseline`
-- 清理前主线：`ab91832 docs: record local Qoder CLI installation`
-- 当前分支：`main`
+- 当前分支：`feat/ai-explanations`
+- 最新提交：`43c941f feat: surface AI limitations and harden Qwen requests`
+- `main` 仍为 `ff2b226 refactor: reduce repository to deployed Qoder Sites deliverable`
 - 远端：尚未配置
-
-查看完整历史：
-
-```bash
-git log --oneline --reverse
-```
-
-本次部署收敛会形成新的清理提交，历史保留。
-
-建议另一台电脑通过私有远端协作：
-
-```bash
-git remote add origin <private-repo-url>
-git push -u origin main
-```
-
-另一台电脑：
-
-```bash
-git clone <private-repo-url> SignalInsight
-cd SignalInsight
-git config user.name "<name>"
-git config user.email "<email>"
-```
-
-不要公开仓库，避免违反赛事共享规则。
+- 不直接修改 `main`；每个任务使用独立分支
+- 提交身份使用仓库历史已有作者，不在全局改写 Git 配置
 
 ---
 
@@ -315,24 +308,41 @@ git config user.email "<email>"
 
 ## 11. 后续优先级
 
-1. 配置 `DASHSCOPE_API_KEY`，新建 action 并发布 Qwen。
-2. 核对天池正式规则、提交格式和截止时间。
-3. 将 DSP 移入 Web Worker，避免大样本阻塞 UI。
-4. 拆分 `app.js` 和 `dsp.js`，引入 JS 静态检查。
-5. 扩展 AM/FM 前先设计可靠模型和证据。
-6. 确认比赛提交是否只要求公开 URL、代码包或视频，再决定是否增加持久化。
+### P1：质量与架构
+
+1. DSP 移入 Web Worker，避免大样本阻塞 UI。
+2. AI 结果缓存 + 数字一致性校验；限流不能影响正常使用。
+3. CSV 解析边界、数据预览、可访问性（aria-live、图表替代表格）。
+4. 浏览器 E2E 回归与真实 CSV fixtures。
+5. 拆分 `app.js` / `dsp.js`，引入静态检查。
+
+### P2：模型扩展
+
+1. AM/FM 候选模型与保守证据选择。
+2. 参数置信区间/不确定性展示。
+3. 本地分析历史（localStorage）或报告增强。
+4. MAT、复数 IQ、非均匀采样、多通道另立阶段，不能虚假宣称。
+
+### 比赛
+
+- 天池报名/组队、实名认证、阿里云大学生认证
+- 11 月 30 日 18:00 前发布论坛作品帖
+- 作品帖五部分：自我介绍、一句话作品、为什么做、5 步以内怎么用、Qoder 过程与截图
+- 3 分钟演示脚本
+- 不保证获奖；以官方规则为准
 
 ---
 
 ## 12. 风险与不可承诺事项
 
-- 未获得官方规则，无法保证获奖或确认格式合规。
-- Qwen 未真实联调。
+- 未获得官方评分权重，无法保证获奖或确认格式合规。
+- Qwen 已真实联调，但公开端点仍受额度、网络和模型可用性影响。
 - 单频/多频算法只对候选库和当前采样条件负责。
 - 可信等级不是概率。
 - 浏览器 MVP 不是 Python 后端。
-- 公开站点可匿名访问，但 Function 依赖账号 Secret 和额度。
+- 公开站点可匿名访问，Function 依赖账号 Secret 和额度。
 - 不应在公开仓库保存密钥、测试数据或赛事受限材料。
+- CN CLI 与当前描述文件格式不兼容；发布统一走桌面端 Sites MCP。
 
 ---
 
@@ -343,3 +353,5 @@ git config user.email "<email>"
 - 保留项目原始立项书作为背景，不再以其完整技术方案约束当前提交版。
 - 保留 Git 历史，不删除历史提交。
 - 保留部署验证测试，即使它们不随网站打包。
+- 新版 AI UI 先提交到独立分支，发布前再做一次线上回归。
+- AI 防滥用以“不影响正常演示”为硬约束，优先缓存和软限制。
