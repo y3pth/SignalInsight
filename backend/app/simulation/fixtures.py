@@ -1,4 +1,3 @@
-import json
 import math
 from dataclasses import asdict
 from io import BytesIO
@@ -7,13 +6,15 @@ from typing import Any
 
 import numpy as np
 
-from app.schemas.enums import DatasetOrigin, SamplingKind, SignalKind
-from app.schemas.simulations import SimulationRequest
-from app.simulation.hashing import (
+from app.core.files import atomic_write_bytes, read_json_object, write_json_atomic
+from app.core.hashing import (
     canonical_json_sha256,
     compute_file_sha256,
     compute_signal_sha256,
 )
+from app.core.paths import resolve_within
+from app.schemas.enums import DatasetOrigin, SamplingKind, SignalKind
+from app.schemas.simulations import SimulationRequest
 from app.simulation.noise import measure_signal_power
 from app.simulation.types import (
     AnalysisSignalInput,
@@ -39,43 +40,10 @@ TRUTH_ONLY_FIELDS = {
 }
 
 
-def _atomic_write(path: Path, content: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tmp")
-    try:
-        temporary.write_bytes(content)
-        temporary.replace(path)
-    finally:
-        if temporary.exists():
-            temporary.unlink()
-
-
-def _write_json(path: Path, payload: Any) -> None:
-    content = json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n"
-    _atomic_write(path, content.encode("utf-8"))
-
-
 def _write_npz(path: Path, **arrays: np.ndarray[Any, Any]) -> None:
     buffer = BytesIO()
     np.savez(buffer, allow_pickle=False, **arrays)
-    _atomic_write(path, buffer.getvalue())
-
-
-def _read_json(path: Path) -> JsonObject:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"expected a JSON object: {path}")
-    return payload
-
-
-def _safe_fixture_path(fixture_dir: Path, relative_path: str) -> Path:
-    root = fixture_dir.resolve()
-    candidate = (root / relative_path).resolve()
-    try:
-        candidate.relative_to(root)
-    except ValueError as exc:
-        raise ValueError("fixture path escapes the fixture directory") from exc
-    return candidate
+    atomic_write_bytes(path, buffer.getvalue())
 
 
 def _analysis_metadata(result: SimulationResult) -> JsonObject:
@@ -101,7 +69,7 @@ def write_simulation_fixture(result: SimulationResult, fixture_dir: Path) -> Jso
         values=result.analysis_input.values,
         time_s=result.analysis_input.time_s,
     )
-    _write_json(fixture_dir / ANALYSIS_METADATA, _analysis_metadata(result))
+    write_json_atomic(fixture_dir / ANALYSIS_METADATA, _analysis_metadata(result))
 
     truth_metadata = {
         "schema_version": "1.0.0",
@@ -110,7 +78,7 @@ def write_simulation_fixture(result: SimulationResult, fixture_dir: Path) -> Jso
         "generator_version": result.truth.generator_version,
         "noise": asdict(result.truth.noise),
     }
-    _write_json(fixture_dir / TRUTH_METADATA, truth_metadata)
+    write_json_atomic(fixture_dir / TRUTH_METADATA, truth_metadata)
     _write_npz(
         fixture_dir / TRUTH_ARRAYS,
         clean_values=result.truth.clean_values,
@@ -129,7 +97,7 @@ def write_simulation_fixture(result: SimulationResult, fixture_dir: Path) -> Jso
             for relative_path in relative_files
         },
     }
-    _write_json(fixture_dir / MANIFEST_NAME, manifest)
+    write_json_atomic(fixture_dir / MANIFEST_NAME, manifest)
     return manifest
 
 
@@ -159,11 +127,11 @@ def _validate_analysis_arrays(signal: AnalysisSignalInput) -> None:
 
 
 def read_analysis_fixture(fixture_dir: Path) -> AnalysisSignalInput:
-    metadata = _read_json(_safe_fixture_path(fixture_dir, ANALYSIS_METADATA))
+    metadata = read_json_object(resolve_within(fixture_dir, ANALYSIS_METADATA))
     forbidden = TRUTH_ONLY_FIELDS.intersection(metadata)
     if forbidden:
         raise ValueError(f"analysis metadata contains truth fields: {sorted(forbidden)}")
-    with np.load(_safe_fixture_path(fixture_dir, ANALYSIS_ARRAYS), allow_pickle=False) as arrays:
+    with np.load(resolve_within(fixture_dir, ANALYSIS_ARRAYS), allow_pickle=False) as arrays:
         values = np.asarray(arrays["values"])
         time_s = np.asarray(arrays["time_s"], dtype=np.float64)
     values.setflags(write=False)
@@ -184,8 +152,8 @@ def read_analysis_fixture(fixture_dir: Path) -> AnalysisSignalInput:
 
 
 def read_simulation_truth(fixture_dir: Path) -> SimulationTruth:
-    metadata = _read_json(_safe_fixture_path(fixture_dir, TRUTH_METADATA))
-    with np.load(_safe_fixture_path(fixture_dir, TRUTH_ARRAYS), allow_pickle=False) as arrays:
+    metadata = read_json_object(resolve_within(fixture_dir, TRUTH_METADATA))
+    with np.load(resolve_within(fixture_dir, TRUTH_ARRAYS), allow_pickle=False) as arrays:
         clean_values = np.asarray(arrays["clean_values"])
         noise_values = np.asarray(arrays["noise_values"])
         kept_indices = np.asarray(arrays["kept_indices"], dtype=np.int64)
@@ -208,12 +176,12 @@ def validate_simulation_fixture(fixture_dir: Path) -> FixtureValidationReport:
     errors: list[str] = []
     checked_files = 0
     try:
-        manifest = _read_json(_safe_fixture_path(fixture_dir, MANIFEST_NAME))
+        manifest = read_json_object(resolve_within(fixture_dir, MANIFEST_NAME))
         files = manifest["files"]
         if not isinstance(files, dict):
             raise ValueError("fixture manifest files must be an object")
         for relative_path, expected_hash in files.items():
-            path = _safe_fixture_path(fixture_dir, relative_path)
+            path = resolve_within(fixture_dir, relative_path)
             checked_files += 1
             if compute_file_sha256(path) != expected_hash:
                 errors.append(f"file hash mismatch: {relative_path}")

@@ -4,8 +4,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
-from app.simulation.types import FloatArray, SignalArray
+FloatArray = NDArray[np.float64]
+SignalArray = NDArray[np.float64] | NDArray[np.complex128]
 
 
 def _update_array(digest: Any, values: np.ndarray) -> None:
