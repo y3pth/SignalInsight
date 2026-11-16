@@ -1,7 +1,7 @@
 # SignalInsight 新对话交接书
 
 > 更新日期：2026-11-17
-> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；P1/P2 与边界/极限修复均已发布
+> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；信任实验室功能已实现，待最终发布
 > 这是新对话的首要入口。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
 
 ---
@@ -76,6 +76,12 @@ site/.SignalInsight.qoder.site
 - 单频/双频/三频改为阶梯式选择，只有显著改善才升级
 - 500k 样本栈溢出已修复；CSV 解析 O(n²) 已修复
 - AI 状态区分“已配置 / 未配置 / 服务不可达”
+- 可信结论卡与可点击证据链（依据 chips、会改变结论的条件）
+- 数据体检（削顶/漂移/跳变/平稳性/阶梯/Nyquist/周期）与实验设计建议
+- AM/FM 调制解构卡（包络 / 瞬时频率 / 边带）
+- 反事实压力测试（加噪 20/10 dB、观测减半、降采样 2×）
+- 多通道逐通道独立分析；MAT v5 实数矩阵导入；IQ 单分量复指数分析
+- 结果过期/AI 竞态/Worker 超时/Function 输入重建等架构加固
 
 ---
 
@@ -83,14 +89,14 @@ site/.SignalInsight.qoder.site
 
 当前不能宣称支持：
 
-- MAT 文件
-- 多通道批量分析
-- 复数 IQ
+- MAT v7.3/HDF5 或复数 MAT（当前仅 MAT v5 实数矩阵）
+- IQ 多分量/复数调制模型（当前仅单分量复指数）
+- 多通道联合模型（当前逐通道独立分析）
 - 非均匀采样
 - Python FastAPI/SQLite 线上部署
 - 用户系统、历史持久化、共享报告
 
-AM/FM 候选模型与参数不确定度已实现，但仍受候选库和采样条件限制；MAT、IQ、非均匀采样、多通道另立阶段。不能把浏览器 MVP 描述为完整 Python 后端；不能把未实现模型说成已支持。
+AM/FM、参数不确定度、多通道逐通道、MAT v5 实数和 IQ 单分量已实现，但都受候选库和采样条件限制。不能把浏览器 MVP 描述为完整 Python 后端；不能把未实现模型说成已支持。
 
 ---
 
@@ -291,6 +297,9 @@ DASHSCOPE_BASE_URL    默认 https://dashscope.aliyuncs.com/compatible-mode/v1
 ```bash
 node site/test/dsp.test.mjs
 node site/test/csv.test.mjs
+node site/test/extreme.test.mjs
+node site/test/mat.test.mjs
+node site/test/iq.test.mjs
 node site/test/function.test.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
@@ -315,6 +324,18 @@ P1/P2 已发布并完成线上回归：
 - `app.js`、`dsp.js`、`csv.js`、`analyzer-worker.js` 均 200
 - `/explain` 请求 200；默认软限流未影响正常演示
 
+信任实验室功能本地验证：
+
+- 结论卡：单频/unknown/AM 均给出依据 chips；点击会高亮证据行和对应图表
+- 数据体检：削顶信号正确标红；干净 50 Hz 周期信号不再误报削顶/量化
+- 实验设计：AM 给出调制周期和采样率建议
+- 调制解构：AM 3 条边带、FM 5 条边带，曲线与参数正常
+- 压力测试：单频 4 个扰动场景均稳定；翻转标识逻辑可用
+- 多通道：time + 3 信号列批量分析，3 个通道均返回单频模型
+- MAT v5：SciPy 生成的 64×2 矩阵正确解析为 time+signal，分析正常
+- IQ：120 Hz/幅值 2/相位 0.3 的复指数正确识别，Worker 运行；噪声 IQ 输出 unknown
+- 结果过期会禁用 AI/导出；旧 AI 响应不会覆盖新结果
+
 边界与极限测试（已发布并完成线上回归）：
 
 - 63 样本：正确拒绝“至少需要 64 个样本”
@@ -334,10 +355,15 @@ P1/P2 已发布并完成线上回归：
 
 ## 9. Git 状态与分支
 
-- 当前分支：`feat/ai-explanations`
-- 最新提交：`a64b48c docs: record boundary hardening publication`
-- AI UI 提交：`43c941f feat: surface AI limitations and harden Qwen requests`
-- P1 提交：`7874c50 feat: move analysis to a worker and harden AI delivery`
+- 当前分支：`feat/trust-lab`
+- 最新提交：`48ad325 feat: add multi-channel, MAT and IQ data modes`
+- 信任实验室提交：
+  - `e45afb0 fix: harden result and AI data flow`
+  - `d5d7834 feat: add a deterministic trust conclusion card`
+  - `b9a8720 feat: add data health and experiment design guidance`
+  - `352f630 feat: add an AM/FM modulation deconstruction lab`
+  - `e4d6e4c feat: add counterfactual stress testing`
+  - `48ad325 feat: add multi-channel, MAT and IQ data modes`
 - `main` 仍为 `ff2b226 refactor: reduce repository to deployed Qoder Sites deliverable`
 - 远端：尚未配置
 - 不直接修改 `main`；每个任务使用独立分支
@@ -382,8 +408,19 @@ P1/P2 已发布并完成线上回归：
 
 1. [已完成] AM/FM 候选模型与保守证据选择。
 2. [已完成] 参数不确定度展示（近似标准误 + 分辨率）。
-3. [下一步] 本地分析历史（localStorage）或报告增强。
-4. [另立阶段] MAT、复数 IQ、非均匀采样、多通道，不能虚假宣称。
+3. [已完成] 多通道逐通道、MAT v5 实数矩阵、IQ 单分量复指数。
+4. [下一步] 本地分析历史（localStorage）或报告增强。
+5. [另立阶段] MAT v7.3/复数、IQ 多分量/复数调制、非均匀采样、联合多通道模型。
+
+### P3：信任实验室（本轮）
+
+1. [已完成] 结果过期/AI 竞态/Worker 超时/Function 输入重建等架构加固。
+2. [已完成] 结论卡与可点击证据链。
+3. [已完成] 数据体检与实验设计建议。
+4. [已完成] AM/FM 调制解构视图。
+5. [已完成] 反事实压力测试。
+6. [已完成] 多通道、MAT v5、IQ 单分量数据模式。
+7. [待发布] 信任实验室最终版本尚未发布到公开站点。
 
 ### 比赛
 
@@ -399,8 +436,11 @@ P1/P2 已发布并完成线上回归：
 
 - 未获得官方评分权重，无法保证获奖或确认格式合规。
 - Qwen 已真实联调，但公开端点仍受额度、网络和模型可用性影响。
-- 单频/多频/AM/FM 算法只对候选库和当前采样条件负责。
+- 单频/多频/AM/FM/IQ 算法只对候选库和当前采样条件负责。
 - AM/FM 结论受调制证据门控，不等同于物理调制机制。
+- IQ 仅支持单分量复指数；MAT 仅支持 v5 实数矩阵；多通道为逐通道独立分析。
+- 结论卡、数据体检和实验设计是规则汇总，不是物理证明。
+- 压力测试只覆盖有限扰动（加噪/观测减半/降采样），且仅支持 5 万点以内。
 - 参数不确定度为线性拟合近似；频率行是 1/T 分辨率，不是严格置信区间。
 - AI 限流是单 Function isolate 内存软限制，不是全局配额。
 - 50 万点属于极端输入，浏览器端约 30 秒；正常 1k–4k 样本约 1 秒。
