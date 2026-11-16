@@ -1,7 +1,7 @@
 # SignalInsight 新对话交接书
 
 > 更新日期：2026-11-17
-> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；新版 AI UI 已提交，待发布
+> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；新版 AI UI 已发布
 > 这是新对话的首要入口。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
 
 ---
@@ -25,13 +25,13 @@ SignalInsight 最初规划为 Vue + FastAPI + SQLite 的完整信号分析平台
 - 生命周期：active
 - Site ID：`01a1e4bb-ea05-7b36-88f4-72a743ddb34d`
 - Project ID：`01a1e4bb-ea05-7036-8eea-6bdc90a0ab26`
-- 当前线上发布 action：`0ce2bc13-f6ea-49d2-a9ba-775b9ae53345`
+- 当前线上发布 action：`41485a58-2169-4c64-bb96-05cced35d199`
 - 当前 Function：`app`，edge runtime，已发布
 - 站点 Secret：`DASHSCOPE_API_KEY` 已配置
 - Function `/functions/v1/app/health` 返回：`{"ok":true,"configured":true,"provider":"dashscope-compatible"}`
 - 线上 Qwen 已真实调用成功：单频、双频、噪声 unknown、CSV 上传均已验证
 
-当前线上仍是**旧版 AI UI**。新版 AI UI（限制展示、请求超时、错误细分）已提交到分支 `feat/ai-explanations`，提交 `43c941f`，尚未发布。
+新版 AI UI（限制展示、请求超时、错误细分）已发布并完成线上回归。
 
 本地发布描述：
 
@@ -61,7 +61,7 @@ site/.SignalInsight.qoder.site
 - JSON 报告导出
 - Qwen 解释代理及确定性规则降级
 - Qwen 解释已在线可用
-- 新版 AI UI 已实现但待发布：
+- 新版 AI UI 已发布：
   - Qwen 返回的 `limitations` 展示
   - health 8 秒超时、explain 30 秒超时
   - `service_not_configured`、`upstream_error` 等错误细分
@@ -276,7 +276,8 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ## 9. Git 状态与分支
 
 - 当前分支：`feat/ai-explanations`
-- 最新提交：`43c941f feat: surface AI limitations and harden Qwen requests`
+- 最新提交：`4dc92d2 docs: refresh handoff for live Qwen and CN publishing`
+- AI UI 提交：`43c941f feat: surface AI limitations and harden Qwen requests`
 - `main` 仍为 `ff2b226 refactor: reduce repository to deployed Qoder Sites deliverable`
 - 远端：尚未配置
 - 不直接修改 `main`；每个任务使用独立分支
@@ -353,5 +354,5 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 - 保留项目原始立项书作为背景，不再以其完整技术方案约束当前提交版。
 - 保留 Git 历史，不删除历史提交。
 - 保留部署验证测试，即使它们不随网站打包。
-- 新版 AI UI 先提交到独立分支，发布前再做一次线上回归。
+- 新版 AI UI 在独立分支提交，完成线上回归后发布。
 - AI 防滥用以“不影响正常演示”为硬约束，优先缓存和软限制。

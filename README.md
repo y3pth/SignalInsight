@@ -6,7 +6,7 @@
 
 - **公开站点：** <https://signal-insight-s31b5iv5ld0.qoder.zone>
 - **当前状态：** 已公开发布；单频/双频/unknown/CSV/AI/报告导出可用
-- **AI：** Qwen 已配置并在线可用；新版限制展示/超时/错误提示在 `feat/ai-explanations`，待发布
+- **AI：** Qwen 已配置并在线可用；限制展示/超时/错误提示已发布
 - **立项背景：** [立项确定书.md](立项确定书.md)
 - **新对话交接：** [HANDOFF.md](HANDOFF.md)
 - **协作规则：** [AGENTS.md](AGENTS.md)
