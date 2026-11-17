@@ -143,7 +143,7 @@ AI_ERROR_MESSAGES                 // 错误码 → 中文提示映射
 
 ## 8. 学习库 API（learn.js，后端拥有，前端学习页调用）
 
-> DOM-free。复用 dsp.js 数值内核与种子信号生成。**10 场景**（clean/modulation/defect/out-of-library）；M2 原理展开见 §4 `/learn-explain`。
+> DOM-free。复用 dsp.js 数值内核与种子信号生成。**15 场景（含 IQ）**（clean/modulation/defect/out-of-library）；M2 原理展开见 §4 `/learn-explain`。
 
 ```js
 listScenarios()            -> ScenarioMeta[]   // {id,title,category,difficulty,summary}

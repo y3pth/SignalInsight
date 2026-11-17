@@ -1,4 +1,4 @@
-import { analyzeSignal, analyzeIqSignal } from "./dsp.js?v=11";
+import { analyzeSignal, analyzeIqSignal } from "./dsp.js?v=12";
 
 const TAU = 2 * Math.PI;
 
@@ -269,6 +269,133 @@ const SCENARIOS = [
     questions: ["纯噪声的频谱长什么样？", "为什么'拒绝结论'比'给一个拟合'更可信？"],
     steps: ["observe", "hypothesize", "verify", "conclude"],
   },
+  {
+    id: "iq-single",
+    title: "IQ 复指数信号",
+    category: "clean",
+    difficulty: 3,
+    summary: "用 I/Q 两路表示的复指数信号。学习复信号表示，以及为什么 IQ 能直接给出幅值/相位而不含负频率镜像。",
+    signal: { kind: "iq", waveform: "iq", fs: 1024, n: 4096, seed: 5, carrierFrequency: 120, amplitude: 2, phase: 0.3, iOffset: 0.1, qOffset: 0.05, noiseSigma: 0.01 },
+    groundTruth: { frequency: 120, amplitude: 2, phase: 0.3 },
+    expected: { unknown: false, model: "iq_single", reliability: "reliable", health: "ok" },
+    principle: {
+      concept: "复指数 z(t)=c+(u+jv)e^{j2πft} 同时拟合 I/Q 两路；复谱无负频率镜像，频率/复幅值/复相位可直接估计。",
+      evidenceIds: ["spectral_prominence", "fit_quality", "residual_whiteness", "frequency_resolution"],
+      points: [
+        "I=A·cos、Q=A·sin 构成旋转复矢量，幅值 A=√(I²+Q²)，相位 atan2(Q,I)。",
+        "复谱只在正频率出现单峰，避免实信号的双边镜像。",
+        "IQ 单分量模型同时拟合两路，R² 接近 1，频率/幅值/相位准确。",
+        "当前 IQ 仅支持单分量复指数；多分量/复数调制属另立阶段。",
+      ],
+    },
+    diagnosis: null,
+    questions: ["IQ 表示相比实信号有什么优势？", "为什么复谱没有负频率镜像？"],
+    steps: ["observe", "hypothesize", "verify", "conclude"],
+  },
+  {
+    id: "weak-modulation",
+    title: "弱调制（门控拒绝 AM）",
+    category: "modulation",
+    difficulty: 3,
+    summary: "调制指数极小的 AM 信号。学习保守证据门控：调制证据不足时不轻易判为 AM，而按音调模型处理。",
+    signal: { kind: "real", waveform: "am", fs: 1000, n: 2048, seed: 11, carrierFrequency: 120, carrierAmplitude: 2, carrierPhase: 0.2, modulationFrequency: 5, modulationIndex: 0.02, modulationPhase: 0.3, offset: 0.1, noiseSigma: 0.02 },
+    groundTruth: { carrierFrequency: 120, modulationFrequency: 5, modulationIndex: 0.02 },
+    expected: { unknown: false, reliability: "reliable", health: "ok" },
+    principle: {
+      concept: "AM 候选需通过调制指数/包络显著度门控且优于音调模型；调制指数 0.02 太弱，门控拒绝 AM，边带被当作多频音调。",
+      evidenceIds: ["spectral_prominence", "fit_quality", "residual_structure"],
+      points: [
+        "调制指数仅 0.02，包络起伏几乎淹没在噪声中，调制证据不足。",
+        "系统不把它判为 AM（避免过度声称调制），而用多频音调拟合载波+边带。",
+        "这体现保守门控：宁可不用复杂调制模型，也不误判。",
+        "增大调制指数或降低噪声后，AM 证据才会通过门控。",
+      ],
+    },
+    diagnosis: null,
+    questions: ["为什么弱调制不被判为 AM？", "保守门控如何避免过度声称物理机制？"],
+    steps: ["observe", "hypothesize", "verify", "conclude"],
+  },
+  {
+    id: "low-snr",
+    title: "低信噪比信号",
+    category: "defect",
+    difficulty: 2,
+    summary: "噪声很强的单频信号。学习信噪比如何影响可信度：即使识别出模型，参数结论仍可能不可信。",
+    signal: { kind: "real", waveform: "tones", fs: 1000, n: 2048, seed: 21, components: [{ frequency: 50, amplitude: 2, phase: 0.2 }], offset: 0.1, noiseSigma: 1.0 },
+    groundTruth: { frequency: 50, amplitude: 2, noiseSigma: 1.0 },
+    expected: { unknown: false, model: "single_tone", reliability: "unreliable", health: "ok" },
+    principle: {
+      concept: "强噪声下仍能识别主频，但拟合解释力 R² 下降、参数不确定度增大，可信度判 unreliable。",
+      evidenceIds: ["spectral_prominence", "fit_quality", "residual_whiteness"],
+      points: [
+        "主峰仍可辨识（显著度通过），模型选单频。",
+        "噪声功率与信号相当，R² 跌到约 0.66，fit_quality 判 fail。",
+        "识别出模型 ≠ 参数可信；可信度综合残差与解释力判 unreliable。",
+        "提高信噪比（平均/增益/屏蔽）才能改善参数可信度。",
+      ],
+    },
+    diagnosis: {
+      issues: ["信噪比过低：噪声标准差 1.0 与信号幅值 2 相当"],
+      causes: ["信号弱或环境噪声强"],
+      improvements: ["多次平均提高 SNR", "增大信号增益或改善屏蔽"],
+    },
+    questions: ["为什么识别出单频模型却仍判 unreliable？", "R² 与可信度是什么关系？"],
+    steps: ["observe", "hypothesize", "verify", "conclude"],
+  },
+  {
+    id: "short-record",
+    title: "短观测信号",
+    category: "defect",
+    difficulty: 2,
+    summary: "只有 64 个样本的短记录。学习观测时长如何限制频率分辨率（1/T），以及为何可信度降级。",
+    signal: { kind: "real", waveform: "tones", fs: 1000, n: 64, seed: 22, components: [{ frequency: 50, amplitude: 2, phase: 0.2 }], offset: 0.1, noiseSigma: 0.02 },
+    groundTruth: { frequency: 50, amplitude: 2, sampleCount: 64 },
+    expected: { unknown: false, model: "single_tone", reliability: "caution", health: "warn" },
+    principle: {
+      concept: "频率分辨率约 1/T（T 为观测时长）。短记录 T 小，分辨率粗，频率不确定度大，可信度降为 caution。",
+      evidenceIds: ["frequency_resolution", "data_health", "fit_quality"],
+      points: [
+        "64 样本 @1000 Hz 仅 0.063 s，约 3 个周期，分辨率约 15.9 Hz。",
+        "拟合 R² 仍高，但频率不确定度（1/T）很大，frequency_resolution 判 warn。",
+        "系统给 caution 而非 reliable，提醒分辨率不足。",
+        "延长观测时长可显著提高频率分辨率与可信度。",
+      ],
+    },
+    diagnosis: {
+      issues: ["观测时长不足：仅 64 样本，频率分辨率粗"],
+      causes: ["采集时间过短"],
+      improvements: ["延长观测时长以覆盖更多周期", "提高采样率不能替代延长时长（分辨率由 T 决定）"],
+    },
+    questions: ["频率分辨率由什么决定？", "提高采样率能否改善频率分辨率？"],
+    steps: ["observe", "hypothesize", "verify", "conclude"],
+  },
+  {
+    id: "near-nyquist",
+    title: "近 Nyquist 信号",
+    category: "defect",
+    difficulty: 2,
+    summary: "频率接近 Nyquist 极限的信号。学习采样定理边界，以及为什么靠近 Nyquist 会触发警告。",
+    signal: { kind: "real", waveform: "tones", fs: 1000, n: 2048, seed: 23, components: [{ frequency: 480, amplitude: 2, phase: 0.2 }], offset: 0.1, noiseSigma: 0.02 },
+    groundTruth: { frequency: 480, sampleRate: 1000, nyquist: 500 },
+    expected: { unknown: false, model: "single_tone", reliability: "caution", health: "warn", healthChecks: { nyquist: "warn" } },
+    principle: {
+      concept: "采样定理要求信号频率低于 Nyquist（fs/2）。主峰接近 Nyquist 时抗混叠裕量不足，体检 nyquist 判 warn。",
+      evidenceIds: ["data_health", "frequency_resolution", "spectral_prominence"],
+      points: [
+        "fs=1000 Hz，Nyquist=500 Hz；信号 480 Hz 达 Nyquist 的 96%。",
+        "靠近 Nyquist 易受混叠与滤波器滚降影响，体检 nyquist 判 warn。",
+        "模型仍可拟合，但可信度降为 caution，提醒采样裕量不足。",
+        "提高采样率使信号远离 Nyquist 可改善。",
+      ],
+    },
+    diagnosis: {
+      issues: ["频率接近 Nyquist：480 Hz 达 500 Hz 的 96%"],
+      causes: ["采样率相对信号频率偏低"],
+      improvements: ["提高采样率，使信号频率远低于 fs/2", "确认抗混叠滤波器有效"],
+    },
+    questions: ["Nyquist 频率是什么？", "为什么靠近 Nyquist 需要警告？"],
+    steps: ["observe", "hypothesize", "verify", "conclude"],
+  },
 ];
 
 export function listScenarios() {
@@ -289,6 +416,11 @@ export function generateScenarioSignal(id) {
   const time = Array.from({ length: signal.n }, (_, index) =>
     index / signal.fs + (jitter ? (random() - 0.5) * 2 * jitter / signal.fs : 0),
   );
+  if (signal.waveform === "iq") {
+    const i = time.map((t) => (signal.iOffset ?? 0) + signal.amplitude * Math.cos(TAU * signal.carrierFrequency * t + (signal.phase ?? 0)) + (signal.noiseSigma ? signal.noiseSigma * gaussian(random) : 0));
+    const q = time.map((t) => (signal.qOffset ?? 0) + signal.amplitude * Math.sin(TAU * signal.carrierFrequency * t + (signal.phase ?? 0)) + (signal.noiseSigma ? signal.noiseSigma * gaussian(random) : 0));
+    return { kind: "iq", time, i, q };
+  }
   const values = time.map((t) => {
     let value = signal.offset ?? 0;
     switch (signal.waveform ?? "tones") {

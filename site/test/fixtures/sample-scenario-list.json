@@ -68,5 +68,40 @@
     "category": "out-of-library",
     "difficulty": 1,
     "summary": "纯高斯噪声。学习识别'无信号'，理解无显著谱峰时系统如何拒绝给出结论。"
+  },
+  {
+    "id": "iq-single",
+    "title": "IQ 复指数信号",
+    "category": "clean",
+    "difficulty": 3,
+    "summary": "用 I/Q 两路表示的复指数信号。学习复信号表示，以及为什么 IQ 能直接给出幅值/相位而不含负频率镜像。"
+  },
+  {
+    "id": "weak-modulation",
+    "title": "弱调制（门控拒绝 AM）",
+    "category": "modulation",
+    "difficulty": 3,
+    "summary": "调制指数极小的 AM 信号。学习保守证据门控：调制证据不足时不轻易判为 AM，而按音调模型处理。"
+  },
+  {
+    "id": "low-snr",
+    "title": "低信噪比信号",
+    "category": "defect",
+    "difficulty": 2,
+    "summary": "噪声很强的单频信号。学习信噪比如何影响可信度：即使识别出模型，参数结论仍可能不可信。"
+  },
+  {
+    "id": "short-record",
+    "title": "短观测信号",
+    "category": "defect",
+    "difficulty": 2,
+    "summary": "只有 64 个样本的短记录。学习观测时长如何限制频率分辨率（1/T），以及为何可信度降级。"
+  },
+  {
+    "id": "near-nyquist",
+    "title": "近 Nyquist 信号",
+    "category": "defect",
+    "difficulty": 2,
+    "summary": "频率接近 Nyquist 极限的信号。学习采样定理边界，以及为什么靠近 Nyquist 会触发警告。"
   }
 ]

@@ -3,7 +3,7 @@
 > 面向：负责 **UI 设计与渲染** 的前端协作者。
 > 你的搭档（后端）负责数值/逻辑。本文件让你独立上手、并行开发、不冲突。
 > 配套：`COLLABORATION.md`（协作流程）、`CONTRACT.md`（数据契约 v1.0）、`HANDOFF.md`（项目全局）。
-> 更新：2026-11-17 · 模块版本 v=11 · 契约 v1.0
+> 更新：2026-11-17 · 模块版本 v=12 · 契约 v1.0
 
 ---
 
@@ -157,7 +157,7 @@ UI 渲染规则：
 
 ## 10. 版本号与缓存（重要）
 
-- 所有模块/资源带 `?v=N`（当前 v=11），`static.test.mjs` 强制单一版本。
+- 所有模块/资源带 `?v=N`（当前 v=12），`static.test.mjs` 强制单一版本。
 - **并行开发期间你不要改 `?v=`**；集成入 `integration` 后由后端统一递增。
 - 改 `index.html` 结构时保留 script/link 的 `?v=` 原值。
 - 本地调试若看到旧行为，强制刷新（Ctrl+F5）或临时改 query 绕过缓存。
@@ -194,7 +194,7 @@ UI 渲染规则：
 
 ## 15. 学习模式页面（learn.html）完整施工规格
 
-后端学习库 `learn.js` 已就绪（**10 个场景**，覆盖 clean/modulation/defect/out-of-library；M2 Qwen 原理展开已接入）。本节让你**独立、无歧义**地建好 `learn.html`。你拥有 `learn.html` + 学习渲染模块 + 相关样式；`learn.js`/`dsp.js` 归后端，只读消费。
+后端学习库 `learn.js` 已就绪（**15 个场景（含 IQ）**，覆盖 clean/modulation/defect/out-of-library；M2 Qwen 原理展开已接入）。本节让你**独立、无歧义**地建好 `learn.html`。你拥有 `learn.html` + 学习渲染模块 + 相关样式；`learn.js`/`dsp.js` 归后端，只读消费。
 
 ### 15.1 目标与边界
 - 建独立页面 `site/dist/learn.html`（与分析页 `index.html` 平级），状态隔离，互不干扰。
@@ -204,16 +204,16 @@ UI 渲染规则：
 ### 15.2 快速开始
 ```html
 <!-- learn.html -->
-<script type="module" src="./learn-app.js?v=11"></script>
+<script type="module" src="./learn-app.js?v=12"></script>
 ```
 ```js
 // learn-app.js（前端自有，命名自定）
-import { listScenarios, getScenario, generateScenarioSignal, analyzeScenario } from "./learn.js?v=11";
-import { analyzeSignal } from "./dsp.js?v=11"; // 仅在需要自行重算时；通常直接用 analyzeScenario
+import { listScenarios, getScenario, generateScenarioSignal, analyzeScenario } from "./learn.js?v=12";
+import { analyzeSignal } from "./dsp.js?v=12"; // 仅在需要自行重算时；通常直接用 analyzeScenario
 const catalog = listScenarios();           // 渲染目录
 const { scenario, result, match } = analyzeScenario("clean-single"); // 渲染学习页
 ```
-- 所有 import 带 `?v=11`（与全局一致；集成期后端统一递增，你不要改）。
+- 所有 import 带 `?v=12`（与全局一致；集成期后端统一递增，你不要改）。
 - 无构建步骤；可复用 `styles.css` 或新建 `learn.css`。
 
 ### 15.3 API 详解（CONTRACT.md §8）
@@ -310,11 +310,12 @@ listScenarios() → 目录
 ### 15.11 样例数据（独立开发，无需后端实时）
 | 文件 | 内容 | 用途 |
 |---|---|---|
-| `site/test/fixtures/sample-scenario-list.json` | `listScenarios()` 输出（10 场景） | 调目录 UI |
+| `site/test/fixtures/sample-scenario-list.json` | `listScenarios()` 输出（15 场景） | 调目录 UI |
 | `sample-scenario-clean.json` | `analyzeScenario("clean-single")` 完整输出 | 调干净场景学习页 |
 | `sample-scenario-defect.json` | `analyzeScenario("clipped-tone")` 完整输出 | 调缺陷场景学习页（含 diagnosis） |
 | `sample-scenario-am.json` | `analyzeScenario("am-tone")` 完整输出 | 调调制场景学习页 |
 | `sample-scenario-chirp.json` | `analyzeScenario("chirp")` 完整输出 | 调库外/unknown 场景学习页 |
+| `sample-scenario-iq.json` | `analyzeScenario("iq-single")` 完整输出 | 调 IQ 场景学习页（result.kind="iq"，含 iq.q） |
 
 直接 `fetch`/import 这些 JSON 喂渲染函数即可调样式，不必跑分析。
 
@@ -326,7 +327,7 @@ listScenarios() → 目录
   3. verify 步 result 渲染复用分析模式规则（unknown/徽章/体检）。
   4. `match.ok` 反馈正确；缺陷场景显示 diagnosis。
   5. 进度持久化；导航互通；窄视口无溢出；控制台无错误。
-  6. 不改后端文件；import 带 `?v=11`。
+  6. 不改后端文件；import 带 `?v=12`。
 
 ### 15.13 约束与陷阱
 - **不改 `learn.js`/`dsp.js`/`service.js`**；需新场景/字段 → HANDOFF 协作日志提案，后端加法提供。
@@ -357,8 +358,8 @@ listScenarios() → 目录
 - 后端 `learn.js` 导出 `buildLearnPayload(scenario, result)` → 学习 payload（concept/points/evidence/diagnosis/groundTruth）。
 - 前端经 `service.js` 调用：
 ```js
-import { fetchLearnExplanation } from "./service.js?v=11";
-import { buildLearnPayload, analyzeScenario } from "./learn.js?v=11";
+import { fetchLearnExplanation } from "./service.js?v=12";
+import { buildLearnPayload, analyzeScenario } from "./learn.js?v=12";
 const { scenario, result } = analyzeScenario(id);
 const payload = buildLearnPayload(scenario, result);
 try {
@@ -373,7 +374,7 @@ try {
 - 模型选择复用分析页 `#model-select` 或学习页自有选择器（白名单 qwen-plus/max/turbo/long）。
 - 不变量：AI 输出纯文本，绝不回写数值/可信等级；缓存可按 payload+model（参考分析页 `aiCache`）。
 
-> 完成本节即可独立交付 learn.html（10 场景 + M2 原理展开 + 降级）。需新场景/字段写 HANDOFF 协作日志，后端加法提供。
+> 完成本节即可独立交付 learn.html（15 场景 + M2 原理展开 + 降级）。需新场景/字段写 HANDOFF 协作日志，后端加法提供。
 
 ## 16. 关键文件速查
 

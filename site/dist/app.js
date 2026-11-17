@@ -3,9 +3,9 @@ import {
   buildDecision,
   buildExperimentPlan,
   templateExplanation,
-} from "./dsp.js?v=11";
-import { parseCsv } from "./csv.js?v=11";
-import { parseMat } from "./mat.js?v=11";
+} from "./dsp.js?v=12";
+import { parseCsv } from "./csv.js?v=12";
+import { parseMat } from "./mat.js?v=12";
 import {
   analyzeSignalSafely,
   analyzeIqSafely,
@@ -16,7 +16,7 @@ import {
   getHistory,
   addHistory,
   clearHistoryStorage,
-} from "./service.js?v=11";
+} from "./service.js?v=12";
 
 const elements = {
   tabs: [...document.querySelectorAll(".source-tab")],

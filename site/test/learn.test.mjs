@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { listScenarios, getScenario, generateScenarioSignal, analyzeScenario, buildLearnPayload } from "../dist/learn.js";
 
 const list = listScenarios();
-assert.equal(list.length, 10);
+assert.equal(list.length, 15);
 assert.ok(list.every((scenario) => scenario.id && scenario.title && scenario.category && scenario.summary));
 
 for (const meta of list) {
@@ -35,6 +35,19 @@ assert.equal(analyzeScenario("quantized-tone").result.health.checks.find((check)
 assert.equal(analyzeScenario("jittered-tone").result.recommendedId, "single_tone");
 assert.equal(analyzeScenario("chirp").result.unknown, true);
 assert.equal(analyzeScenario("pure-noise").result.unknown, true);
+
+const iq = analyzeScenario("iq-single");
+assert.equal(iq.result.kind, "iq");
+assert.equal(iq.result.recommendedId, "iq_single");
+assert.ok(iq.result.iq && "q" in iq.result.iq);
+const iqFrequency = iq.result.best.parameters.find((parameter) => parameter.id === "frequency_1").value;
+assert.ok(Math.abs(iqFrequency - 120) < 0.1, `iq frequency ${iqFrequency}`);
+
+assert.notEqual(analyzeScenario("weak-modulation").result.recommendedId, "am");
+assert.equal(analyzeScenario("low-snr").result.reliability.level, "unreliable");
+assert.equal(analyzeScenario("short-record").result.reliability.level, "caution");
+const nearNyquist = analyzeScenario("near-nyquist");
+assert.equal(nearNyquist.result.health.checks.find((check) => check.id === "nyquist").status, "warn");
 
 assert.equal(getScenario("nope"), null);
 assert.throws(() => generateScenarioSignal("nope"), /未知学习场景/);
