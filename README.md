@@ -5,10 +5,12 @@
 当前唯一交付物是 Qoder Sites 公开提交版。
 
 - **公开站点：** <https://signal-insight-s31b5iv5ld0.qoder.zone>
-- **当前状态：** 公开版可用；信任实验室功能已发布并完成线上回归
+- **当前状态：** 公开版可用；信任实验室已发布并完成线上回归。P1/P2 扩展（fixtures/静态检查/AI 审计/E2E/本地历史）已完成本地质检，尚未发布
 - **AI：** Qwen 已配置并在线可用；限制展示/超时/错误提示已发布；AI 结果缓存与软限流已启用
 - **分析：** DSP 在 Web Worker 中运行；支持单频、多频、AM/FM 候选与参数不确定度
 - **信任实验室：** 结论卡/证据链、数据体检、实验设计建议、AM/FM 解构、反事实压力测试
+- **本地历史：** localStorage 只读快照（仅存摘要，不含原始序列，不覆盖当前结果）
+- **质量保障：** 拟真 CSV fixtures、零依赖静态检查、AI 数字一致性审计、零依赖 CDP 浏览器 E2E
 - **数据模式：** 实数单/多通道 CSV、MAT v5 实数矩阵、IQ CSV（单分量复指数）
 - **立项背景：** [立项确定书.md](立项确定书.md)
 - **新对话交接：** [HANDOFF.md](HANDOFF.md)
@@ -37,6 +39,9 @@ node site/test/mat.test.mjs
 node site/test/iq.test.mjs
 node site/test/function.test.mjs
 node site/test/fixtures.test.mjs
+node site/test/static.test.mjs
+node site/test/ai-consistency.test.mjs
+node site/test/e2e.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
 
@@ -62,6 +67,7 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 - IQ 当前仅支持单分量复指数模型，不支持 IQ 多分量、复数调制或 IQ 压力测试。
 - 不支持 MAT v7.3/HDF5、复数 MAT、非均匀采样。
 - 参数不确定度为线性拟合近似，频率行是 1/T 分辨率，不是严格置信区间。
+- 本地分析历史仅存摘要快照（localStorage，≤20 条），只读、不含原始序列、不重新计算、不覆盖当前结果。
 - 50 万点属于极端输入，浏览器 Worker 约 30 秒；正常样本约 1–2 秒。
 - 不保证获奖；正式赛事规则仍待核验。
 - API Key 只通过 Qoder Sites Secrets 配置，不进入源码或聊天。

@@ -1,7 +1,7 @@
 # SignalInsight 新对话交接书
 
 > 更新日期：2026-11-17
-> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；信任实验室功能已发布并完成线上回归
+> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；信任实验室功能已发布并完成线上回归。P1/P2 扩展（fixtures/静态检查/AI 审计/E2E/本地历史）已在 `feat/realistic-fixtures` 完成本地质检，**尚未发布**。
 > 这是新对话的首要入口。更完整的工程转接说明见 `TRANSFER.md`。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
 
 ---
@@ -82,6 +82,8 @@ site/.SignalInsight.qoder.site
 - 反事实压力测试（加噪 20/10 dB、观测减半、降采样 2×）
 - 多通道逐通道独立分析；MAT v5 实数矩阵导入；IQ 单分量复指数分析
 - 结果过期/AI 竞态/Worker 超时/Function 输入重建等架构加固
+- 本地分析历史（localStorage 只读快照，仅存摘要，不含原始序列，不覆盖当前结果）
+- 拟真 CSV fixtures、零依赖静态检查、AI 数字一致性程序化审计、零依赖 CDP 浏览器 E2E
 
 ---
 
@@ -128,6 +130,9 @@ SignalInsight/
         ├── iq.test.mjs
         ├── function.test.mjs
         ├── fixtures.test.mjs
+        ├── static.test.mjs
+        ├── ai-consistency.test.mjs
+        ├── e2e.mjs              # 零依赖 CDP 浏览器端到端（需 Chrome/Edge）
         └── fixtures/            # 12 个仿真拟真 CSV + manifest.json + generate.mjs
 ```
 
@@ -308,6 +313,9 @@ node site/test/mat.test.mjs
 node site/test/iq.test.mjs
 node site/test/function.test.mjs
 node site/test/fixtures.test.mjs
+node site/test/static.test.mjs
+node site/test/ai-consistency.test.mjs
+node site/test/e2e.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
 
@@ -379,9 +387,18 @@ P1/P2 已发布并完成线上回归：
 
 ## 9. Git 状态与分支
 
-- 当前分支：`feat/trust-lab`
-- 最近代码提交：`48ad325 feat: add multi-channel, MAT and IQ data modes`
+- 当前分支：`feat/realistic-fixtures`（从 `feat/trust-lab` 分出）
+- 最近提交：`4003863 feat: add local analysis history with read-only snapshots`
 - 转接文档：`TRANSFER.md`
+- 本轮（P1/P2 扩展）提交：
+  - `c37c6d0 test: add realistic simulated CSV fixtures and regression suite`
+  - `23bbd0d fix: unify module version tags and set real result kind`
+  - `7801e5c test: add dependency-free static checks`
+  - `9f4ae3c test: add programmatic AI numeric-consistency audit`
+  - `3478b9c test: add zero-dependency browser E2E via CDP`
+  - `4003863 feat: add local analysis history with read-only snapshots`
+- 模块版本：v=7（全部模块/资源统一，`static.test.mjs` 强制一致）
+- 状态：本轮改动已通过本地全套测试 + E2E 质检，**尚未发布**；线上仍为信任实验室版本
 - 信任实验室提交：
   - `e45afb0 fix: harden result and AI data flow`
   - `d5d7834 feat: add a deterministic trust conclusion card`
@@ -423,10 +440,10 @@ P1/P2 已发布并完成线上回归：
 ### P1：质量与架构
 
 1. [已完成] DSP 移入 Web Worker，失败回退主线程。
-2. [已完成] AI 结果缓存 + 60 次/分钟/IP 软限流；数字一致性审计仍待补。
+2. [已完成] AI 结果缓存 + 60 次/分钟/IP 软限流；数字一致性程序化审计（`ai-consistency.test.mjs`）。
 3. [已完成] CSV 引号换行、数据预览、aria-live 播报。
-4. [部分完成] 拟真 CSV fixtures 已完成（12 个仿真 fixture + manifest + `fixtures.test.mjs`，明确标注仿真）；浏览器 E2E 自动化仍待补。
-5. [部分完成] 已抽离 `csv.js`；`app.js` / `dsp.js` 仍较大，静态检查待补。
+4. [已完成] 拟真 CSV fixtures（12 个仿真 fixture + manifest + `fixtures.test.mjs`，明确标注仿真）；浏览器 E2E 自动化（`e2e.mjs`，零依赖 CDP，复用 fixtures）。
+5. [已完成] 已抽离 `csv.js`；零依赖静态检查（`static.test.mjs`：语法/版本一致性/导入导出/引用存在）。`app.js` / `dsp.js` 仍较大，进一步拆分为可选后续。
 6. [已完成] 63/64/500k 样本、抖动、非递增、NaN、>10MB、同列映射等边界回归。
 
 ### P2：模型扩展
@@ -434,7 +451,7 @@ P1/P2 已发布并完成线上回归：
 1. [已完成] AM/FM 候选模型与保守证据选择。
 2. [已完成] 参数不确定度展示（近似标准误 + 分辨率）。
 3. [已完成] 多通道逐通道、MAT v5 实数矩阵、IQ 单分量复指数。
-4. [下一步] 本地分析历史（localStorage）或报告增强。
+4. [已完成] 本地分析历史（localStorage，只读快照，仅存摘要不含原始序列，不覆盖当前结果）。报告增强为可选后续。
 5. [另立阶段] MAT v7.3/复数、IQ 多分量/复数调制、非均匀采样、联合多通道模型。
 
 ### P3：信任实验室（本轮）
@@ -474,7 +491,8 @@ P1/P2 已发布并完成线上回归：
 - 公开站点可匿名访问，Function 依赖账号 Secret 和额度。
 - 不应在公开仓库保存密钥、测试数据或赛事受限材料。
 - CN CLI 与当前描述文件格式不兼容；发布统一走桌面端 Sites MCP。
-- 架构自检（2026-11-17）：Worker/DSP 版本一致（v=5）、结果过期/AI 竞态/Worker 超时回退/Function 白名单重建与限流均严谨。两处低风险待办：① `app.js` 主线程回退导入 `dsp.js/csv.js/mat.js` 及 `index.html` 加载 `app.js/styles.css` 未带版本号，版本升级后回退路径可能复用旧缓存（Worker 路径已 v=5）；② 实数 `analyzeSignal` 结果不带 `kind` 字段（仅 IQ 设 `kind:"iq"`），app.js/导出以 `?? "real"` 正规化，文档 schema 与代码略有出入。两者均非正确性 bug，修改需重新发布。
+- 架构自检（2026-11-17）：Worker/DSP 版本一致、结果过期/AI 竞态/Worker 超时回退/Function 白名单重建与限流均严谨。原两处低风险项已修复：模块/资源版本号统一为 v=7（含主线程回退导入，由 `static.test.mjs` 强制一致）；实数 `analyzeSignal` 结果已补 `kind:"real"`，与文档 schema 一致。
+- 本地分析历史仅存摘要快照（不含原始序列），只读、不重新计算、不覆盖当前结果/AI/导出；localStorage 上限 20 条，配额不足或被禁用时降级提示，损坏存储自动恢复为空。
 
 ---
 

@@ -97,6 +97,9 @@ node site/test/mat.test.mjs
 node site/test/iq.test.mjs
 node site/test/function.test.mjs
 node site/test/fixtures.test.mjs
+node site/test/static.test.mjs
+node site/test/ai-consistency.test.mjs
+node site/test/e2e.mjs
 ```
 
 当前基线：
@@ -158,7 +161,7 @@ Qoder Sites Edge Function
 3. **结果必须有版本**：`dataVersion` / `resultVersion` / `resultStale` 防止旧结果被 AI/导出/压力测试使用。
 4. **AI 响应必须有请求号**：`aiRequestSequence` 防止旧 AI 响应覆盖新结果。
 5. **Worker 返回摘要，不返回所有候选的大数组**：候选只保留参数、指标、残差摘要；只有最佳序列进入 `series`。
-6. **Worker/DSP 有版本号**：当前 `analyzer-worker.js?v=5`，Worker 内导入 `dsp.js?v=5`。修改 Worker 或 DSP 后必须同时递增这两处版本，否则浏览器可能复用旧模块。
+6. **模块版本统一**：当前所有模块/资源统一 `?v=7`（`index.html` 的 `styles.css`/`app.js`，`app.js` 导入 `dsp.js`/`csv.js`/`mat.js` 与 Worker URL，Worker 内 `dsp.js`）。任何前端改动后递增全部版本标签并保持一致；`static.test.mjs` 强制单一版本，避免主线程回退路径复用旧缓存。
 7. **发布描述是生成的**：`site/.SignalInsight.qoder.site` 由 Sites 工具生成，不要手写字段。
 
 ---
@@ -571,7 +574,9 @@ IQ：`z(t)=c+(u+jv)e^{j2πft}`，同时拟合 I/Q。
 - 结果版本/竞态保护
 - Worker 返回摘要，避免大数组复制
 - 响应式布局、aria-live 结果播报
-- Node 测试：DSP/CSV/Extreme/MAT/IQ/Function
+- Node 测试：DSP/CSV/Extreme/MAT/IQ/Function/Fixtures/Static/AI-Consistency
+- 零依赖 CDP 浏览器 E2E（`e2e.mjs`，复用 fixtures，需 Chrome/Edge）
+- 本地分析历史（localStorage 只读快照，仅存摘要，≤20 条）
 
 ---
 
@@ -587,7 +592,7 @@ IQ：`z(t)=c+(u+jv)e^{j2πft}`，同时拟合 I/Q。
 - AM/FM 物理机制验证（仅拟合候选）
 - 严格置信区间（当前为近似标准误/分辨率）
 - 程序化 AI 数字一致性审计（目前靠提示词和“只解释证据”约束）
-- 浏览器 E2E 自动化（拟真 CSV fixtures 已具备，见 `site/test/fixtures/`，均为标注的仿真数据）
+- 真实测量数据 fixtures（当前 fixtures 均为明确标注的仿真数据；浏览器 E2E 已具备 `e2e.mjs`）
 - 全局限流（当前为单 Function isolate 内存软限流）
 
 其他边界：
@@ -595,7 +600,8 @@ IQ：`z(t)=c+(u+jv)e^{j2πft}`，同时拟合 I/Q。
 - 压力测试只支持 ≤50,000 点；
 - 50 万点浏览器约 30 秒，但 Worker 保持 UI 响应；
 - CSV/MAT 解析在主线程；CSV 已修复 O(n²)，但超大文件仍可能短暂阻塞；
-- `app.js` / `dsp.js` 较大，没有静态类型检查或构建步骤；
+- `app.js` / `dsp.js` 较大，已有零依赖静态检查（`static.test.mjs`），但仍无静态类型检查或构建步骤；
+- 本地分析历史仅存摘要快照（localStorage ≤20 条），只读、不含原始序列、不覆盖当前结果；
 - `main` 未合并当前分支，远端未配置。
 
 ---
@@ -651,6 +657,9 @@ node site/test/mat.test.mjs
 node site/test/iq.test.mjs
 node site/test/function.test.mjs
 node site/test/fixtures.test.mjs
+node site/test/static.test.mjs
+node site/test/ai-consistency.test.mjs
+node site/test/e2e.mjs
 
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
@@ -661,11 +670,11 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 - 页面会显示“AI 服务不可达”，这是预期行为；
 - 要验证 Qwen，请使用公开地址，或配置本地代理。
 
-Worker/DSP 缓存注意事项：
+模块缓存注意事项：
 
-- 当前 `app.js` 使用 `analyzer-worker.js?v=5`；
-- Worker 内使用 `dsp.js?v=5`；
-- 修改 Worker 或 DSP 后，**两处版本号都要递增**，否则浏览器可能复用旧模块。
+- 当前所有模块/资源统一 `?v=7`；
+- 修改任何前端文件后，递增全部版本标签（`index.html` 2 处、`app.js` 4 处、Worker 1 处）保持一致；
+- `node site/test/static.test.mjs` 校验版本一致性、导入导出与引用存在，防止回退路径复用旧缓存。
 
 ---
 
