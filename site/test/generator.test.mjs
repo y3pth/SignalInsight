@@ -9,7 +9,7 @@ import {
   CONDITION_CATALOG,
 } from "../dist/generator.js";
 
-assert.equal(CONDITION_CATALOG.length, 17);
+assert.equal(CONDITION_CATALOG.length, 29);
 assert.ok(CONDITION_CATALOG.every((item) => item.id && item.label && item.description));
 
 const clean = synthesizeSignal({ kind: "real", waveform: "tones", fs: 1000, n: 512, seed: 1, components: [{ frequency: 50, amplitude: 2, phase: 0 }], noiseSigma: 0.01 });
@@ -41,6 +41,18 @@ const verdictByCondition = {
   noise: "unknown-rejected",
   "invalid-short": "input-rejected",
   "invalid-jitter": "input-rejected",
+  harmonics: "correct-model",
+  spike: "caution-boundary",
+  dropout: "unreliable-defect",
+  "close-tones": "correct-model",
+  "over-modulation": "correct-model",
+  "weak-signal": "unknown-rejected",
+  "few-cycles": "caution-boundary",
+  "exact-nyquist": "unknown-rejected",
+  "mains-hum": "correct-model",
+  "invalid-nonincreasing": "input-rejected",
+  "invalid-nan": "input-rejected",
+  "invalid-toolong": "input-rejected",
 };
 for (const [condition, verdict] of Object.entries(verdictByCondition)) {
   const experiment = runExperiment({ condition, seed: 42 });
@@ -84,6 +96,13 @@ assert.equal(generated.data.time.length, generated.params.n);
 const classifiedError = classifyOutcome(null, { fs: 1000 }, {}, new Error("至少需要 64 个样本。"));
 assert.equal(classifiedError.verdict, "input-rejected");
 assert.equal(classifiedError.rejected, true);
+
+assert.equal(runExperiment({ condition: "harmonics", seed: 42 }).result.recommendedId, "multi_tone_3");
+assert.equal(runExperiment({ condition: "mains-hum", seed: 42 }).result.recommendedId, "multi_tone_2");
+const exactNyquist = runExperiment({ condition: "exact-nyquist", seed: 42 });
+assert.ok(exactNyquist.conditions.some((condition) => condition.includes("恰为 Nyquist")));
+assert.equal(runExperiment({ condition: "invalid-nan", seed: 42 }).outcome.rejected, true);
+assert.equal(runExperiment({ condition: "invalid-toolong", seed: 42 }).outcome.rejected, true);
 
 console.log("Generator tests passed", {
   conditions: CONDITION_CATALOG.length,

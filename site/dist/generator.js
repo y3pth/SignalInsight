@@ -1,4 +1,4 @@
-import { analyzeSignal, analyzeIqSignal } from "./dsp.js?v=13";
+import { analyzeSignal, analyzeIqSignal } from "./dsp.js?v=14";
 
 const TAU = 2 * Math.PI;
 
@@ -27,6 +27,7 @@ export function synthesizeSignal(params) {
   const time = Array.from({ length: n }, (_, index) =>
     index / fs + (jitter ? (random() - 0.5) * 2 * jitter / fs : 0),
   );
+  if (params.duplicateTime && n > 2) time[1] = time[0];
   if (params.waveform === "iq") {
     const i = time.map((t) => (params.iOffset ?? 0) + params.amplitude * Math.cos(TAU * params.carrierFrequency * t + (params.phase ?? 0)) + (params.noiseSigma ? params.noiseSigma * gaussian(random) : 0));
     const q = time.map((t) => (params.qOffset ?? 0) + params.amplitude * Math.sin(TAU * params.carrierFrequency * t + (params.phase ?? 0)) + (params.noiseSigma ? params.noiseSigma * gaussian(random) : 0));
@@ -63,6 +64,20 @@ export function synthesizeSignal(params) {
     if (params.clip != null) value = Math.max(-params.clip, Math.min(params.clip, value));
     return value;
   });
+  if (params.dropout) {
+    const start = Math.floor(params.dropout.startFraction * n);
+    const end = Math.floor(params.dropout.endFraction * n);
+    for (let index = start; index < end; index += 1) values[index] = 0;
+  }
+  if (params.spikes) {
+    for (let index = 0; index < params.spikes.count; index += 1) {
+      const at = Math.floor(random() * n);
+      values[at] += params.spikes.amplitude * (random() > 0.5 ? 1 : -1);
+    }
+  }
+  if (params.nanCount) {
+    for (let index = 0; index < params.nanCount; index += 1) values[Math.floor(random() * n)] = NaN;
+  }
   return { kind: params.kind ?? "real", time, values };
 }
 
@@ -84,6 +99,18 @@ export const CONDITION_CATALOG = [
   { id: "noise", label: "纯噪声", description: "无确定性信号。" },
   { id: "invalid-short", label: "边界：样本不足", description: "少于 64 样本，应被拒绝。" },
   { id: "invalid-jitter", label: "边界：抖动超限", description: "抖动超 5%，应被拒绝。" },
+  { id: "harmonics", label: "谐波失真", description: "基波加二/三次谐波，放大器非线性。" },
+  { id: "spike", label: "脉冲干扰", description: "稀疏大幅尖峰，EMI 干扰。" },
+  { id: "dropout", label: "信号掉零", description: "一段数据缺失置零，传感器掉线。" },
+  { id: "close-tones", label: "近频拍频", description: "两个相近频率，分辨挑战。" },
+  { id: "over-modulation", label: "AM 过调制", description: "调制指数 >1，包络失真。" },
+  { id: "weak-signal", label: "极弱信号", description: "信号远弱于噪声，应拒绝结论。" },
+  { id: "few-cycles", label: "少周期低频", description: "观测内仅约 2 个周期。" },
+  { id: "exact-nyquist", label: "恰 Nyquist", description: "频率恰为 fs/2，采样退化。" },
+  { id: "mains-hum", label: "工频干扰", description: "信号叠加 50 Hz 工频干扰。" },
+  { id: "invalid-nonincreasing", label: "边界：时间重复", description: "时间戳非递增，应被拒绝。" },
+  { id: "invalid-nan", label: "边界：无效值", description: "含 NaN/Infinity，应被拒绝。" },
+  { id: "invalid-toolong", label: "边界：样本超限", description: "超过 50 万样本，应被拒绝。" },
 ];
 
 const CONDITION_IDS = CONDITION_CATALOG.map((item) => item.id);
@@ -146,6 +173,34 @@ export function randomSignalParams(options = {}) {
       return { ...base, condition, n: 63 };
     case "invalid-jitter":
       return { ...base, condition, jitterPercent: range(random, 6, 10) };
+    case "harmonics": {
+      const f0 = range(random, 20, 0.12 * fs);
+      return { ...base, condition, noiseSigma: amplitude * 0.01, components: [{ frequency: f0, amplitude, phase: range(random, 0, TAU) }, { frequency: 2 * f0, amplitude: amplitude * 0.3, phase: range(random, 0, TAU) }, { frequency: 3 * f0, amplitude: amplitude * 0.15, phase: range(random, 0, TAU) }] };
+    }
+    case "spike":
+      return { ...base, condition, spikes: { count: pick(random, [3, 5, 8]), amplitude: amplitude * range(random, 3, 6) } };
+    case "dropout":
+      return { ...base, condition, dropout: { startFraction: 0.4, endFraction: 0.6 } };
+    case "close-tones": {
+      const f1 = range(random, 50, 0.2 * fs);
+      return { ...base, condition, components: [{ frequency: f1, amplitude, phase: range(random, 0, TAU) }, { frequency: f1 + range(random, 2, 8), amplitude: amplitude * 0.9, phase: range(random, 0, TAU) }] };
+    }
+    case "over-modulation":
+      return { ...base, condition, waveform: "am", carrierFrequency: range(random, 0.1 * fs, 0.3 * fs), carrierAmplitude: amplitude, carrierPhase: range(random, 0, TAU), modulationFrequency: range(random, 2, 8), modulationIndex: range(random, 1.2, 1.8), modulationPhase: range(random, 0, TAU), noiseSigma: 0.02 };
+    case "weak-signal":
+      return { ...base, condition, noiseSigma: 1.0, components: [{ frequency: toneFrequency, amplitude: 0.05, phase: range(random, 0, TAU) }] };
+    case "few-cycles":
+      return { ...base, condition, noiseSigma: amplitude * 0.02, components: [{ frequency: (2.2 * fs) / (baseN - 1), amplitude, phase: range(random, 0, TAU) }] };
+    case "exact-nyquist":
+      return { ...base, condition, noiseSigma: 0, components: [{ frequency: nyquist, amplitude, phase: 0 }] };
+    case "mains-hum":
+      return { ...base, condition, components: [{ frequency: range(random, 80, 0.3 * fs), amplitude, phase: range(random, 0, TAU) }, { frequency: 50, amplitude: amplitude * 0.5, phase: range(random, 0, TAU) }] };
+    case "invalid-nonincreasing":
+      return { ...base, condition, duplicateTime: true };
+    case "invalid-nan":
+      return { ...base, condition, nanCount: pick(random, [3, 5]) };
+    case "invalid-toolong":
+      return { ...base, condition, n: 500001 };
     default:
       return { ...base, condition };
   }
@@ -177,10 +232,19 @@ export function describeConditions(params) {
   if (params.driftEnd) conditions.push(`基线漂移：0 → ${params.driftEnd.toFixed(3)}`);
   if (params.jitterPercent) conditions.push(`采样抖动：±${params.jitterPercent.toFixed(2)}%${params.jitterPercent > 5 ? "（超 5% 容差）" : ""}`);
   if (primary && primary.frequency > nyquist) conditions.push(`真实频率 ${primary.frequency.toFixed(1)} Hz 超 Nyquist ${nyquist} Hz（将发生混叠）`);
-  else if (primary && primary.frequency > 0.9 * nyquist) conditions.push(`频率 ${primary.frequency.toFixed(1)} Hz 接近 Nyquist ${nyquist} Hz`);
+  else if (primary && primary.frequency > 0.9 * nyquist && primary.frequency < nyquist) conditions.push(`频率 ${primary.frequency.toFixed(1)} Hz 接近 Nyquist ${nyquist} Hz`);
   if (params.n < 128) conditions.push(`短观测：仅 ${params.n} 样本，分辨率约 ${(params.fs / params.n).toFixed(1)} Hz`);
   if (params.waveform === "noise") conditions.push("纯噪声，无确定性信号");
   if (params.waveform === "chirp") conditions.push("扫频信号，候选库外");
+  if (params.spikes) conditions.push(`脉冲干扰：${params.spikes.count} 个尖峰 ±${params.spikes.amplitude.toFixed(2)}`);
+  if (params.dropout) conditions.push(`信号掉零：${Math.round(params.dropout.startFraction * 100)}%–${Math.round(params.dropout.endFraction * 100)}% 段缺失`);
+  if (params.nanCount) conditions.push(`含 ${params.nanCount} 个 NaN/Infinity 无效值`);
+  if (params.duplicateTime) conditions.push("时间戳重复（非递增）");
+  if (params.n > 500000) conditions.push(`样本数 ${params.n} 超 50 万上限`);
+  if (params.components?.length >= 3) conditions.push("含谐波成分（基波+谐波）");
+  if (params.waveform === "am" && params.modulationIndex > 1) conditions.push(`AM 过调制：指数 ${params.modulationIndex.toFixed(2)} > 1`);
+  if (primary && Math.abs(primary.frequency - nyquist) < 1e-9) conditions.push("频率恰为 Nyquist，采样退化");
+  if (primary && primary.frequency * ((params.n - 1) / params.fs) < 3) conditions.push(`少周期：观测内约 ${(primary.frequency * (params.n - 1) / params.fs).toFixed(1)} 个周期`);
   return { groundTruth, conditions };
 }
 

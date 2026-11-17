@@ -183,12 +183,12 @@ describeConditions(params)      -> { groundTruth, conditions[] }
 generateRandomSignal(options)   -> { params, groundTruth, conditions, data }
 runExperiment(options)          -> { params, groundTruth, conditions, data, result, outcome }
 classifyOutcome(result, params, groundTruth, error) -> outcome
-CONDITION_CATALOG               -> [{id,label,description}]  // 17 种条件
+CONDITION_CATALOG               -> [{id,label,description}]  // 29 种条件
 ```
 
 `outcome.verdict` ∈ `correct-model | caution-boundary | unreliable-defect | unknown-rejected | aliasing-warning | input-rejected`；含 `{rejected,unknown,reliability,model,modelFrequency,healthIssues[],aliasing,frequencyError,notes[]}`。
 
-条件覆盖：clean/noisy/clipped/quantized/drift/jitter/aliasing/near-nyquist/short/multi/am/fm/iq/chirp/noise/invalid-short/invalid-jitter。
+条件覆盖（29）：clean/noisy/clipped/quantized/drift/jitter/aliasing/near-nyquist/short/multi/am/fm/iq/chirp/noise/invalid-short/invalid-jitter/harmonics/spike/dropout/close-tones/over-modulation/weak-signal/few-cycles/exact-nyquist/mains-hum/invalid-nonincreasing/invalid-nan/invalid-toolong。
 
 约定：
 - `groundTruth` 记录真实参数（频率/幅值/调制/采样率/Nyquist），供学习对照。
@@ -203,3 +203,4 @@ CONDITION_CATALOG               -> [{id,label,description}]  // 17 种条件
 - 1.0（2026-11-17，加法）：新增 learn.js 学习库 API（§8）与场景 schema；M1 场景 clean-single/clipped-tone。
 - 1.0（2026-11-17，加法）：学习库扩至 10 场景；M2 新增 `/learn-explain` + `buildLearnPayload` + `fetchLearnExplanation`（文本-only，不改数值）。
 - 1.0（2026-11-17，加法）：学习库扩至 15 场景（含 IQ）；新增 generator.js 数据产生器 API（§9，17 条件 + 真值感知结论分类）。
+- 1.0（2026-11-17，加法）：generator.js 扩至 29 条件（谐波/脉冲/掉零/近频/过调制/极弱/少周期/恰 Nyquist/工频/时间重复/NaN/超长）。

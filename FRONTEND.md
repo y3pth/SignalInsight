@@ -3,7 +3,7 @@
 > 面向：负责 **UI 设计与渲染** 的前端协作者。
 > 你的搭档（后端）负责数值/逻辑。本文件让你独立上手、并行开发、不冲突。
 > 配套：`COLLABORATION.md`（协作流程）、`CONTRACT.md`（数据契约 v1.0）、`HANDOFF.md`（项目全局）。
-> 更新：2026-11-17 · 模块版本 v=13 · 契约 v1.0
+> 更新：2026-11-17 · 模块版本 v=14 · 契约 v1.0
 
 ---
 
@@ -157,7 +157,7 @@ UI 渲染规则：
 
 ## 10. 版本号与缓存（重要）
 
-- 所有模块/资源带 `?v=N`（当前 v=13），`static.test.mjs` 强制单一版本。
+- 所有模块/资源带 `?v=N`（当前 v=14），`static.test.mjs` 强制单一版本。
 - **并行开发期间你不要改 `?v=`**；集成入 `integration` 后由后端统一递增。
 - 改 `index.html` 结构时保留 script/link 的 `?v=` 原值。
 - 本地调试若看到旧行为，强制刷新（Ctrl+F5）或临时改 query 绕过缓存。
@@ -204,16 +204,16 @@ UI 渲染规则：
 ### 15.2 快速开始
 ```html
 <!-- learn.html -->
-<script type="module" src="./learn-app.js?v=13"></script>
+<script type="module" src="./learn-app.js?v=14"></script>
 ```
 ```js
 // learn-app.js（前端自有，命名自定）
-import { listScenarios, getScenario, generateScenarioSignal, analyzeScenario } from "./learn.js?v=13";
-import { analyzeSignal } from "./dsp.js?v=13"; // 仅在需要自行重算时；通常直接用 analyzeScenario
+import { listScenarios, getScenario, generateScenarioSignal, analyzeScenario } from "./learn.js?v=14";
+import { analyzeSignal } from "./dsp.js?v=14"; // 仅在需要自行重算时；通常直接用 analyzeScenario
 const catalog = listScenarios();           // 渲染目录
 const { scenario, result, match } = analyzeScenario("clean-single"); // 渲染学习页
 ```
-- 所有 import 带 `?v=13`（与全局一致；集成期后端统一递增，你不要改）。
+- 所有 import 带 `?v=14`（与全局一致；集成期后端统一递增，你不要改）。
 - 无构建步骤；可复用 `styles.css` 或新建 `learn.css`。
 
 ### 15.3 API 详解（CONTRACT.md §8）
@@ -327,7 +327,7 @@ listScenarios() → 目录
   3. verify 步 result 渲染复用分析模式规则（unknown/徽章/体检）。
   4. `match.ok` 反馈正确；缺陷场景显示 diagnosis。
   5. 进度持久化；导航互通；窄视口无溢出；控制台无错误。
-  6. 不改后端文件；import 带 `?v=13`。
+  6. 不改后端文件；import 带 `?v=14`。
 
 ### 15.13 约束与陷阱
 - **不改 `learn.js`/`dsp.js`/`service.js`**；需新场景/字段 → HANDOFF 协作日志提案，后端加法提供。
@@ -358,8 +358,8 @@ listScenarios() → 目录
 - 后端 `learn.js` 导出 `buildLearnPayload(scenario, result)` → 学习 payload（concept/points/evidence/diagnosis/groundTruth）。
 - 前端经 `service.js` 调用：
 ```js
-import { fetchLearnExplanation } from "./service.js?v=13";
-import { buildLearnPayload, analyzeScenario } from "./learn.js?v=13";
+import { fetchLearnExplanation } from "./service.js?v=14";
+import { buildLearnPayload, analyzeScenario } from "./learn.js?v=14";
 const { scenario, result } = analyzeScenario(id);
 const payload = buildLearnPayload(scenario, result);
 try {
@@ -379,8 +379,8 @@ try {
 后端提供 `generator.js`，随机生成**严格模拟真实条件**的数据并分析，告诉用户"这种条件会得到什么结果"。
 
 ```js
-import { CONDITION_CATALOG, runExperiment, generateRandomSignal } from "./generator.js?v=13";
-CONDITION_CATALOG;  // 17 种条件菜单：clean/noisy/clipped/quantized/drift/jitter/aliasing/near-nyquist/short/multi/am/fm/iq/chirp/noise/invalid-short/invalid-jitter
+import { CONDITION_CATALOG, runExperiment, generateRandomSignal } from "./generator.js?v=14";
+CONDITION_CATALOG;  // 29 种条件菜单：clean/noisy/clipped/quantized/drift/jitter/aliasing/near-nyquist/short/multi/am/fm/iq/chirp/noise/invalid-short/invalid-jitter/harmonics/spike/dropout/close-tones/over-modulation/weak-signal/few-cycles/exact-nyquist/mains-hum/invalid-nonincreasing/invalid-nan/invalid-toolong
 const exp = runExperiment({ condition: "aliasing", seed: 42 });
 // exp = { params, groundTruth, conditions, data, result, outcome }
 // outcome.verdict: correct-model | caution-boundary | unreliable-defect | unknown-rejected | aliasing-warning | input-rejected
