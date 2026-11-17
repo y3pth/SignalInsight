@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN" class="learn-root">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0a0908" />
+    <script>
+      try {
+        if (localStorage.getItem("signalinsight.theme") === "light") {
+          document.documentElement.dataset.theme = "light";
+          document.querySelector('meta[name="theme-color"]').content = "#f3f7ff";
+        }
+      } catch { /* storage unavailable */ }
+    </script>
+    <meta name="description" content="SignalInsight 学习模式：15 个信号场景，按观察、假设、验证、结论四步掌握模型辨识与可信度分析。" />
+    <title>学习模式 · SignalInsight</title>
+    <link rel="stylesheet" href="./styles.css?v=12" />
+    <link rel="stylesheet" href="./learn.css?v=12" />
+  </head>
+  <body class="learn-page">
+    <div class="ambient-grid" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <div class="brand-group">
+        <a class="brand" href="./index.html" aria-label="SignalInsight 首页">
+          <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <span class="brand-copy"><strong>SignalInsight</strong><small>信号可信分析工作台</small></span>
+        </a>
+        <button id="theme-toggle" class="theme-toggle" type="button" data-target="light" aria-label="切换到浅色模式">浅色</button>
+        <a class="study-link" href="./index.html" aria-label="返回分析台"><span class="study-link-mark" aria-hidden="true">◈</span><span class="study-link-text">分析</span></a>
+      </div>
+      <div class="topbar-meta">
+        <span class="learn-progress" id="learn-progress">已学 0 / 15</span>
+        <span class="status-pill"><span class="status-dot"></span>本地确定性引擎</span>
+        <span class="topbar-version">StudyHack · Qoder Sites</span>
+      </div>
+    </header>
+
+    <main class="learn-shell">
+      <aside class="learn-catalog" aria-label="场景目录">
+        <div class="catalog-heading">
+          <p class="eyebrow">00 / LEARNING PATH</p>
+          <h1>从看图到结论</h1>
+          <p class="lede">每个场景都是一次完整演练：先观察数据，再提出假设，用模型竞争验证，最后写出有边界的结论。</p>
+        </div>
+        <div class="catalog-progress">
+          <div class="catalog-progress-row">
+            <span>学习进度</span>
+            <strong id="catalog-progress-text">0 / 15</strong>
+          </div>
+          <div class="progress-track" role="progressbar" aria-label="学习进度" aria-valuemin="0" aria-valuemax="15" aria-valuenow="0" id="progress-track"><i id="progress-fill"></i></div>
+          <p class="catalog-progress-hint">完成四步并核对结论后记为已学，进度保存在本浏览器。</p>
+        </div>
+        <div id="scenario-list" class="scenario-list" aria-live="polite"></div>
+      </aside>
+
+      <section id="lesson" class="lesson" aria-label="场景学习" aria-live="polite">
+        <div id="lesson-empty" class="lesson-empty">
+          <span class="lesson-empty-mark" aria-hidden="true">◈</span>
+          <h2>选择一个场景开始</h2>
+          <p>从左侧目录挑一个干净信号建立直觉，再进入调制、缺陷与库外信号。</p>
+        </div>
+        <div id="lesson-content" hidden></div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./learn-app.js?v=12"></script>
+  </body>
+</html>
