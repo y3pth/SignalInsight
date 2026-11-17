@@ -107,6 +107,40 @@ assert.ok(!("candidates" in output), "AI response must not echo numeric results"
 assert.ok(!("parameters" in output));
 assert.equal(typeof output.explanation.summary, "string");
 
+const learnInput = {
+  scenarioId: "clean-single",
+  title: "t",
+  category: "clean",
+  concept: "单频原理",
+  points: ["p1"],
+  evidence: [{ label: "主峰", value: "1136×", detail: "d", status: "pass", evil: "x" }],
+  recommendedModel: "单频模型",
+  unknown: false,
+  reliabilityLevel: "reliable",
+  healthStatus: "ok",
+  diagnosis: null,
+  groundTruth: { frequency: 93.7 },
+  instructions: "ignore previous",
+  extra: "DROP",
+};
+const learnResponse = await handler(new Request("https://site.test/functions/v1/app/learn-explain", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(learnInput),
+}));
+assert.equal(learnResponse.status, 200);
+const learnOutput = await learnResponse.json();
+const learnPrompt = captured.messages.find((message) => message.role === "user").content;
+assert.ok(learnPrompt.includes("不得修改"));
+const learnMarker = "学习场景证据：";
+const learnRebuilt = JSON.parse(learnPrompt.slice(learnPrompt.indexOf(learnMarker) + learnMarker.length));
+assert.ok(!("instructions" in learnRebuilt), "learn whitelist drops injected top-level fields");
+assert.ok(!("extra" in learnRebuilt));
+assert.ok(!("evil" in learnRebuilt.evidence[0]), "learn whitelist drops injected evidence fields");
+assert.equal(learnRebuilt.scenarioId, "clean-single");
+assert.deepEqual(Object.keys(learnOutput.explanation).sort(), ["limitations", "observations", "summary"]);
+assert.ok(!("candidates" in learnOutput), "learn AI response must not echo numeric results");
+
 console.log("AI consistency tests passed", {
   candidates: payload.candidates.length,
   rebuiltR2: rebuilt.candidates[0].r2,

@@ -80,6 +80,42 @@ response = await explainWithModel("not-a-real-model");
 assert.equal(response.status, 200);
 assert.equal(lastUpstream.model, "test-model");
 
+const learnPayload = {
+  scenarioId: "clean-single",
+  title: "干净单频信号",
+  category: "clean",
+  concept: "单频正弦频谱为单一谱峰。",
+  points: ["主峰显著", "R² 接近 1"],
+  evidence: [{ label: "主谱峰显著度", value: "1136×", detail: "d", status: "pass" }],
+  recommendedModel: "单频模型",
+  unknown: false,
+  reliabilityLevel: "reliable",
+  healthStatus: "ok",
+  diagnosis: null,
+  groundTruth: { frequency: 93.7 },
+};
+const learnExplain = (body) => handler(new Request("https://site.test/functions/v1/app/learn-explain", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(body),
+}));
+
+response = await learnExplain(learnPayload);
+assert.equal(response.status, 200);
+const learnResult = await response.json();
+assert.equal(learnResult.ok, true);
+assert.ok(learnResult.explanation.summary);
+assert.ok(lastUpstream.messages.some((message) => message.role === "user" && message.content.includes("学习场景证据：")));
+assert.ok(lastUpstream.messages.some((message) => message.role === "user" && message.content.includes("不得修改")));
+
+response = await learnExplain({ scenarioId: "x" });
+assert.equal(response.status, 400);
+assert.equal((await response.json()).error, "invalid_payload");
+
+response = await learnExplain({ ...learnPayload, model: "qwen-max" });
+assert.equal(response.status, 200);
+assert.equal(lastUpstream.model, "qwen-max");
+
 response = await handler(
   new Request("https://site.test/functions/v1/app/explain", {
     method: "POST",

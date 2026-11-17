@@ -407,7 +407,7 @@ P1/P2 已发布并完成线上回归：
   - `3478b9c test: add zero-dependency browser E2E via CDP`
   - `4003863 feat: add local analysis history with read-only snapshots`
   - `adfa9c9 feat: specific Qwen explanations and user-selectable model whitelist`
-- 模块版本：v=10（全部模块/资源统一，`static.test.mjs` 强制一致）
+- 模块版本：v=11（全部模块/资源统一，`static.test.mjs` 强制一致）
 - 状态：本轮改动已通过本地全套测试 + E2E 质检，**尚未发布**；线上仍为信任实验室版本
 - 信任实验室提交：
   - `e45afb0 fix: harden result and AI data flow`
@@ -476,7 +476,7 @@ P1/P2 已发布并完成线上回归：
 
 ### 学习模式（M1 后端学习库已实现）
 
-进度：后端 `site/dist/learn.js`（DOM-free）已实现 M1 垂直切片——`listScenarios/getScenario/generateScenarioSignal/analyzeScenario` API + 2 场景（clean-single/clipped-tone，含结构化原理/诊断/思考题/步骤）；`learn.test.mjs` 通过；契约 §8 + 样例 `sample-scenario-*.json` 就绪。**前端 `learn.html` 待建**（消费 learn.js，见 FRONTEND.md §15）。M2（Qwen 自然语言展开）/M3（引导 UI+进度）/M4（E2E）后续。
+进度：后端 `site/dist/learn.js`（DOM-free）已实现 **M1+M2**——`listScenarios/getScenario/generateScenarioSignal/analyzeScenario/buildLearnPayload` API + **10 场景**（clean/modulation/defect/out-of-library，含结构化原理/诊断/思考题/步骤）；M2 Qwen 原理展开经 `/functions/v1/app/learn-explain` + `service.fetchLearnExplanation`（文本-only、不改数值、白名单、共享限流）；`learn.test.mjs`/`function.test`/`ai-consistency` 覆盖；契约 §4/§8 + 样例 `sample-scenario-*.json` 就绪。**前端 `learn.html` 待建**（消费 learn.js + M2，见 FRONTEND.md §15）。M3（引导 UI+进度）/M4（学习页 E2E）由前端后续。
 
 目标：双模式双页面。**分析模式**即现有全部功能；**学习模式**用内置仿真数据引导学习，讲清"为什么这样选模型"，对极限/问题数据指出"哪里有问题"，以原理分析帮助理解。
 
@@ -555,3 +555,4 @@ P1/P2 已发布并完成线上回归：
 - 2026-11-17 · 后端 · backend/service-split · 契约1.0 · 实施 app.js→service.js 拆分（DOM-free）+ contract.test；模块 v=9 · 10 测试+E2E 14 场景全绿，零行为变化 · 阻塞:无 · 下一步:合并 integration，前端按契约并行改 UI
 - 2026-11-17 · 后端 · integration · 契约1.0 · 配置 origin（GitHub 私有仓库）并经 127.0.0.1:7890 代理推送 integration/feat/trust-lab/main；feat/trust-lab 同步至 integration · 远端分支已验证 · 阻塞:无 · 下一步:前端 clone 后按所有权表并行
 - 2026-11-17 · 后端 · backend/learning-library · 契约1.0(加法§8) · 学习库 M1 learn.js（clean-single/clipped-tone）+ learn.test + 样例；FRONTEND.md §15 扩为 learn.html 完整施工规格（API/schema/组件/数据流/步骤/进度/验收）· 11 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html，后端 M2 Qwen 原理展开
+- 2026-11-17 · 后端 · backend/learning-m2 · 契约1.0(加法) · M2 /learn-explain + buildLearnPayload + fetchLearnExplanation；学习库扩至 10 场景；FRONTEND.md §0 开工提示词 + §15.15 M2 用法；模块 v=11 · 11 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html（含 M2 降级）

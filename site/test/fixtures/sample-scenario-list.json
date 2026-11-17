@@ -7,10 +7,66 @@
     "summary": "一段含轻微噪声的单频正弦。学习如何从频谱识别单一频率成分，并理解为什么不需要更复杂的模型。"
   },
   {
+    "id": "dual-tone",
+    "title": "双频叠加信号",
+    "category": "clean",
+    "difficulty": 2,
+    "summary": "两个频率叠加的信号。学习频谱如何分辨多个成分，以及模型阶梯何时升级到双频。"
+  },
+  {
+    "id": "am-tone",
+    "title": "调幅（AM）信号",
+    "category": "modulation",
+    "difficulty": 3,
+    "summary": "载波幅值随调制信号变化的 AM 信号。学习从包络识别调制，并理解 AM 候选为何优于纯音调。"
+  },
+  {
+    "id": "fm-tone",
+    "title": "调频（FM）信号",
+    "category": "modulation",
+    "difficulty": 3,
+    "summary": "瞬时频率随调制信号变化的 FM 信号。学习从瞬时频率识别调制，并理解频偏与调制指数 β。"
+  },
+  {
     "id": "clipped-tone",
     "title": "削顶失真信号",
     "category": "defect",
     "difficulty": 2,
     "summary": "幅值超出量程被削顶的正弦。学习先做数据体检、识别失真，并理解为什么高 R² 也可能不可信。"
+  },
+  {
+    "id": "drift-tone",
+    "title": "直流漂移信号",
+    "category": "defect",
+    "difficulty": 2,
+    "summary": "基线随时间缓慢漂移的正弦。学习识别漂移、理解它如何污染拟合，以及为何可能拒绝给出结论。"
+  },
+  {
+    "id": "quantized-tone",
+    "title": "粗量化信号",
+    "category": "defect",
+    "difficulty": 3,
+    "summary": "低分辨率 ADC 量化的正弦。学习识别阶梯/量化，理解量化噪声如何引入谐波并降低可信度。"
+  },
+  {
+    "id": "jittered-tone",
+    "title": "采样抖动信号",
+    "category": "clean",
+    "difficulty": 2,
+    "summary": "采样时刻有 ±2% 抖动的正弦。学习采样均匀性容差，理解小幅抖动为何仍可可靠分析。"
+  },
+  {
+    "id": "chirp",
+    "title": "库外信号：线性 chirp",
+    "category": "out-of-library",
+    "difficulty": 3,
+    "summary": "频率随时间线性扫过的 chirp。学习识别候选库之外的信号，理解系统为何拒绝给出模型结论。"
+  },
+  {
+    "id": "pure-noise",
+    "title": "库外信号：纯噪声",
+    "category": "out-of-library",
+    "difficulty": 1,
+    "summary": "纯高斯噪声。学习识别'无信号'，理解无显著谱峰时系统如何拒绝给出结论。"
   }
 ]

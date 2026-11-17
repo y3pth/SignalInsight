@@ -102,6 +102,12 @@
   reliability: { level, evidence: [{ label, value, detail, status }], limitations } }
 ```
 
+`POST /functions/v1/app/learn-explain`（M2 学习原理展开）
+- 请求：`buildLearnPayload(scenario, result)` + 可选 `model`（同白名单）。
+- 成功：同 `/explain` 的 `{ ok, explanation:{summary,observations,limitations}, provider, model, note }`。
+- 校验：`validateLearnPayload` 白名单重建（`scenarioId`/`concept` 必填，points/evidence/diagnosis/groundTruth 裁剪），错误码同 `/explain`。
+- 不变量同 `/explain`：文本-only、不改数值、Key 仅服务端、共享限流。
+
 ## 5. service.js API（已实施，后端拥有，前端调用）
 
 > 纯逻辑、返回数据、不访问 DOM（仅用 fetch / Worker / localStorage）。
@@ -112,6 +118,7 @@ analyzeIqSafely(time, i, q)       -> Promise<Result>
 stressTestSafely(time, values, baseline) -> Promise<StressResult>
 fetchAiHealth()                   -> Promise<{ configured, health, provider }>
 fetchExplanation(payload, model, signal) -> Promise<Explanation>  // 失败抛 Error（AI_ERROR_MESSAGES 细分）
+fetchLearnExplanation(payload, model, signal) -> Promise<Explanation>  // /learn-explain，M2 原理展开
 buildReport(result, sourceLabel)  -> ReportObject        // 纯对象，前端负责下载
 getHistory()                      -> HistoryEntry[]      // localStorage 读取/校验
 addHistory(result, sourceLabel)   -> { entries: HistoryEntry[], persisted: boolean }
@@ -136,13 +143,14 @@ AI_ERROR_MESSAGES                 // 错误码 → 中文提示映射
 
 ## 8. 学习库 API（learn.js，后端拥有，前端学习页调用）
 
-> DOM-free。复用 dsp.js 数值内核与种子信号生成。M1 垂直切片：`clean-single` / `clipped-tone`。
+> DOM-free。复用 dsp.js 数值内核与种子信号生成。**10 场景**（clean/modulation/defect/out-of-library）；M2 原理展开见 §4 `/learn-explain`。
 
 ```js
 listScenarios()            -> ScenarioMeta[]   // {id,title,category,difficulty,summary}
 getScenario(id)            -> Scenario | null
 generateScenarioSignal(id) -> { kind, time, values, i?, q? }  // 合成仿真信号
 analyzeScenario(id)        -> { scenario, result, match }     // result=Result；match={ok,checks[]}
+buildLearnPayload(scenario, result) -> LearnPayload           // M2：供 /learn-explain 的结构化投影
 ```
 
 `Scenario`：
@@ -168,3 +176,4 @@ analyzeScenario(id)        -> { scenario, result, match }     // result=Result�
 
 - 1.0（2026-11-17）：冻结当前结果/压力/Worker/Function 形状；定义 service.js 拆分目标 API。
 - 1.0（2026-11-17，加法）：新增 learn.js 学习库 API（§8）与场景 schema；M1 场景 clean-single/clipped-tone。
+- 1.0（2026-11-17，加法）：学习库扩至 10 场景；M2 新增 `/learn-explain` + `buildLearnPayload` + `fetchLearnExplanation`（文本-only，不改数值）。

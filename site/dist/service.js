@@ -1,4 +1,4 @@
-import { analyzeSignal, analyzeIqSignal, stressTest, buildExperimentPlan } from "./dsp.js?v=10";
+import { analyzeSignal, analyzeIqSignal, stressTest, buildExperimentPlan } from "./dsp.js?v=11";
 
 let analyzerWorker = null;
 let analyzerRequestId = 0;
@@ -8,7 +8,7 @@ const ANALYZER_TIMEOUT_MS = 90000;
 function getAnalyzerWorker() {
   if (analyzerWorker || typeof Worker === "undefined") return analyzerWorker;
   try {
-    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=10", import.meta.url), { type: "module" });
+    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=11", import.meta.url), { type: "module" });
     analyzerWorker.addEventListener("message", (event) => {
       const { id, ok, result, error } = event.data ?? {};
       const pending = analyzerPending.get(id);
@@ -145,6 +145,20 @@ export async function fetchExplanation(payload, model, signal) {
   const data = await response.json().catch(() => null);
   if (!response.ok || !data?.ok || !data?.explanation) {
     throw new Error(AI_ERROR_MESSAGES[data?.error] ?? "Qwen 暂不可用，继续显示确定性规则解释。");
+  }
+  return data.explanation;
+}
+
+export async function fetchLearnExplanation(payload, model, signal) {
+  const response = await fetch("/functions/v1/app/learn-explain", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...payload, model }),
+    signal,
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.ok || !data?.explanation) {
+    throw new Error(AI_ERROR_MESSAGES[data?.error] ?? "Qwen 暂不可用，继续显示结构化原理要点。");
   }
   return data.explanation;
 }
