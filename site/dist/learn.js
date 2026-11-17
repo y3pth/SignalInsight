@@ -1,22 +1,5 @@
-import { analyzeSignal, analyzeIqSignal } from "./dsp.js?v=12";
-
-const TAU = 2 * Math.PI;
-
-function seededNoise(seed) {
-  let state = seed >>> 0;
-  return () => {
-    state += 0x6d2b79f5;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-function gaussian(random) {
-  const u = Math.max(random(), 1e-12);
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());
-}
+import { analyzeSignal, analyzeIqSignal } from "./dsp.js?v=13";
+import { synthesizeSignal } from "./generator.js?v=13";
 
 const SCENARIOS = [
   {
@@ -409,50 +392,7 @@ export function getScenario(id) {
 export function generateScenarioSignal(id) {
   const scenario = getScenario(id);
   if (!scenario) throw new Error(`未知学习场景：${id}`);
-  const signal = scenario.signal;
-  const random = seededNoise(signal.seed);
-  const duration = (signal.n - 1) / signal.fs;
-  const jitter = signal.jitterPercent ? signal.jitterPercent / 100 : 0;
-  const time = Array.from({ length: signal.n }, (_, index) =>
-    index / signal.fs + (jitter ? (random() - 0.5) * 2 * jitter / signal.fs : 0),
-  );
-  if (signal.waveform === "iq") {
-    const i = time.map((t) => (signal.iOffset ?? 0) + signal.amplitude * Math.cos(TAU * signal.carrierFrequency * t + (signal.phase ?? 0)) + (signal.noiseSigma ? signal.noiseSigma * gaussian(random) : 0));
-    const q = time.map((t) => (signal.qOffset ?? 0) + signal.amplitude * Math.sin(TAU * signal.carrierFrequency * t + (signal.phase ?? 0)) + (signal.noiseSigma ? signal.noiseSigma * gaussian(random) : 0));
-    return { kind: "iq", time, i, q };
-  }
-  const values = time.map((t) => {
-    let value = signal.offset ?? 0;
-    switch (signal.waveform ?? "tones") {
-      case "am":
-        value += signal.carrierAmplitude * (1 + signal.modulationIndex * Math.cos(TAU * signal.modulationFrequency * t + (signal.modulationPhase ?? 0))) * Math.cos(TAU * signal.carrierFrequency * t + (signal.carrierPhase ?? 0));
-        break;
-      case "fm":
-        value += signal.carrierAmplitude * Math.cos(TAU * signal.carrierFrequency * t + signal.modulationIndex * Math.sin(TAU * signal.modulationFrequency * t + (signal.modulationPhase ?? 0)) + (signal.carrierPhase ?? 0));
-        break;
-      case "chirp": {
-        const rate = (signal.endFrequency - signal.startFrequency) / (2 * duration);
-        value += signal.amplitude * Math.sin(TAU * (signal.startFrequency * t + rate * t * t));
-        break;
-      }
-      case "drift":
-        for (const component of signal.components) value += component.amplitude * Math.sin(TAU * component.frequency * t + (component.phase ?? 0));
-        value += (signal.driftEnd ?? 0) * (t / duration);
-        break;
-      case "noise":
-        break;
-      default:
-        for (const component of signal.components ?? []) value += component.amplitude * Math.sin(TAU * component.frequency * t + (component.phase ?? 0));
-    }
-    if (signal.noiseSigma) value += signal.noiseSigma * gaussian(random);
-    if (signal.quantizeBits) {
-      const step = (2 * signal.quantizeRange) / 2 ** signal.quantizeBits;
-      value = Math.round(value / step) * step;
-    }
-    if (signal.clip != null) value = Math.max(-signal.clip, Math.min(signal.clip, value));
-    return value;
-  });
-  return { kind: signal.kind, time, values };
+  return synthesizeSignal(scenario.signal);
 }
 
 function matchExpected(result, expected) {

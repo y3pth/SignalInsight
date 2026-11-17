@@ -407,7 +407,7 @@ P1/P2 已发布并完成线上回归：
   - `3478b9c test: add zero-dependency browser E2E via CDP`
   - `4003863 feat: add local analysis history with read-only snapshots`
   - `adfa9c9 feat: specific Qwen explanations and user-selectable model whitelist`
-- 模块版本：v=12（全部模块/资源统一，`static.test.mjs` 强制一致）
+- 模块版本：v=13（全部模块/资源统一，`static.test.mjs` 强制一致）
 - 状态：本轮改动已通过本地全套测试 + E2E 质检，**尚未发布**；线上仍为信任实验室版本
 - 信任实验室提交：
   - `e45afb0 fix: harden result and AI data flow`
@@ -476,7 +476,7 @@ P1/P2 已发布并完成线上回归：
 
 ### 学习模式（M1 后端学习库已实现）
 
-进度：后端 `site/dist/learn.js`（DOM-free）已实现 **M1+M2**——`listScenarios/getScenario/generateScenarioSignal/analyzeScenario/buildLearnPayload` API + **15 场景（含 IQ）**（clean/modulation/defect/out-of-library，含结构化原理/诊断/思考题/步骤）；M2 Qwen 原理展开经 `/functions/v1/app/learn-explain` + `service.fetchLearnExplanation`（文本-only、不改数值、白名单、共享限流）；`learn.test.mjs`/`function.test`/`ai-consistency` 覆盖；契约 §4/§8 + 样例 `sample-scenario-*.json` 就绪。**前端 `learn.html` 待建**（消费 learn.js + M2，见 FRONTEND.md §15）。M3（引导 UI+进度）/M4（学习页 E2E）由前端后续。
+进度：后端 `site/dist/learn.js`（DOM-free）已实现 **M1+M2**——`listScenarios/getScenario/generateScenarioSignal/analyzeScenario/buildLearnPayload` API + **15 场景（含 IQ）**（clean/modulation/defect/out-of-library，含结构化原理/诊断/思考题/步骤）；M2 Qwen 原理展开经 `/functions/v1/app/learn-explain` + `service.fetchLearnExplanation`（文本-only、不改数值、白名单、共享限流）；`learn.test.mjs`/`function.test`/`ai-consistency` 覆盖；契约 §4/§8 + 样例 `sample-scenario-*.json` 就绪。**前端 `learn.html` 待建**（消费 learn.js + M2，见 FRONTEND.md §15）。M3（引导 UI+进度）/M4（学习页 E2E）由前端后续。随机数据产生器 `generator.js`（17 条件、真值感知结论分类、混叠/边界揭示）已就绪，供学习实验沙盒使用。
 
 目标：双模式双页面。**分析模式**即现有全部功能；**学习模式**用内置仿真数据引导学习，讲清"为什么这样选模型"，对极限/问题数据指出"哪里有问题"，以原理分析帮助理解。
 
@@ -522,6 +522,7 @@ P1/P2 已发布并完成线上回归：
 - CN CLI 与当前描述文件格式不兼容；发布统一走桌面端 Sites MCP。
 - 架构自检（2026-11-17）：Worker/DSP 版本一致、结果过期/AI 竞态/Worker 超时回退/Function 白名单重建与限流均严谨。原两处低风险项已修复：模块/资源版本号统一为 v=9（含主线程回退导入，由 `static.test.mjs` 强制一致）；实数 `analyzeSignal` 结果已补 `kind:"real"`，与文档 schema 一致。
 - 本地分析历史仅存摘要快照（不含原始序列），只读、不重新计算、不覆盖当前结果/AI/导出；localStorage 上限 20 条，配额不足或被禁用时降级提示，损坏存储自动恢复为空。
+- 数据流审计（2026-11-17）：输入边界（63/500001/抖动>5%/非递增/NaN）正确拒绝；恒定/纯噪声/库外→unknown；削顶/量化/漂移/低 SNR→unreliable；近 Nyquist→warn/fail；恰 Nyquist→退化 unknown；IQ 边界正确。**固有局限**：超 Nyquist 信号混叠为假频且可能判 reliable（采样定理限制，无法从采样数据区分真频/假频）——非 bug，学习产生器以真值感知 `aliasing-warning` 揭示。
 
 ---
 
@@ -557,3 +558,4 @@ P1/P2 已发布并完成线上回归：
 - 2026-11-17 · 后端 · backend/learning-library · 契约1.0(加法§8) · 学习库 M1 learn.js（clean-single/clipped-tone）+ learn.test + 样例；FRONTEND.md §15 扩为 learn.html 完整施工规格（API/schema/组件/数据流/步骤/进度/验收）· 11 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html，后端 M2 Qwen 原理展开
 - 2026-11-17 · 后端 · backend/learning-m2 · 契约1.0(加法) · M2 /learn-explain + buildLearnPayload + fetchLearnExplanation；学习库扩至 10 场景；FRONTEND.md §0 开工提示词 + §15.15 M2 用法；模块 v=11 · 11 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html（含 M2 降级）
 - 2026-11-17 · 后端 · backend/learning-scenarios · 契约1.0 · 学习库扩至 15 场景（新增 iq-single/weak-modulation/low-snr/short-record/near-nyquist）；合成器支持 IQ；learn.test 15 场景全匹配；IQ 样例；模块 v=12 · 11 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html
+- 2026-11-17 · 后端 · backend/generator · 契约1.0(加法§9) · 数据流审计（边界全正确；混叠固有局限已记录）；新增 generator.js 随机数据产生器（17 条件/真值感知结论/混叠揭示），learn.js 复用 synthesizeSignal；generator.test；模块 v=13 · 12 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html + 实验沙盒

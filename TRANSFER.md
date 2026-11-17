@@ -102,6 +102,7 @@ node site/test/static.test.mjs
 node site/test/ai-consistency.test.mjs
 node site/test/contract.test.mjs
 node site/test/learn.test.mjs
+node site/test/generator.test.mjs
 node site/test/e2e.mjs
 ```
 
@@ -129,6 +130,7 @@ node site/test/e2e.mjs
 ├── site/dist/app.js                  # 前端：UI 状态、输入映射、渲染、事件
 ├── site/dist/service.js              # 后端：Worker 编排、AI 请求、导出构建、历史存储（DOM-free）
 ├── site/dist/learn.js                # 后端：学习库（15 场景含 IQ/原理/诊断/思考题 + buildLearnPayload，DOM-free）
+├── site/dist/generator.js            # 后端：随机数据产生器（17 条件真实模拟 + 真值感知结论，DOM-free）
 ├── site/dist/csv.js                  # CSV 解析
 ├── site/dist/mat.js                  # MAT v5 实数矩阵解析
 ├── site/dist/dsp.js                  # 数值内核（主线程回退 + Worker 共享）
@@ -168,7 +170,7 @@ Qoder Sites Edge Function
 3. **结果必须有版本**：`dataVersion` / `resultVersion` / `resultStale` 防止旧结果被 AI/导出/压力测试使用。
 4. **AI 响应必须有请求号**：`aiRequestSequence` 防止旧 AI 响应覆盖新结果。
 5. **Worker 返回摘要，不返回所有候选的大数组**：候选只保留参数、指标、残差摘要；只有最佳序列进入 `series`。
-6. **模块版本统一**：当前所有模块/资源统一 `?v=12`（`index.html` 的 `styles.css`/`app.js`，`app.js` 导入 `dsp.js`/`csv.js`/`mat.js`/`service.js`，`service.js` 导入 `dsp.js` 与 Worker URL，Worker 内 `dsp.js`）。任何前端改动后递增全部版本标签并保持一致；`static.test.mjs` 强制单一版本，避免主线程回退路径复用旧缓存。
+6. **模块版本统一**：当前所有模块/资源统一 `?v=13`（`index.html` 的 `styles.css`/`app.js`，`app.js` 导入 `dsp.js`/`csv.js`/`mat.js`/`service.js`，`service.js` 导入 `dsp.js` 与 Worker URL，Worker 内 `dsp.js`）。任何前端改动后递增全部版本标签并保持一致；`static.test.mjs` 强制单一版本，避免主线程回退路径复用旧缓存。
 7. **发布描述是生成的**：`site/.SignalInsight.qoder.site` 由 Sites 工具生成，不要手写字段。
 
 ---
@@ -670,6 +672,7 @@ node site/test/static.test.mjs
 node site/test/ai-consistency.test.mjs
 node site/test/contract.test.mjs
 node site/test/learn.test.mjs
+node site/test/generator.test.mjs
 node site/test/e2e.mjs
 
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
@@ -683,7 +686,7 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 
 模块缓存注意事项：
 
-- 当前所有模块/资源统一 `?v=12`；
+- 当前所有模块/资源统一 `?v=13`；
 - 修改任何前端文件后，递增全部版本标签（`index.html` 2 处、`app.js` 4 处、Worker 1 处）保持一致；
 - `node site/test/static.test.mjs` 校验版本一致性、导入导出与引用存在，防止回退路径复用旧缓存。
 

@@ -3,7 +3,7 @@
 > 面向：负责 **UI 设计与渲染** 的前端协作者。
 > 你的搭档（后端）负责数值/逻辑。本文件让你独立上手、并行开发、不冲突。
 > 配套：`COLLABORATION.md`（协作流程）、`CONTRACT.md`（数据契约 v1.0）、`HANDOFF.md`（项目全局）。
-> 更新：2026-11-17 · 模块版本 v=12 · 契约 v1.0
+> 更新：2026-11-17 · 模块版本 v=13 · 契约 v1.0
 
 ---
 
@@ -157,7 +157,7 @@ UI 渲染规则：
 
 ## 10. 版本号与缓存（重要）
 
-- 所有模块/资源带 `?v=N`（当前 v=12），`static.test.mjs` 强制单一版本。
+- 所有模块/资源带 `?v=N`（当前 v=13），`static.test.mjs` 强制单一版本。
 - **并行开发期间你不要改 `?v=`**；集成入 `integration` 后由后端统一递增。
 - 改 `index.html` 结构时保留 script/link 的 `?v=` 原值。
 - 本地调试若看到旧行为，强制刷新（Ctrl+F5）或临时改 query 绕过缓存。
@@ -204,16 +204,16 @@ UI 渲染规则：
 ### 15.2 快速开始
 ```html
 <!-- learn.html -->
-<script type="module" src="./learn-app.js?v=12"></script>
+<script type="module" src="./learn-app.js?v=13"></script>
 ```
 ```js
 // learn-app.js（前端自有，命名自定）
-import { listScenarios, getScenario, generateScenarioSignal, analyzeScenario } from "./learn.js?v=12";
-import { analyzeSignal } from "./dsp.js?v=12"; // 仅在需要自行重算时；通常直接用 analyzeScenario
+import { listScenarios, getScenario, generateScenarioSignal, analyzeScenario } from "./learn.js?v=13";
+import { analyzeSignal } from "./dsp.js?v=13"; // 仅在需要自行重算时；通常直接用 analyzeScenario
 const catalog = listScenarios();           // 渲染目录
 const { scenario, result, match } = analyzeScenario("clean-single"); // 渲染学习页
 ```
-- 所有 import 带 `?v=12`（与全局一致；集成期后端统一递增，你不要改）。
+- 所有 import 带 `?v=13`（与全局一致；集成期后端统一递增，你不要改）。
 - 无构建步骤；可复用 `styles.css` 或新建 `learn.css`。
 
 ### 15.3 API 详解（CONTRACT.md §8）
@@ -327,7 +327,7 @@ listScenarios() → 目录
   3. verify 步 result 渲染复用分析模式规则（unknown/徽章/体检）。
   4. `match.ok` 反馈正确；缺陷场景显示 diagnosis。
   5. 进度持久化；导航互通；窄视口无溢出；控制台无错误。
-  6. 不改后端文件；import 带 `?v=12`。
+  6. 不改后端文件；import 带 `?v=13`。
 
 ### 15.13 约束与陷阱
 - **不改 `learn.js`/`dsp.js`/`service.js`**；需新场景/字段 → HANDOFF 协作日志提案，后端加法提供。
@@ -358,8 +358,8 @@ listScenarios() → 目录
 - 后端 `learn.js` 导出 `buildLearnPayload(scenario, result)` → 学习 payload（concept/points/evidence/diagnosis/groundTruth）。
 - 前端经 `service.js` 调用：
 ```js
-import { fetchLearnExplanation } from "./service.js?v=12";
-import { buildLearnPayload, analyzeScenario } from "./learn.js?v=12";
+import { fetchLearnExplanation } from "./service.js?v=13";
+import { buildLearnPayload, analyzeScenario } from "./learn.js?v=13";
 const { scenario, result } = analyzeScenario(id);
 const payload = buildLearnPayload(scenario, result);
 try {
@@ -374,7 +374,25 @@ try {
 - 模型选择复用分析页 `#model-select` 或学习页自有选择器（白名单 qwen-plus/max/turbo/long）。
 - 不变量：AI 输出纯文本，绝不回写数值/可信等级；缓存可按 payload+model（参考分析页 `aiCache`）。
 
-> 完成本节即可独立交付 learn.html（15 场景 + M2 原理展开 + 降级）。需新场景/字段写 HANDOFF 协作日志，后端加法提供。
+### 15.16 随机数据产生器（generator.js，实验沙盒）
+
+后端提供 `generator.js`，随机生成**严格模拟真实条件**的数据并分析，告诉用户"这种条件会得到什么结果"。
+
+```js
+import { CONDITION_CATALOG, runExperiment, generateRandomSignal } from "./generator.js?v=13";
+CONDITION_CATALOG;  // 17 种条件菜单：clean/noisy/clipped/quantized/drift/jitter/aliasing/near-nyquist/short/multi/am/fm/iq/chirp/noise/invalid-short/invalid-jitter
+const exp = runExperiment({ condition: "aliasing", seed: 42 });
+// exp = { params, groundTruth, conditions, data, result, outcome }
+// outcome.verdict: correct-model | caution-boundary | unreliable-defect | unknown-rejected | aliasing-warning | input-rejected
+// outcome.notes: 面向用户的结论解释（混叠真值对照 / 缺陷诊断 / 边界拒绝原因）
+```
+
+- UI 建议：条件选择器（`CONDITION_CATALOG`）+ "随机生成"（`condition:"random"`）+ seed 输入（可复现）→ 展示 `data` 波形/频谱 + `result` 分析 + `groundTruth` 真值对照 + `outcome.notes` 结论。
+- 教学重点：`aliasing` 展示"真频超 Nyquist → 分析得混叠假频"；`invalid-*` 展示边界拒绝；defect 展示体检诊断。
+- 大样本（>5 万）宜用 service Worker 分析 `data`，而非 `runExperiment` 主线程。
+- 产生器 DOM-free，只读消费；不改 `generator.js`（后端）。
+
+> 完成本节即可独立交付 learn.html（15 场景 + M2 原理展开 + 随机实验沙盒 + 降级）。需新场景/条件/字段写 HANDOFF 协作日志，后端加法提供。
 
 ## 16. 关键文件速查
 

@@ -10,7 +10,7 @@
 - **分析：** DSP 在 Web Worker 中运行；支持单频、多频、AM/FM 候选与参数不确定度
 - **信任实验室：** 结论卡/证据链、数据体检、实验设计建议、AM/FM 解构、反事实压力测试
 - **本地历史：** localStorage 只读快照（仅存摘要，不含原始序列，不覆盖当前结果）
-- **学习模式：** 后端学习库 learn.js（15 场景含 IQ + Qwen 原理展开 /learn-explain）；前端 learn.html 待建（见 FRONTEND.md）
+- **学习模式：** 后端学习库 learn.js（15 场景含 IQ + Qwen 原理展开 /learn-explain）+ 随机数据产生器 generator.js（17 条件真实模拟、真值感知结论）；前端 learn.html 待建（见 FRONTEND.md）
 - **质量保障：** 拟真 CSV fixtures、零依赖静态检查、AI 数字一致性审计、零依赖 CDP 浏览器 E2E
 - **数据模式：** 实数单/多通道 CSV、MAT v5 实数矩阵、IQ CSV（单分量复指数）
 - **立项背景：** [立项确定书.md](立项确定书.md)
@@ -47,6 +47,7 @@ node site/test/static.test.mjs
 node site/test/ai-consistency.test.mjs
 node site/test/contract.test.mjs
 node site/test/learn.test.mjs
+node site/test/generator.test.mjs
 node site/test/e2e.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```

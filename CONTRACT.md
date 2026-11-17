@@ -172,8 +172,34 @@ buildLearnPayload(scenario, result) -> LearnPayload           // M2：供 /learn
 - 前端学习页（`learn.html`）消费本 API；样例数据见 `site/test/fixtures/sample-scenario-*.json`。
 - 加法演进：新增场景/字段不破坏既有 API。
 
+## 9. 数据产生器 API（generator.js，后端拥有，前端学习/实验调用）
+
+> DOM-free。严格模拟真实采集条件（AWGN/量化/削顶/漂移/抖动/混叠等），生成带真值的信号并可运行分析给出结论。
+
+```js
+synthesizeSignal(params)        -> { kind, time, values } | { kind, time, i, q }
+randomSignalParams(options)     -> params      // options:{condition?,seed?,fs?,n?}；condition="random" 随机选
+describeConditions(params)      -> { groundTruth, conditions[] }
+generateRandomSignal(options)   -> { params, groundTruth, conditions, data }
+runExperiment(options)          -> { params, groundTruth, conditions, data, result, outcome }
+classifyOutcome(result, params, groundTruth, error) -> outcome
+CONDITION_CATALOG               -> [{id,label,description}]  // 17 种条件
+```
+
+`outcome.verdict` ∈ `correct-model | caution-boundary | unreliable-defect | unknown-rejected | aliasing-warning | input-rejected`；含 `{rejected,unknown,reliability,model,modelFrequency,healthIssues[],aliasing,frequencyError,notes[]}`。
+
+条件覆盖：clean/noisy/clipped/quantized/drift/jitter/aliasing/near-nyquist/short/multi/am/fm/iq/chirp/noise/invalid-short/invalid-jitter。
+
+约定：
+- `groundTruth` 记录真实参数（频率/幅值/调制/采样率/Nyquist），供学习对照。
+- **混叠真值感知**：真实频率超 Nyquist 时 `outcome.aliasing=true`，notes 说明真频与混叠假频（分析本身无法从采样区分，属采样定理固有局限）。
+- 边界非法输入（<64 样本、抖动>5% 等）→ `input-rejected`，notes 解释拒绝原因。
+- `runExperiment` 用主线程 dsp 分析；大样本前端宜改用 service Worker 路径。
+- 加法演进：新增条件/字段不破坏既有 API。
+
 ## Changelog
 
 - 1.0（2026-11-17）：冻结当前结果/压力/Worker/Function 形状；定义 service.js 拆分目标 API。
 - 1.0（2026-11-17，加法）：新增 learn.js 学习库 API（§8）与场景 schema；M1 场景 clean-single/clipped-tone。
 - 1.0（2026-11-17，加法）：学习库扩至 10 场景；M2 新增 `/learn-explain` + `buildLearnPayload` + `fetchLearnExplanation`（文本-only，不改数值）。
+- 1.0（2026-11-17，加法）：学习库扩至 15 场景（含 IQ）；新增 generator.js 数据产生器 API（§9，17 条件 + 真值感知结论分类）。
