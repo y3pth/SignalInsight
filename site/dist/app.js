@@ -6,9 +6,9 @@ import {
   buildExperimentPlan,
   stressTest,
   templateExplanation,
-} from "./dsp.js?v=7";
-import { parseCsv } from "./csv.js?v=7";
-import { parseMat } from "./mat.js?v=7";
+} from "./dsp.js?v=8";
+import { parseCsv } from "./csv.js?v=8";
+import { parseMat } from "./mat.js?v=8";
 
 const elements = {
   tabs: [...document.querySelectorAll(".source-tab")],
@@ -67,6 +67,7 @@ const elements = {
   aiLimitations: document.querySelector("#ai-limitations"),
   aiButton: document.querySelector("#ai-button"),
   aiStatus: document.querySelector("#ai-status"),
+  modelSelect: document.querySelector("#model-select"),
   timeLegend: document.querySelector("#time-legend"),
   toast: document.querySelector("#toast"),
   resultAnnouncer: document.querySelector("#result-announcer"),
@@ -412,7 +413,7 @@ const ANALYZER_TIMEOUT_MS = 90000;
 function getAnalyzerWorker() {
   if (analyzerWorker || typeof Worker === "undefined") return analyzerWorker;
   try {
-    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=7", import.meta.url), { type: "module" });
+    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=8", import.meta.url), { type: "module" });
     analyzerWorker.addEventListener("message", (event) => {
       const { id, ok, result, error } = event.data ?? {};
       const pending = analyzerPending.get(id);
@@ -1234,7 +1235,8 @@ async function requestQwenExplanation() {
   const requestId = ++state.aiRequestSequence;
   const version = state.resultVersion;
   const payload = buildAiPayload(state.result);
-  const cacheKey = JSON.stringify(payload);
+  const model = elements.modelSelect.value;
+  const cacheKey = `${JSON.stringify(payload)}::${model}`;
   const cached = aiCache.get(cacheKey);
   if (cached) {
     if (requestId === state.aiRequestSequence && version === state.resultVersion && !state.resultStale) {
@@ -1249,7 +1251,7 @@ async function requestQwenExplanation() {
     const response = await fetch("/functions/v1/app/explain", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, model }),
       signal: AbortSignal.timeout(30000),
     });
     const data = await response.json().catch(() => null);

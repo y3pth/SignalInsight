@@ -191,6 +191,12 @@ try {
   assert.ok(Math.abs(frequencyFromParams(initial.params) - 93.7) < 0.1, "initial frequency");
   summary.push({ scenario: "default-example", model: initial.conclusion });
 
+  const modelPicker = await evaluate("(() => ({ exists: !!document.querySelector('#model-select'), options: Array.from(document.querySelector('#model-select')?.options || []).map((o) => o.value), value: document.querySelector('#model-select')?.value }))()");
+  assert.ok(modelPicker.exists, "model selector present");
+  assert.deepEqual(modelPicker.options, ["qwen-plus", "qwen-max", "qwen-turbo", "qwen-long"], "model whitelist options");
+  assert.equal(modelPicker.value, "qwen-plus", "default model");
+  summary.push({ scenario: "model-selector", options: modelPicker.options.length });
+
   await upload("#csv-file", "single-tone-noisy.csv");
   const stale = await evaluate("(() => ({ downloadDisabled: document.querySelector('#download-button')?.disabled, aiDisabled: document.querySelector('#ai-button')?.disabled }))()");
   assert.equal(stale.downloadDisabled, true, "upload must invalidate export");
@@ -235,6 +241,61 @@ try {
   assert.ok(noise.params.some((cells) => cells[0] === "无可靠参数估计"), "noise refuses parameters");
   assert.ok(noise.toast.includes("noise-only.csv"), "noise scenario analyzed the fixture");
   summary.push({ scenario: "noise-fixture", conclusion: noise.conclusion });
+
+  await upload("#csv-file", "am-noisy.csv");
+  const am = await evaluate(analyzeExpression("am-noisy.csv"));
+  assert.ok(am.conclusion.includes("AM"), `AM model: ${am.conclusion}`);
+  const amModulation = await evaluate("(() => ({ labHidden: document.querySelector('#modulation-lab')?.hidden, sidebands: document.querySelector('#modulation-sidebands')?.children.length || 0, type: document.querySelector('#modulation-type')?.textContent || '' }))()");
+  assert.equal(amModulation.labHidden, false, "AM modulation lab visible");
+  assert.ok(amModulation.sidebands >= 3, `AM sidebands: ${amModulation.sidebands}`);
+  summary.push({ scenario: "am-modulation", model: am.conclusion, sidebands: amModulation.sidebands });
+
+  const stress = await evaluate(`(async () => {
+    document.querySelector('#stress-button').click();
+    const start = Date.now();
+    let rows = 0;
+    while (Date.now() - start < 60000) {
+      rows = document.querySelector('#stress-list')?.children.length || 0;
+      if (rows >= 4) break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    return { rows, summary: document.querySelector('#stress-summary')?.textContent || '' };
+  })()`);
+  assert.equal(stress.rows, 4, `stress variants: ${stress.rows}`);
+  assert.ok(stress.summary.length > 0, "stress summary present");
+  summary.push({ scenario: "stress-test", variants: stress.rows });
+
+  await evaluate("(() => { window.__report = null; window.__origCreate = URL.createObjectURL; URL.createObjectURL = (blob) => { blob.text().then((t) => { window.__report = t; }); return window.__origCreate(blob); }; return true; })()");
+  await evaluate("(() => { document.querySelector('#download-button').click(); return true; })()");
+  const reportText = await evaluate("(async () => { const start = Date.now(); while (Date.now() - start < 5000) { if (window.__report) break; await new Promise((r) => setTimeout(r, 100)); } URL.createObjectURL = window.__origCreate; return window.__report; })()");
+  assert.ok(reportText, "export produced a report");
+  const report = JSON.parse(reportText);
+  assert.equal(report.product, "SignalInsight");
+  assert.ok(Array.isArray(report.candidates) && report.candidates.length > 0, "report candidates");
+  assert.ok(report.method && report.method.selection, "report method boundaries");
+  assert.ok("unknown" in report && "reliability" in report && "health" in report, "report trust fields");
+  summary.push({ scenario: "export-report", candidates: report.candidates.length });
+
+  await upload("#csv-file", "fm-noisy.csv");
+  const fm = await evaluate(analyzeExpression("fm-noisy.csv"));
+  assert.ok(fm.conclusion.includes("FM"), `FM model: ${fm.conclusion}`);
+  const fmModulation = await evaluate("(() => ({ labHidden: document.querySelector('#modulation-lab')?.hidden, sidebands: document.querySelector('#modulation-sidebands')?.children.length || 0 }))()");
+  assert.equal(fmModulation.labHidden, false, "FM modulation lab visible");
+  assert.ok(fmModulation.sidebands >= 5, `FM sidebands: ${fmModulation.sidebands}`);
+  summary.push({ scenario: "fm-modulation", model: fm.conclusion, sidebands: fmModulation.sidebands });
+
+  await upload("#csv-file", "clipped-tone.csv");
+  const clipped = await evaluate(analyzeExpression("clipped-tone.csv"));
+  assert.equal(clipped.health, "有异常", `clipped health: ${clipped.health}`);
+  const healthText = await evaluate("(() => document.querySelector('#health-list')?.textContent || '')()");
+  assert.ok(healthText.includes("削顶"), "clipping flagged in health list");
+  summary.push({ scenario: "defect-health", health: clipped.health });
+
+  await upload("#mat-file", "two-column.mat");
+  const mat = await evaluate(analyzeExpression("two-column.mat"));
+  assert.ok(mat.toast.includes("two-column.mat"), "MAT scenario analyzed the fixture");
+  assert.ok(mat.conclusion.includes("推荐") || mat.conclusion.includes("暂不推荐"), `MAT conclusion: ${mat.conclusion}`);
+  summary.push({ scenario: "mat-import", conclusion: mat.conclusion });
 
   const historyBefore = await evaluate("(() => ({ count: document.querySelectorAll('#history-list .history-item').length, stored: JSON.parse(localStorage.getItem('signalinsight.history.v1') || '[]').length }))()");
   assert.ok(historyBefore.count >= 3, `history entries: ${historyBefore.count}`);

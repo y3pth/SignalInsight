@@ -374,6 +374,8 @@ td.model-name { font-family: var(--site-font); font-weight: 620; }
 .ai-card > * { position: relative; }
 .ai-card > .ai-orb { position: absolute; }
 .ai-summary { margin: 16px 0 0; max-width: 78ch; color: var(--ink); font-size: .85rem; line-height: 1.72; }
+.model-picker { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.68rem; }
+.model-picker select { background: var(--surface-strong); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; font: inherit; font-size: 0.68rem; }
 .ai-observations { display: grid; gap: 6px; margin-top: 12px; }
 .ai-observations p { margin: 0; color: var(--muted); font-size: .72rem; }
 .ai-observations p::before { content: "—"; color: var(--accent); margin-right: 7px; }

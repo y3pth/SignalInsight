@@ -32,10 +32,10 @@ assert.equal((await response.json()).error, "service_not_configured");
 
 env.set("DASHSCOPE_API_KEY", "test-key");
 env.set("QWEN_MODEL", "test-model");
+let lastUpstream = null;
 globalThis.fetch = async (url, init) => {
   assert.ok(String(url).endsWith("/chat/completions"));
-  const body = JSON.parse(init.body);
-  assert.equal(body.model, "test-model");
+  lastUpstream = JSON.parse(init.body);
   return Response.json({
     choices: [
       {
@@ -62,6 +62,23 @@ assert.equal(response.status, 200);
 const result = await response.json();
 assert.equal(result.ok, true);
 assert.equal(result.explanation.summary, "测试解释");
+assert.equal(lastUpstream.model, "test-model");
+assert.ok(lastUpstream.messages.some((message) => message.role === "user" && message.content.includes("不得修改")));
+
+const explainWithModel = (model) => handler(new Request("https://site.test/functions/v1/app/explain", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ ...validPayload, model }),
+}));
+
+response = await explainWithModel("qwen-max");
+assert.equal(response.status, 200);
+assert.equal(lastUpstream.model, "qwen-max");
+assert.equal((await response.json()).model, "qwen-max");
+
+response = await explainWithModel("not-a-real-model");
+assert.equal(response.status, 200);
+assert.equal(lastUpstream.model, "test-model");
 
 response = await handler(
   new Request("https://site.test/functions/v1/app/explain", {

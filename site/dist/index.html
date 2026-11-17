@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0b1718" />
     <meta name="description" content="SignalInsight：在浏览器中完成单频/多频信号模型辨识、参数估计、模型竞争与可信度分析。" />
     <title>SignalInsight · 信号可信分析实验台</title>
-    <link rel="stylesheet" href="./styles.css?v=7" />
+    <link rel="stylesheet" href="./styles.css?v=8" />
   </head>
   <body>
     <div class="ambient-grid" aria-hidden="true"></div>
@@ -196,6 +196,14 @@
           <div id="ai-observations" class="ai-observations"></div>
           <div id="ai-limitations" class="ai-limitations" hidden></div>
           <div class="ai-actions">
+            <label class="model-picker">模型
+              <select id="model-select" aria-label="选择 Qwen 模型">
+                <option value="qwen-plus">qwen-plus（默认）</option>
+                <option value="qwen-max">qwen-max</option>
+                <option value="qwen-turbo">qwen-turbo</option>
+                <option value="qwen-long">qwen-long</option>
+              </select>
+            </label>
             <button id="ai-button" class="secondary-button" type="button" disabled>正在检查 AI 服务…</button>
             <span id="ai-status" class="ai-status">正在检查 AI 服务…</span>
           </div>
@@ -216,6 +224,6 @@
     </main>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <p id="result-announcer" class="sr-only" role="status" aria-live="polite"></p>
-    <script type="module" src="./app.js?v=7"></script>
+    <script type="module" src="./app.js?v=8"></script>
   </body>
 </html>
