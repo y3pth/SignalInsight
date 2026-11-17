@@ -34,7 +34,7 @@ Do not work directly on `main`. Use a dedicated branch for each task.
 - Do not publish descriptions that imply Python backend deployment or award guarantees.
 - Do not delete unknown work, force-push or rewrite history.
 - Run `node site/test/dsp.test.mjs` and `node site/test/function.test.mjs` after changing analysis or Function behavior.
-- Run `node site/test/static.test.mjs` after changing module imports or version tags; keep every `?v=` tag identical (currently v=14).
+- Run `node site/test/static.test.mjs` after changing module imports or version tags; keep every `?v=` tag identical (currently v=15).
 - Run `node site/test/e2e.mjs` after changing frontend UI behavior (requires Chrome/Edge; zero npm deps).
 - Run `node site/test/contract.test.mjs` after changing the result shape or service.js API, `node site/test/learn.test.mjs` after changing learn.js, and `node site/test/generator.test.mjs` after changing generator.js; keep `CONTRACT.md` in sync.
 - Front/back split: backend logic is DOM-free (`service.js`/`learn.js`/`generator.js`/`dsp.js`/`csv.js`/`mat.js`/`analyzer-worker.js`/`functions/*`); UI is `app.js`/`index.html`/`styles.css`/`learn.html`. See `COLLABORATION.md` for ownership and async workflow.

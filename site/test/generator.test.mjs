@@ -6,6 +6,7 @@ import {
   generateRandomSignal,
   runExperiment,
   classifyOutcome,
+  buildExperimentPayload,
   CONDITION_CATALOG,
 } from "../dist/generator.js";
 
@@ -103,6 +104,27 @@ const exactNyquist = runExperiment({ condition: "exact-nyquist", seed: 42 });
 assert.ok(exactNyquist.conditions.some((condition) => condition.includes("恰为 Nyquist")));
 assert.equal(runExperiment({ condition: "invalid-nan", seed: 42 }).outcome.rejected, true);
 assert.equal(runExperiment({ condition: "invalid-toolong", seed: 42 }).outcome.rejected, true);
+
+const cleanExperiment = runExperiment({ condition: "clean", seed: 42 });
+assert.ok(cleanExperiment.outcome.notes.some((note) => note.includes("R²=")), "notes cite R²");
+assert.ok(cleanExperiment.outcome.notes.some((note) => note.includes("频率估计") && note.includes("误差")), "notes cite frequency error");
+assert.ok(cleanExperiment.outcome.notes.some((note) => note.includes("BIC")), "notes cite BIC gap");
+assert.equal(typeof cleanExperiment.outcome.r2, "number");
+
+const cleanA = runExperiment({ condition: "clean", seed: 1 });
+const cleanB = runExperiment({ condition: "clean", seed: 2 });
+assert.notDeepEqual(cleanA.outcome.notes, cleanB.outcome.notes, "different data must yield different explanations");
+
+assert.ok(aliasing.outcome.notes.some((note) => note.includes("采样率提高到")), "aliasing notes give remedy");
+const noiseExperiment = runExperiment({ condition: "noise", seed: 42 });
+assert.ok(noiseExperiment.outcome.notes.some((note) => note.includes("纯噪声")), "unknown notes give specific reason");
+
+const experimentPayload = buildExperimentPayload(cleanExperiment);
+assert.ok(experimentPayload.scenarioId.startsWith("experiment-"));
+assert.ok(experimentPayload.concept.includes("Hz"));
+assert.ok(experimentPayload.points.length > 0);
+assert.ok(Array.isArray(experimentPayload.evidence));
+assert.equal(experimentPayload.recommendedModel, cleanExperiment.outcome.model);
 
 console.log("Generator tests passed", {
   conditions: CONDITION_CATALOG.length,

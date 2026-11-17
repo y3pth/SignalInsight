@@ -1,4 +1,4 @@
-import { analyzeSignal, analyzeIqSignal } from "./dsp.js?v=14";
+import { analyzeSignal, analyzeIqSignal } from "./dsp.js?v=15";
 
 const TAU = 2 * Math.PI;
 
@@ -261,25 +261,37 @@ function aliasFrequency(trueFrequency, fs) {
 
 export function classifyOutcome(result, params, groundTruth, error) {
   if (error) {
-    return { verdict: "input-rejected", rejected: true, unknown: null, reliability: null, model: null, healthIssues: [], aliasing: false, notes: [`输入被拒绝：${error.message}`, "这是预期的边界保护，说明数据不满足分析前提。"] };
+    return { verdict: "input-rejected", rejected: true, unknown: null, reliability: null, model: null, healthIssues: [], aliasing: false, frequencyError: null, amplitudeError: null, r2: null, bicGap: null, notes: [`输入被拒绝：${error.message}`, "这是预期的边界保护——数据不满足分析前提（样本数 / 采样均匀性 / 有限值），系统拒绝而非强行拟合。"] };
   }
   const nyquist = params.fs / 2;
+  const resolution = params.fs / params.n;
+  const duration = (params.n - 1) / params.fs;
   const healthIssues = result.health.checks.filter((check) => check.status !== "pass").map((check) => `${check.label}：${check.detail}`);
-  const notes = [];
+  const metrics = result.best?.metrics ?? null;
+  const r2 = metrics?.r2 ?? null;
+  const rmse = metrics?.rmse ?? null;
+  const bicGap = result.reliability?.bicGap ?? null;
   const modelFrequency = result.best?.parameters.find((parameter) => parameter.id === "frequency_1")?.value ?? null;
+  const modelAmplitude = result.best?.parameters.find((parameter) => parameter.id === "amplitude_1")?.value ?? null;
+  const notes = [];
   let aliasing = false;
   let frequencyError = null;
+  let amplitudeError = null;
 
   if (groundTruth.frequency != null && groundTruth.frequency > nyquist && modelFrequency != null) {
     const alias = aliasFrequency(groundTruth.frequency, params.fs);
-    if (Math.abs(modelFrequency - alias) < Math.max(1, params.fs / params.n)) {
+    if (Math.abs(modelFrequency - alias) < Math.max(1, resolution)) {
       aliasing = true;
-      notes.push(`混叠：真实频率 ${groundTruth.frequency.toFixed(1)} Hz 超 Nyquist ${nyquist} Hz，分析得到假频 ${modelFrequency.toFixed(1)} Hz（≈理论混叠 ${alias.toFixed(1)} Hz）。`);
-      notes.push("从采样数据本身无法区分真频与混叠假频；需提高采样率或抗混叠滤波。系统对此假频仍可能判可靠，这是采样定理的固有局限。");
+      notes.push(`混叠：真实频率 ${groundTruth.frequency.toFixed(1)} Hz 超过 Nyquist ${nyquist} Hz，采样后折叠为假频 ${modelFrequency.toFixed(1)} Hz（理论混叠 ${alias.toFixed(1)} Hz）。`);
+      notes.push(`系统把这个假频当作真实信号（R²=${r2?.toFixed(3)}）并可能判可靠——从采样数据本身无法区分真频与假频，这是采样定理的固有局限。`);
+      notes.push(`避免方法：采样率提高到 > ${(2 * groundTruth.frequency).toFixed(0)} Hz，或采集前加抗混叠滤波。`);
     }
   }
   if (!aliasing && groundTruth.frequency != null && modelFrequency != null && result.recommendedId === "single_tone") {
     frequencyError = Math.abs(modelFrequency - groundTruth.frequency);
+  }
+  if (groundTruth.amplitude != null && modelAmplitude != null && (result.recommendedId === "single_tone" || result.recommendedId === "iq_single")) {
+    amplitudeError = Math.abs(modelAmplitude - groundTruth.amplitude);
   }
 
   let verdict;
@@ -287,24 +299,54 @@ export function classifyOutcome(result, params, groundTruth, error) {
     verdict = "aliasing-warning";
   } else if (result.unknown) {
     verdict = "unknown-rejected";
-    notes.push("证据不足，系统拒绝给出模型结论（无显著谱峰 / R² 过低 / 候选库外）。");
-    if (params.waveform === "noise") notes.push("纯噪声无确定性成分，拒绝结论是正确行为。");
-    if (params.waveform === "chirp") notes.push("扫频信号超出定频/调制候选库，拒绝结论体现诚实边界。");
+    const prominence = result.reliability.evidence.find((item) => item.id === "spectral_prominence");
+    if (prominence && prominence.status !== "pass") {
+      notes.push(`拒绝原因：无显著谱峰（${prominence.detail}），数据中没有可辨识的确定性频率成分。`);
+    } else if (r2 != null && r2 < 0.5) {
+      notes.push(`拒绝原因：最佳候选拟合解释力 R²=${r2.toFixed(3)} 低于 0.5 阈值，候选库无法充分解释数据。`);
+    } else {
+      notes.push("拒绝原因：证据不足，候选库无法给出可靠结论。");
+    }
+    if (params.waveform === "noise") notes.push("这是纯噪声——没有信号可拟合，拒绝结论是正确且诚实的行为。");
+    else if (params.waveform === "chirp") notes.push(`这是扫频信号（${groundTruth.startFrequency?.toFixed(0)}→${groundTruth.endFrequency?.toFixed(0)} Hz），频率随时间变化，超出定频/调制候选库的表达能力。`);
+    else if (params.components?.[0] && params.components[0].amplitude < 0.1) notes.push("信号幅值极小、淹没在噪声中（SNR 极低），提高信噪比后才可能辨识。");
+    else notes.push("可尝试延长观测、提高信噪比，或确认信号是否落在候选库内。");
   } else if (result.reliability.level === "unreliable") {
     verdict = "unreliable-defect";
-    notes.push(`识别出模型 ${result.best?.label ?? ""}，但数据缺陷使结论不可信。`);
+    notes.push(`识别出 ${result.best?.label ?? "模型"}（R²=${r2?.toFixed(3)}），但数据缺陷使参数结论不可信。`);
     notes.push(...healthIssues);
+    if (params.clip != null) notes.push(`削顶把幅值 ${groundTruth.amplitude?.toFixed(2)} 限制到 ±${params.clip.toFixed(2)}，顶部削平引入谐波，污染频率/幅值估计。`);
+    if (params.quantizeBits) notes.push(`${params.quantizeBits}-bit 量化把连续幅值离散成少数电平，量化误差等效谐波失真。`);
+    if (params.driftEnd) notes.push(`基线漂移 0→${params.driftEnd.toFixed(2)} 与信号叠加，常数偏移模型无法吸收，残差含低频结构。`);
+    if (params.dropout) notes.push("数据中段掉零造成不连续，破坏频谱与拟合。");
+    if (params.noiseSigma && groundTruth.amplitude && params.noiseSigma > groundTruth.amplitude * 0.3) notes.push(`噪声 σ=${params.noiseSigma.toFixed(2)} 相对信号幅值 ${groundTruth.amplitude.toFixed(2)} 偏大，参数不确定度高。`);
   } else if (result.reliability.level === "caution") {
     verdict = "caution-boundary";
-    notes.push(`模型 ${result.best?.label ?? ""} 可用但需谨慎。`);
-    notes.push(...healthIssues);
+    notes.push(`模型 ${result.best?.label ?? ""} 可用但需谨慎（R²=${r2?.toFixed(3)}）。`);
+    const nyq = result.health.checks.find((check) => check.id === "nyquist");
+    const cyc = result.health.checks.find((check) => check.id === "cycles");
+    const res = result.reliability.evidence.find((item) => item.id === "frequency_resolution");
+    if (nyq && nyq.status !== "pass" && modelFrequency != null) notes.push(`主频 ${modelFrequency.toFixed(1)} Hz 达 Nyquist ${nyquist} Hz 的 ${((modelFrequency / nyquist) * 100).toFixed(0)}%，采样裕量不足，易受混叠/滤波滚降影响。`);
+    if (cyc && cyc.status !== "pass" && modelFrequency != null) notes.push(`观测内仅约 ${(modelFrequency * duration).toFixed(1)} 个周期，频率分辨率受限。`);
+    if (res && res.status !== "pass") notes.push(`观测时长 ${duration.toFixed(3)} s 决定分辨率约 ±${resolution.toFixed(1)} Hz（1/T），频率不确定度较大。`);
+    notes.push(...healthIssues.filter((issue) => !issue.startsWith("Nyquist") && !issue.startsWith("观测周期")));
   } else {
     verdict = "correct-model";
-    notes.push(`可靠识别：${result.best?.label ?? ""}。`);
-    if (frequencyError != null) notes.push(`频率估计误差 ${frequencyError.toFixed(3)} Hz（真值 ${groundTruth.frequency.toFixed(2)} Hz）。`);
+    notes.push(`可靠识别：${result.best?.label ?? ""}，R²=${r2?.toFixed(4)}、RMSE=${rmse?.toFixed(4)}。`);
+    if (frequencyError != null) {
+      const tier = frequencyError < resolution * 0.05 ? "极高" : frequencyError < resolution * 0.2 ? "高" : "中等";
+      notes.push(`频率估计 ${modelFrequency.toFixed(3)} Hz，真值 ${groundTruth.frequency.toFixed(2)} Hz，误差 ${frequencyError.toFixed(3)} Hz（${tier}精度，观测分辨率 ±${resolution.toFixed(2)} Hz）。`);
+    }
+    if (amplitudeError != null) notes.push(`幅值估计 ${modelAmplitude.toFixed(3)}，真值 ${groundTruth.amplitude.toFixed(2)}，误差 ${amplitudeError.toFixed(3)}。`);
+    if (bicGap != null) notes.push(`模型区分度：最优领先次优 ${bicGap.toFixed(1)} BIC${bicGap >= 10 ? "（区分充分）" : "（<10，区分有限，结论对噪声敏感）"}。`);
+    if (result.recommendedId === "am" || result.recommendedId === "fm") {
+      const modulationIndex = result.best.parameters.find((parameter) => parameter.id === "modulation_index")?.value;
+      const modulationFrequency = result.best.parameters.find((parameter) => parameter.id === "modulation_frequency")?.value;
+      if (modulationIndex != null) notes.push(`调制指数 ${modulationIndex.toFixed(3)}、调制频率 ${modulationFrequency?.toFixed(2)} Hz，边带结构支持调制候选。`);
+    }
   }
 
-  return { verdict, rejected: false, unknown: result.unknown, reliability: result.reliability.level, model: result.recommendedId, modelFrequency, healthIssues, aliasing, frequencyError, notes };
+  return { verdict, rejected: false, unknown: result.unknown, reliability: result.reliability.level, model: result.recommendedId, modelFrequency, modelAmplitude, healthIssues, aliasing, frequencyError, amplitudeError, r2, bicGap, notes };
 }
 
 export function runExperiment(options = {}) {
@@ -319,4 +361,27 @@ export function runExperiment(options = {}) {
   } catch (error) {
     return { params, groundTruth, conditions, data: null, result: null, outcome: classifyOutcome(null, params, groundTruth, error) };
   }
+}
+
+export function buildExperimentPayload(experiment) {
+  const { params, groundTruth, conditions, result, outcome } = experiment;
+  const evidence = (result?.reliability?.evidence ?? []).map((item) => ({ label: item.label, value: item.value, detail: item.detail, status: item.status }));
+  return {
+    scenarioId: `experiment-${params.condition ?? "custom"}`,
+    title: `随机实验：${params.condition ?? "自定义条件"}`,
+    category: "experiment",
+    concept: `在采样率 ${params.fs} Hz、${params.n} 样本下生成 ${params.waveform ?? "tones"} 信号并分析，演示该采集条件会得到什么结果。`,
+    points: [
+      ...conditions,
+      `分析结论：${outcome.verdict}（模型 ${outcome.model ?? "unknown"}，可信度 ${outcome.reliability ?? "—"}）。`,
+      ...outcome.notes,
+    ],
+    evidence,
+    recommendedModel: outcome.model ?? null,
+    unknown: outcome.unknown ?? null,
+    reliabilityLevel: outcome.reliability ?? null,
+    healthStatus: result?.health?.status ?? null,
+    diagnosis: null,
+    groundTruth,
+  };
 }

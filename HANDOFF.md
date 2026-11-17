@@ -407,7 +407,7 @@ P1/P2 已发布并完成线上回归：
   - `3478b9c test: add zero-dependency browser E2E via CDP`
   - `4003863 feat: add local analysis history with read-only snapshots`
   - `adfa9c9 feat: specific Qwen explanations and user-selectable model whitelist`
-- 模块版本：v=14（全部模块/资源统一，`static.test.mjs` 强制一致）
+- 模块版本：v=15（全部模块/资源统一，`static.test.mjs` 强制一致）
 - 状态：本轮改动已通过本地全套测试 + E2E 质检，**尚未发布**；线上仍为信任实验室版本
 - 信任实验室提交：
   - `e45afb0 fix: harden result and AI data flow`
@@ -476,7 +476,7 @@ P1/P2 已发布并完成线上回归：
 
 ### 学习模式（M1 后端学习库已实现）
 
-进度：后端 `site/dist/learn.js`（DOM-free）已实现 **M1+M2**——`listScenarios/getScenario/generateScenarioSignal/analyzeScenario/buildLearnPayload` API + **15 场景（含 IQ）**（clean/modulation/defect/out-of-library，含结构化原理/诊断/思考题/步骤）；M2 Qwen 原理展开经 `/functions/v1/app/learn-explain` + `service.fetchLearnExplanation`（文本-only、不改数值、白名单、共享限流）；`learn.test.mjs`/`function.test`/`ai-consistency` 覆盖；契约 §4/§8 + 样例 `sample-scenario-*.json` 就绪。**前端 `learn.html` 待建**（消费 learn.js + M2，见 FRONTEND.md §15）。M3（引导 UI+进度）/M4（学习页 E2E）由前端后续。随机数据产生器 `generator.js`（29 条件、真值感知结论分类、混叠/边界揭示）已就绪，供学习实验沙盒使用。
+进度：后端 `site/dist/learn.js`（DOM-free）已实现 **M1+M2**——`listScenarios/getScenario/generateScenarioSignal/analyzeScenario/buildLearnPayload` API + **15 场景（含 IQ）**（clean/modulation/defect/out-of-library，含结构化原理/诊断/思考题/步骤）；M2 Qwen 原理展开经 `/functions/v1/app/learn-explain` + `service.fetchLearnExplanation`（文本-only、不改数值、白名单、共享限流）；`learn.test.mjs`/`function.test`/`ai-consistency` 覆盖；契约 §4/§8 + 样例 `sample-scenario-*.json` 就绪。**前端 `learn.html` 待建**（消费 learn.js + M2，见 FRONTEND.md §15）。M3（引导 UI+进度）/M4（学习页 E2E）由前端后续。随机数据产生器 `generator.js`（29 条件、真值感知结论分类、混叠/边界揭示）已就绪，供学习实验沙盒使用。结论解释 `outcome.notes` 已改为**数据驱动自适应**（随实际 R²/频率/幅值误差/BIC/分辨率/具体拒绝原因变化），并提供 `buildExperimentPayload` 供 Qwen `/learn-explain` 自然语言展开。
 
 目标：双模式双页面。**分析模式**即现有全部功能；**学习模式**用内置仿真数据引导学习，讲清"为什么这样选模型"，对极限/问题数据指出"哪里有问题"，以原理分析帮助理解。
 
@@ -560,3 +560,4 @@ P1/P2 已发布并完成线上回归：
 - 2026-11-17 · 后端 · backend/learning-scenarios · 契约1.0 · 学习库扩至 15 场景（新增 iq-single/weak-modulation/low-snr/short-record/near-nyquist）；合成器支持 IQ；learn.test 15 场景全匹配；IQ 样例；模块 v=12 · 11 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html
 - 2026-11-17 · 后端 · backend/generator · 契约1.0(加法§9) · 数据流审计（边界全正确；混叠固有局限已记录）；新增 generator.js 随机数据产生器（17 条件/真值感知结论/混叠揭示），learn.js 复用 synthesizeSignal；generator.test；模块 v=13 · 12 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html + 实验沙盒
 - 2026-11-17 · 后端 · backend/generator-conditions · 契约1.0 · generator.js 扩至 29 条件（谐波/脉冲/掉零/近频/过调制/极弱/少周期/恰Nyquist/工频/时间重复/NaN/超长）；合成器加 dropout/spikes/nan/duplicateTime 修饰；generator.test 29 条件断言；模块 v=14 · 12 测试+E2E绿 · 阻塞:无 · 下一步:前端实验沙盒
+- 2026-11-17 · 后端 · backend/outcome-notes · 契约1.0 · classifyOutcome 解释数据驱动自适应（真实误差/R²/BIC/具体原因/精度分级/缺陷成因），新增 buildExperimentPayload 供 Qwen 展开；generator.test 加变化性断言；模块 v=15 · 12 测试+E2E绿 · 阻塞:无 · 下一步:前端实验沙盒

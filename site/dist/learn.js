@@ -1,5 +1,5 @@
-import { analyzeSignal, analyzeIqSignal } from "./dsp.js?v=14";
-import { synthesizeSignal } from "./generator.js?v=14";
+import { analyzeSignal, analyzeIqSignal } from "./dsp.js?v=15";
+import { synthesizeSignal } from "./generator.js?v=15";
 
 const SCENARIOS = [
   {
