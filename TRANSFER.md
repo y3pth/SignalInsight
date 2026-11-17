@@ -3,6 +3,7 @@
 > 更新日期：2026-11-17
 > 适用对象：接手本项目的下一个 Qoder 对话
 > 阅读顺序：本文件 → `AGENTS.md` → `README.md` → `HANDOFF.md` → `立项确定书.md`
+> 前后端分离协作：`COLLABORATION.md`（流程）+ `CONTRACT.md`（接口契约 v1.0）
 > 当前分支：`feat/trust-lab`
 > 最近代码提交：`48ad325 feat: add multi-channel, MAT and IQ data modes`
 > 转接文档：`TRANSFER.md`
