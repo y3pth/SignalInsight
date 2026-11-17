@@ -554,3 +554,4 @@ P1/P2 已发布并完成线上回归：
 - 2026-11-17 · 后端 · feat/trust-lab · 契约1.0 · 产出 COLLABORATION.md/CONTRACT.md + 样例 fixture；删除学习生活类比 · 全套测试+E2E绿 · 阻塞:无
 - 2026-11-17 · 后端 · backend/service-split · 契约1.0 · 实施 app.js→service.js 拆分（DOM-free）+ contract.test；模块 v=9 · 10 测试+E2E 14 场景全绿，零行为变化 · 阻塞:无 · 下一步:合并 integration，前端按契约并行改 UI
 - 2026-11-17 · 后端 · integration · 契约1.0 · 配置 origin（GitHub 私有仓库）并经 127.0.0.1:7890 代理推送 integration/feat/trust-lab/main；feat/trust-lab 同步至 integration · 远端分支已验证 · 阻塞:无 · 下一步:前端 clone 后按所有权表并行
+- 2026-11-17 · 后端 · backend/learning-library · 契约1.0(加法§8) · 学习库 M1 learn.js（clean-single/clipped-tone）+ learn.test + 样例；FRONTEND.md §15 扩为 learn.html 完整施工规格（API/schema/组件/数据流/步骤/进度/验收）· 11 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html，后端 M2 Qwen 原理展开

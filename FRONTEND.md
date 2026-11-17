@@ -160,39 +160,163 @@ UI 渲染规则：
 - 你的近期目标：UI 视觉/交互重做。后续可能有"学习模式"双页面（规划中，见 HANDOFF §11），届时新增页面/模块，仍共享后端内核。
 - 后端待命可按契约加法提供新数据/功能。
 
-## 15. 学习模式页面（learn.html）开发指引
+## 15. 学习模式页面（learn.html）完整施工规格
 
-后端学习库 `learn.js` 已就绪（M1：`clean-single` / `clipped-tone`）。你建独立 `learn.html` 消费它，与分析页状态隔离。
+后端学习库 `learn.js` 已就绪（M1：`clean-single` / `clipped-tone`）。本节让你**独立、无歧义**地建好 `learn.html`。你拥有 `learn.html` + 学习渲染模块 + 相关样式；`learn.js`/`dsp.js` 归后端，只读消费。
 
-**API（详见 CONTRACT.md §8）：**
-```js
-import { listScenarios, getScenario, generateScenarioSignal, analyzeScenario } from "./learn.js?v=10";
-listScenarios()      // 场景目录 [{id,title,category,difficulty,summary}]
-getScenario(id)      // 完整场景（principle/diagnosis/questions/steps/expected）
-analyzeScenario(id)  // { scenario, result, match }；result 同分析模式 Result；match.ok=是否符合预期
+### 15.1 目标与边界
+- 建独立页面 `site/dist/learn.html`（与分析页 `index.html` 平级），状态隔离，互不干扰。
+- 学习模式 = 用仿真场景引导理解"为什么这样选模型 / 数据哪里有问题"，**原理先行**，结合具体证据数值。
+- 你只做 UI/交互/渲染；数值、场景数据、分析全部来自后端 API。不要重写分析逻辑。
+
+### 15.2 快速开始
+```html
+<!-- learn.html -->
+<script type="module" src="./learn-app.js?v=10"></script>
 ```
+```js
+// learn-app.js（前端自有，命名自定）
+import { listScenarios, getScenario, generateScenarioSignal, analyzeScenario } from "./learn.js?v=10";
+import { analyzeSignal } from "./dsp.js?v=10"; // 仅在需要自行重算时；通常直接用 analyzeScenario
+const catalog = listScenarios();           // 渲染目录
+const { scenario, result, match } = analyzeScenario("clean-single"); // 渲染学习页
+```
+- 所有 import 带 `?v=10`（与全局一致；集成期后端统一递增，你不要改）。
+- 无构建步骤；可复用 `styles.css` 或新建 `learn.css`。
 
-**样例数据（独立开发，无需后端实时）：**
-- `site/test/fixtures/sample-scenario-list.json`（目录）
-- `sample-scenario-clean.json`（干净单频完整分析）
-- `sample-scenario-defect.json`（削顶缺陷完整分析）
+### 15.3 API 详解（CONTRACT.md §8）
+| 函数 | 返回 | 用途 |
+|---|---|---|
+| `listScenarios()` | `[{id,title,category,difficulty,summary}]` | 场景目录卡片 |
+| `getScenario(id)` | `Scenario \| null` | 取场景定义（原理/诊断/思考题/步骤/预期），不含分析 |
+| `generateScenarioSignal(id)` | `{kind,time,values,i?,q?}` | 合成仿真信号（画时域/频谱预览用） |
+| `analyzeScenario(id)` | `{scenario,result,match}` | 一步拿到场景+分析结果+预期对照 |
 
-**建议 UI 结构（你全权设计）：**
-1. 场景目录：`listScenarios()` 渲染卡片（标题/类别/难度/简介）。
-2. 场景学习页：
-   - 观察：信号时域/频谱预览（`generateScenarioSignal` + 复用 `drawPlot`，或样例 `result.series`）。
-   - 原理卡：`principle.concept` + `points`；`evidenceIds` 可链接证据。
-   - 分步引导：`steps` = observe→hypothesize→verify→conclude，逐步揭示。
-   - 验证/对照：渲染 `analyzeScenario(id).result`（复用分析模式渲染），`match.ok` 给"符合预期"反馈。
-   - 诊断（缺陷场景）：`diagnosis.issues/causes/improvements`。
-   - 思考题：`questions`；进度：localStorage（前端自有）。
-3. 与分析页导航互通（index.html ↔ learn.html）。
+- 未知 id：`getScenario` 返回 `null`；`generateScenarioSignal`/`analyzeScenario` 抛 `Error("未知学习场景：…")`。UI 需兜底。
+- `analyzeScenario` 内部已调用 dsp 分析，**你无需再算**；`result` 即分析模式同款 `Result`。
 
-**约束：**
-- 不改 `learn.js`/`dsp.js`（后端）；原理自然语言展开后续由 Qwen（M2）提供，仍只解释不改数值。
-- 复用 Result 渲染规则（unknown 拒绝结论、可信度徽章、体检状态）。
-- `learn.html` 模块 import 带 `?v=10`（与全局一致；集成期后端统一递增）。
-- 学习页 E2E 由你补充。
+### 15.4 场景 Schema 逐字段（getScenario / scenario）
+| 字段 | 类型 | 渲染建议 |
+|---|---|---|
+| `id` | string | 路由/进度 key |
+| `title` | string | 标题 |
+| `category` | `clean`/`modulation`/`defect`/`out-of-library` | 分类标签/配色 |
+| `difficulty` | number(1–) | 难度星级 |
+| `summary` | string | 简介 |
+| `signal` | `{kind,fs,n,seed,components,offset,noiseSigma,clip?}` | 一般不直接展示；供"观察"步生成信号 |
+| `groundTruth` | object | "真值"对照（如 frequency/amplitude），验证步展示 |
+| `expected` | `{unknown?,model?,reliability?,health?,healthChecks?}` | 预期结论，验证步与 result 对照 |
+| `principle` | `{concept,evidenceIds[],points[]}` | **原理卡**：concept 概述 + points 逐条；evidenceIds 可链接证据 |
+| `diagnosis` | `null \| {issues[],causes[],improvements[]}` | 缺陷场景的"问题诊断"卡；clean 场景为 null（隐藏） |
+| `questions` | string[] | 思考题列表 |
+| `steps` | `["observe","hypothesize","verify","conclude"]` | 分步引导顺序 |
+
+### 15.5 analyzeScenario 返回结构（实测）
+```js
+{
+  scenario: { /* 15.4 全部字段 */ },
+  result: { kind, createdAt, sampleCount, sampleRate, duration, nyquist,
+            spectrum, health, candidates, best, unknown, recommendedId,
+            reliability, series },        // 与分析模式 Result 完全一致
+  match: { ok: true, checks: [true,true,true,true] }  // 实际是否符合 expected
+}
+```
+- `match.ok===true` → 给"符合预期 ✓"正向反馈；false → 提示"与预期不符"并展示差异（后端场景保证 ok，false 属异常）。
+- `result` 渲染规则**完全复用分析模式**（见 §7）：unknown 拒绝结论、reliability 徽章、health 状态、candidates 摘要、series 画图。
+
+### 15.6 页面结构与组件（你全权设计，以下为推荐）
+**A. 场景目录视图**
+- `listScenarios()` → 卡片网格：title / category 标签 / difficulty / summary。
+- 点击卡片 → 进入该场景学习视图（可用 hash 路由 `learn.html#clean-single`，无需后端）。
+- 显示学习进度徽标（已学/未学，见 15.9）。
+
+**B. 场景学习视图**（按 steps 分步揭示）
+1. 头部：title + category + difficulty + summary + "返回目录"。
+2. 原理卡：`principle.concept` + `principle.points`（逐条）；`evidenceIds` 渲染为可点击 chips（点击高亮对应证据/图表）。
+3. 分步区（15.7）：observe → hypothesize → verify → conclude。
+4. 问题诊断卡（仅 `diagnosis!==null`）：issues / causes / improvements 三段。
+5. 思考题卡：`questions` 列表（可折叠参考答案——答案可由后续 Qwen M2 提供，M1 先留空或静态）。
+6. 底部：标记"已学"按钮（写进度）+ 上一/下一场景导航。
+
+### 15.7 分步引导设计（steps）
+| 步 | 揭示内容 | 数据来源 |
+|---|---|---|
+| observe（观察） | 信号时域波形 + 频谱预览；提示"你看到了什么" | `generateScenarioSignal(id)` + 复用 `drawPlot`；或 `result.series`/`result.spectrum` |
+| hypothesize（假设） | 原理卡 concept + points；引导"可能是什么模型/有什么问题" | `scenario.principle` |
+| verify（验证） | 运行分析，展示 result（候选竞争/参数/体检/证据）+ groundTruth 对照 | `analyzeScenario(id).result` + `scenario.groundTruth` |
+| conclude（结论） | 推荐模型/可信度 + `match.ok` 反馈 + 诊断（若有）+ 思考题 | `result.recommendedId/reliability` + `match` + `scenario.diagnosis/questions` |
+
+- 交互建议：默认只显示当前步，"下一步"按钮推进；允许回看。进度条 4 段。
+- 画图复用 `app.js` 的 `drawPlot`（若抽成共享模块更好）；或直接用样例 `result.series` 静态渲染。
+
+### 15.8 数据流
+```
+listScenarios() → 目录
+  → 用户选场景 id
+  → getScenario(id) → 原理卡/诊断/思考题/步骤（静态内容）
+  → generateScenarioSignal(id) → observe 步画图
+  → analyzeScenario(id) → verify/conclude 步渲染 result + match
+  → 标记已学 → localStorage 进度
+```
+- 分析在浏览器本地（dsp/Worker），学习页无需 Edge Function；AI 原理展开（M2）才需 Function。
+- 不要缓存/改写 `result` 数值；渲染只读。
+
+### 15.9 学习进度（前端自有，localStorage）
+建议 key `signalinsight.learn.v1`，结构自定，例如：
+```js
+{ completed: ["clean-single"], lastVisited: "clipped-tone", updatedAt: ISO }
+```
+- 目录据此显示"已学"徽标；学习视图"标记已学"写入。
+- 容量小（场景 id 列表），无配额风险；损坏时降级为空。
+
+### 15.10 导航与共享
+- `index.html`（分析）↔ `learn.html`（学习）顶部互链。
+- 共享后端模块：`dsp.js`/`service.js`/`learn.js`（只读）。
+- **状态隔离**：学习页用自己的 UI 状态，不复用分析页 `state`；避免互相污染。
+- 可复用 `styles.css` 设计变量（`--accent`/`--surface`/`--border` 等）保持视觉一致。
+
+### 15.11 样例数据（独立开发，无需后端实时）
+| 文件 | 内容 | 用途 |
+|---|---|---|
+| `site/test/fixtures/sample-scenario-list.json` | `listScenarios()` 输出 | 调目录 UI |
+| `sample-scenario-clean.json` | `analyzeScenario("clean-single")` 完整输出 | 调干净场景学习页 |
+| `sample-scenario-defect.json` | `analyzeScenario("clipped-tone")` 完整输出 | 调缺陷场景学习页（含 diagnosis） |
+
+直接 `fetch`/import 这些 JSON 喂渲染函数即可调样式，不必跑分析。
+
+### 15.12 测试与验收
+- 补学习页 E2E（`e2e.mjs` 扩展或独立 `learn-e2e.mjs`，你拥有）：目录渲染 2 场景 → 进入 clean-single → 四步推进 → result 显示 single_tone/reliable → 标记已学 → 刷新进度仍在 → 进入 clipped-tone → diagnosis 显示 + health 有异常。
+- 验收标准（Definition of Done）：
+  1. 目录正确列出后端场景（不硬编码场景内容）。
+  2. 四步引导可推进/回看，原理卡/诊断/思考题按 schema 渲染。
+  3. verify 步 result 渲染复用分析模式规则（unknown/徽章/体检）。
+  4. `match.ok` 反馈正确；缺陷场景显示 diagnosis。
+  5. 进度持久化；导航互通；窄视口无溢出；控制台无错误。
+  6. 不改后端文件；import 带 `?v=10`。
+
+### 15.13 约束与陷阱
+- **不改 `learn.js`/`dsp.js`/`service.js`**；需新场景/字段 → HANDOFF 协作日志提案，后端加法提供。
+- AI 只解释不改数值（M2 接入时同样约束）；M1 原理用后端结构化 `points`，不要自行编造数值结论。
+- unknown 场景拒绝参数结论；可信度/体检文案与分析模式一致。
+- `?v=` 并行期不改；本地调试旧行为用 Ctrl+F5。
+- 场景内容由后端保证准确性；前端只渲染，不改写原理文本语义。
+
+### 15.14 两个场景的具体呈现（实测参考）
+**clean-single（干净单频）**
+- category=clean，difficulty=1。
+- 原理 evidenceIds：`spectral_prominence / fit_quality / residual_whiteness / frequency_resolution`。
+- verify：`result.recommendedId="single_tone"`，reliability=`reliable`，health=`ok`，频率≈93.7001 Hz（groundTruth 93.7）。
+- diagnosis=null（隐藏诊断卡）；match.ok=true。
+- 思考题：为什么不用双频/BIC 作用；观测减半对分辨率的影响。
+
+**clipped-tone（削顶失真）**
+- category=defect，difficulty=2。
+- 原理 evidenceIds：`data_health / spectral_prominence / residual_structure`。
+- verify：health=`fail`（clipping=fail），reliability=`unreliable`，模型竞争可能选多频（削顶谐波）——**这正是教学点：高 R² 也不可信**。
+- diagnosis：issues=["削顶/饱和：幅值 2 超量程 ±1"]，causes=["增益过高/ADC 量程不足"]，improvements=["降增益/扩量程","重采确认 clipping 通过再分析"]。
+- match.ok=true；思考题：削顶为何诱导多频；高 R² 为何仍不可信。
+
+> 完成本节即可独立交付 learn.html。后端 M2 将提供 Qwen 原理自然语言展开（仍只解释），届时按契约加法接入，不破坏你的 UI。
 
 ## 16. 关键文件速查
 
