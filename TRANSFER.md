@@ -96,6 +96,7 @@ node site/test/extreme.test.mjs
 node site/test/mat.test.mjs
 node site/test/iq.test.mjs
 node site/test/function.test.mjs
+node site/test/fixtures.test.mjs
 ```
 
 当前基线：
@@ -130,7 +131,8 @@ Qoder Sites Edge Function
 └── site/functions/handler.ts         # /health、/explain、Qwen 代理
 
 测试
-└── site/test/*.test.mjs
+├── site/test/*.test.mjs
+└── site/test/fixtures/        # 12 个仿真拟真 CSV + manifest.json + generate.mjs（明确标注仿真）
 ```
 
 没有 bundler、TypeScript 编译或静态检查；浏览器直接加载 ES module。修改 `site/dist/` 即是修改线上构建产物。
@@ -585,7 +587,7 @@ IQ：`z(t)=c+(u+jv)e^{j2πft}`，同时拟合 I/Q。
 - AM/FM 物理机制验证（仅拟合候选）
 - 严格置信区间（当前为近似标准误/分辨率）
 - 程序化 AI 数字一致性审计（目前靠提示词和“只解释证据”约束）
-- 浏览器 E2E 自动化、真实实验数据 fixtures（MAT 除外）
+- 浏览器 E2E 自动化（拟真 CSV fixtures 已具备，见 `site/test/fixtures/`，均为标注的仿真数据）
 - 全局限流（当前为单 Function isolate 内存软限流）
 
 其他边界：
@@ -648,6 +650,7 @@ node site/test/extreme.test.mjs
 node site/test/mat.test.mjs
 node site/test/iq.test.mjs
 node site/test/function.test.mjs
+node site/test/fixtures.test.mjs
 
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```

@@ -21,7 +21,7 @@
 site/dist/       线上静态前端与浏览器数值算法
 site/functions/  Qoder Sites Deno Function（Qwen 解释代理）
 site/test/       部署代码回归测试
-site/test/fixtures/  MAT v5 测试夹具
+site/test/fixtures/  MAT v5 夹具 + 12 个仿真拟真 CSV（generate.mjs / manifest.json，明确标注仿真）
 site/.SignalInsight.qoder.site  发布描述，不要手改
 ```
 
@@ -36,6 +36,7 @@ node site/test/extreme.test.mjs
 node site/test/mat.test.mjs
 node site/test/iq.test.mjs
 node site/test/function.test.mjs
+node site/test/fixtures.test.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
 
@@ -52,6 +53,7 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 - 50 万点单频：Node 约 10 秒，浏览器 Worker 约 30 秒
 - Qwen 解释对单频/双频/噪声/CSV/AM 可用
 - 报告导出包含候选模型、可靠性、健康检查和方法边界
+- 拟真 fixtures：12 个落盘仿真 CSV 经 解析→映射→分析 回归；缺陷信号触发对应体检，库外/噪声输出 unknown
 
 ## 边界
 

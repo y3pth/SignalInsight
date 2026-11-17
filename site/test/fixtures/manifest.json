@@ -1,0 +1,473 @@
+{
+  "note": "全部 fixture 均为仿真数据（明确标注），由 generate.mjs 确定性生成，不是真实测量数据。",
+  "regenerate": "node site/test/fixtures/generate.mjs",
+  "fixtures": [
+    {
+      "file": "single-tone-noisy.csv",
+      "description": "单频正弦 + 高斯噪声，干净基线",
+      "simulated": true,
+      "seed": 42,
+      "sampleRate": 1024,
+      "sampleCount": 2048,
+      "delimiter": ",",
+      "bom": false,
+      "timeHeader": "time",
+      "kind": "real",
+      "groundTruth": {
+        "frequency": 93.7,
+        "amplitude": 2,
+        "phase": 0.4,
+        "offset": 0.1,
+        "noiseSigma": 0.02
+      },
+      "expect": {
+        "unknown": false,
+        "model": "single_tone",
+        "reliability": "reliable",
+        "health": "ok",
+        "minR2": 0.999,
+        "params": [
+          {
+            "id": "frequency_1",
+            "value": 93.7,
+            "tolerance": 0.05
+          },
+          {
+            "id": "amplitude_1",
+            "value": 2,
+            "tolerance": 0.02
+          },
+          {
+            "id": "phase_1",
+            "value": 0.4,
+            "tolerance": 0.05
+          }
+        ]
+      }
+    },
+    {
+      "file": "dual-tone-noisy.csv",
+      "description": "双频叠加 + 高斯噪声",
+      "simulated": true,
+      "seed": 43,
+      "sampleRate": 1024,
+      "sampleCount": 2048,
+      "delimiter": ",",
+      "bom": false,
+      "timeHeader": "time",
+      "kind": "real",
+      "groundTruth": {
+        "components": [
+          {
+            "frequency": 80.5,
+            "amplitude": 1.2,
+            "phase": 0.1
+          },
+          {
+            "frequency": 173.2,
+            "amplitude": 0.7,
+            "phase": -0.5
+          }
+        ],
+        "offset": 0.1,
+        "noiseSigma": 0.02
+      },
+      "expect": {
+        "unknown": false,
+        "model": "multi_tone_2",
+        "reliability": "reliable",
+        "health": "ok",
+        "minR2": 0.999,
+        "params": [
+          {
+            "id": "frequency_1",
+            "value": 80.5,
+            "tolerance": 0.1
+          },
+          {
+            "id": "frequency_2",
+            "value": 173.2,
+            "tolerance": 0.1
+          },
+          {
+            "id": "amplitude_1",
+            "value": 1.2,
+            "tolerance": 0.03
+          },
+          {
+            "id": "amplitude_2",
+            "value": 0.7,
+            "tolerance": 0.03
+          }
+        ]
+      }
+    },
+    {
+      "file": "am-noisy.csv",
+      "description": "AM 调制 + 高斯噪声（载波 120 Hz，调制 5 Hz，指数 0.6）",
+      "simulated": true,
+      "seed": 99,
+      "sampleRate": 1024,
+      "sampleCount": 4096,
+      "delimiter": ",",
+      "bom": false,
+      "timeHeader": "time",
+      "kind": "real",
+      "groundTruth": {
+        "carrierFrequency": 120,
+        "carrierAmplitude": 2,
+        "modulationFrequency": 5,
+        "modulationIndex": 0.6,
+        "offset": 0.1,
+        "noiseSigma": 0.02
+      },
+      "expect": {
+        "unknown": false,
+        "model": "am",
+        "reliability": "reliable",
+        "health": "ok",
+        "minR2": 0.99,
+        "params": [
+          {
+            "id": "frequency_1",
+            "value": 120,
+            "tolerance": 0.2
+          },
+          {
+            "id": "modulation_frequency",
+            "value": 5,
+            "tolerance": 0.2
+          },
+          {
+            "id": "modulation_index",
+            "value": 0.6,
+            "tolerance": 0.08
+          }
+        ]
+      }
+    },
+    {
+      "file": "fm-noisy.csv",
+      "description": "FM 调制 + 高斯噪声（载波 150 Hz，调制 4 Hz，β=2）",
+      "simulated": true,
+      "seed": 123,
+      "sampleRate": 1024,
+      "sampleCount": 4096,
+      "delimiter": ",",
+      "bom": false,
+      "timeHeader": "time",
+      "kind": "real",
+      "groundTruth": {
+        "carrierFrequency": 150,
+        "carrierAmplitude": 2,
+        "modulationFrequency": 4,
+        "modulationIndex": 2,
+        "offset": 0.1,
+        "noiseSigma": 0.02
+      },
+      "expect": {
+        "unknown": false,
+        "model": "fm",
+        "reliability": "reliable",
+        "health": "ok",
+        "minR2": 0.99,
+        "params": [
+          {
+            "id": "frequency_1",
+            "value": 150,
+            "tolerance": 0.2
+          },
+          {
+            "id": "modulation_frequency",
+            "value": 4,
+            "tolerance": 0.2
+          },
+          {
+            "id": "modulation_index",
+            "value": 2,
+            "tolerance": 0.15
+          }
+        ]
+      }
+    },
+    {
+      "file": "clipped-tone.csv",
+      "description": "削顶/饱和：50 Hz 幅值 2 被限制在 ±1",
+      "simulated": true,
+      "seed": 1,
+      "sampleRate": 1000,
+      "sampleCount": 1024,
+      "delimiter": ",",
+      "bom": false,
+      "timeHeader": "time",
+      "kind": "real",
+      "groundTruth": {
+        "frequency": 50,
+        "amplitude": 2,
+        "clipLevel": 1
+      },
+      "expect": {
+        "unknown": false,
+        "reliability": "unreliable",
+        "health": "fail",
+        "healthChecks": {
+          "clipping": "fail"
+        }
+      }
+    },
+    {
+      "file": "drift-tone.csv",
+      "description": "直流漂移：50 Hz 叠加 0→2.5 线性漂移；分号分隔 + BOM",
+      "simulated": true,
+      "seed": 2,
+      "sampleRate": 1000,
+      "sampleCount": 2048,
+      "delimiter": ";",
+      "bom": true,
+      "timeHeader": "time",
+      "kind": "real",
+      "groundTruth": {
+        "frequency": 50,
+        "amplitude": 1,
+        "driftStart": 0,
+        "driftEnd": 2.5
+      },
+      "expect": {
+        "unknown": true,
+        "reliability": "insufficient_evidence",
+        "health": "fail",
+        "healthChecks": {
+          "drift": "fail"
+        }
+      }
+    },
+    {
+      "file": "quantized-tone.csv",
+      "description": "ADC 量化：20 Hz 幅值 2 经 4-bit 量化（量程 ±2.5），触发阶梯/量化体检",
+      "simulated": true,
+      "seed": 3,
+      "sampleRate": 1000,
+      "sampleCount": 1024,
+      "delimiter": ",",
+      "bom": false,
+      "timeHeader": "time",
+      "kind": "real",
+      "groundTruth": {
+        "frequency": 20,
+        "amplitude": 2,
+        "adcBits": 4,
+        "adcRange": 2.5
+      },
+      "expect": {
+        "unknown": false,
+        "reliability": "unreliable",
+        "health": "fail",
+        "healthChecks": {
+          "quantization": "fail"
+        }
+      }
+    },
+    {
+      "file": "jittered-tone.csv",
+      "description": "采样抖动 ±2%（容差 5% 内）：50 Hz，值按真实抖动时刻计算",
+      "simulated": true,
+      "seed": 4,
+      "sampleRate": 1000,
+      "sampleCount": 2048,
+      "delimiter": ",",
+      "bom": false,
+      "timeHeader": "time",
+      "kind": "real",
+      "groundTruth": {
+        "frequency": 50,
+        "amplitude": 2,
+        "phase": 0.2,
+        "offset": 0.1,
+        "jitterPercent": 2,
+        "noiseSigma": 0.01
+      },
+      "expect": {
+        "unknown": false,
+        "model": "single_tone",
+        "reliability": "reliable",
+        "health": "ok",
+        "minR2": 0.999,
+        "params": [
+          {
+            "id": "frequency_1",
+            "value": 50,
+            "tolerance": 0.1
+          },
+          {
+            "id": "amplitude_1",
+            "value": 2,
+            "tolerance": 0.03
+          }
+        ]
+      }
+    },
+    {
+      "file": "iq-single.csv",
+      "description": "IQ 单分量复指数：120 Hz / 幅值 2 / 相位 0.3，I/Q 各带噪声与偏置",
+      "simulated": true,
+      "seed": 5,
+      "sampleRate": 1024,
+      "sampleCount": 4096,
+      "delimiter": ",",
+      "bom": false,
+      "timeHeader": "time",
+      "kind": "iq",
+      "groundTruth": {
+        "frequency": 120,
+        "amplitude": 2,
+        "phase": 0.3,
+        "iOffset": 0.1,
+        "qOffset": 0.05,
+        "noiseSigma": 0.01
+      },
+      "expect": {
+        "unknown": false,
+        "model": "iq_single",
+        "reliability": "reliable",
+        "health": "ok",
+        "params": [
+          {
+            "id": "frequency_1",
+            "value": 120,
+            "tolerance": 0.1
+          },
+          {
+            "id": "amplitude_1",
+            "value": 2,
+            "tolerance": 0.05
+          },
+          {
+            "id": "phase_1",
+            "value": 0.3,
+            "tolerance": 0.05
+          }
+        ]
+      }
+    },
+    {
+      "file": "multi-channel.csv",
+      "description": "多通道：time + 3 个独立单频通道（50/120/200 Hz）",
+      "simulated": true,
+      "seed": 6,
+      "sampleRate": 1024,
+      "sampleCount": 2048,
+      "delimiter": ",",
+      "bom": false,
+      "timeHeader": "time",
+      "kind": "multi",
+      "groundTruth": {
+        "channels": [
+          {
+            "header": "ch1",
+            "frequency": 50,
+            "amplitude": 1.5,
+            "phase": 0.1
+          },
+          {
+            "header": "ch2",
+            "frequency": 120,
+            "amplitude": 1,
+            "phase": -0.3
+          },
+          {
+            "header": "ch3",
+            "frequency": 200,
+            "amplitude": 0.8,
+            "phase": 0.5
+          }
+        ],
+        "noiseSigma": 0.02
+      },
+      "expect": {
+        "channels": [
+          {
+            "header": "ch1",
+            "model": "single_tone",
+            "health": "ok",
+            "params": [
+              {
+                "id": "frequency_1",
+                "value": 50,
+                "tolerance": 0.1
+              }
+            ]
+          },
+          {
+            "header": "ch2",
+            "model": "single_tone",
+            "health": "ok",
+            "params": [
+              {
+                "id": "frequency_1",
+                "value": 120,
+                "tolerance": 0.1
+              }
+            ]
+          },
+          {
+            "header": "ch3",
+            "model": "single_tone",
+            "health": "ok",
+            "params": [
+              {
+                "id": "frequency_1",
+                "value": 200,
+                "tolerance": 0.1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "file": "out-of-library-chirp.csv",
+      "description": "库外信号：线性 chirp 20→200 Hz，候选库无法表达",
+      "simulated": true,
+      "seed": 8,
+      "sampleRate": 1024,
+      "sampleCount": 2048,
+      "delimiter": ",",
+      "bom": false,
+      "timeHeader": "time",
+      "kind": "real",
+      "groundTruth": {
+        "startFrequency": 20,
+        "endFrequency": 200,
+        "amplitude": 1.5,
+        "noiseSigma": 0.02
+      },
+      "expect": {
+        "unknown": true,
+        "model": null,
+        "reliability": "insufficient_evidence",
+        "health": "ok"
+      }
+    },
+    {
+      "file": "noise-only.csv",
+      "description": "纯高斯噪声：应拒绝给出模型结论（unknown）",
+      "simulated": true,
+      "seed": 7,
+      "sampleRate": 1024,
+      "sampleCount": 2048,
+      "delimiter": ",",
+      "bom": false,
+      "timeHeader": "time",
+      "kind": "real",
+      "groundTruth": {
+        "noiseSigma": 1
+      },
+      "expect": {
+        "unknown": true,
+        "model": null,
+        "reliability": "insufficient_evidence",
+        "health": "ok"
+      }
+    }
+  ]
+}

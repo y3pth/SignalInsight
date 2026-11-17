@@ -122,7 +122,13 @@ SignalInsight/
     │   └── handler.ts            # Qwen 代理、校验、降级
     └── test/
         ├── dsp.test.mjs
-        └── function.test.mjs
+        ├── csv.test.mjs
+        ├── extreme.test.mjs
+        ├── mat.test.mjs
+        ├── iq.test.mjs
+        ├── function.test.mjs
+        ├── fixtures.test.mjs
+        └── fixtures/            # 12 个仿真拟真 CSV + manifest.json + generate.mjs
 ```
 
 `site/test/` 直接验证线上算法和 Function，不是无关文件。
@@ -301,8 +307,17 @@ node site/test/extreme.test.mjs
 node site/test/mat.test.mjs
 node site/test/iq.test.mjs
 node site/test/function.test.mjs
+node site/test/fixtures.test.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
+
+拟真 fixtures 回归（2026-11-17，`fixtures.test.mjs`）：
+
+- 12 个落盘仿真 CSV（明确标注仿真，非真实测量），由 `fixtures/generate.mjs` 确定性生成，`manifest.json` 记录真值/种子/期望。
+- 单频/双频/AM/FM/IQ/抖动/多通道：模型与参数在容差内命中，体检 ok。
+- 削顶→clipping fail + 不可信；漂移→drift fail + unknown；4-bit 量化→quantization fail + 不可信。
+- 库外 chirp 与纯噪声→unknown / insufficient_evidence。
+- 浏览器上传路径已验证：单频/多通道/IQ 三类 fixture 经 文件→解析→映射→Worker→渲染 正确；IQ 自动识别 I/Q、隐藏通道卡、禁用压力测试；控制台仅有本地 health 404（预期）。
 
 2026-11-17 P1/P2 本地验证：
 
@@ -410,7 +425,7 @@ P1/P2 已发布并完成线上回归：
 1. [已完成] DSP 移入 Web Worker，失败回退主线程。
 2. [已完成] AI 结果缓存 + 60 次/分钟/IP 软限流；数字一致性审计仍待补。
 3. [已完成] CSV 引号换行、数据预览、aria-live 播报。
-4. [进行中] 浏览器 E2E 回归与真实 CSV fixtures。
+4. [部分完成] 拟真 CSV fixtures 已完成（12 个仿真 fixture + manifest + `fixtures.test.mjs`，明确标注仿真）；浏览器 E2E 自动化仍待补。
 5. [部分完成] 已抽离 `csv.js`；`app.js` / `dsp.js` 仍较大，静态检查待补。
 6. [已完成] 63/64/500k 样本、抖动、非递增、NaN、>10MB、同列映射等边界回归。
 
@@ -459,6 +474,7 @@ P1/P2 已发布并完成线上回归：
 - 公开站点可匿名访问，Function 依赖账号 Secret 和额度。
 - 不应在公开仓库保存密钥、测试数据或赛事受限材料。
 - CN CLI 与当前描述文件格式不兼容；发布统一走桌面端 Sites MCP。
+- 架构自检（2026-11-17）：Worker/DSP 版本一致（v=5）、结果过期/AI 竞态/Worker 超时回退/Function 白名单重建与限流均严谨。两处低风险待办：① `app.js` 主线程回退导入 `dsp.js/csv.js/mat.js` 及 `index.html` 加载 `app.js/styles.css` 未带版本号，版本升级后回退路径可能复用旧缓存（Worker 路径已 v=5）；② 实数 `analyzeSignal` 结果不带 `kind` 字段（仅 IQ 设 `kind:"iq"`），app.js/导出以 `?? "real"` 正规化，文档 schema 与代码略有出入。两者均非正确性 bug，修改需重新发布。
 
 ---
 
