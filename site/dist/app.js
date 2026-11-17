@@ -6,9 +6,9 @@ import {
   buildExperimentPlan,
   stressTest,
   templateExplanation,
-} from "./dsp.js?v=6";
-import { parseCsv } from "./csv.js?v=6";
-import { parseMat } from "./mat.js?v=6";
+} from "./dsp.js?v=7";
+import { parseCsv } from "./csv.js?v=7";
+import { parseMat } from "./mat.js?v=7";
 
 const elements = {
   tabs: [...document.querySelectorAll(".source-tab")],
@@ -70,6 +70,9 @@ const elements = {
   timeLegend: document.querySelector("#time-legend"),
   toast: document.querySelector("#toast"),
   resultAnnouncer: document.querySelector("#result-announcer"),
+  historyList: document.querySelector("#history-list"),
+  historyDetail: document.querySelector("#history-detail"),
+  historyClear: document.querySelector("#history-clear"),
 };
 
 const state = {
@@ -88,10 +91,13 @@ const state = {
   channelResults: null,
   channelBusy: false,
   inputMode: "real",
+  history: [],
 };
 
 const AI_CACHE_LIMIT = 20;
 const aiCache = new Map();
+const HISTORY_KEY = "signalinsight.history.v1";
+const HISTORY_LIMIT = 20;
 
 let toastTimer = null;
 
@@ -406,7 +412,7 @@ const ANALYZER_TIMEOUT_MS = 90000;
 function getAnalyzerWorker() {
   if (analyzerWorker || typeof Worker === "undefined") return analyzerWorker;
   try {
-    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=6", import.meta.url), { type: "module" });
+    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=7", import.meta.url), { type: "module" });
     analyzerWorker.addEventListener("message", (event) => {
       const { id, ok, result, error } = event.data ?? {};
       const pending = analyzerPending.get(id);
@@ -596,6 +602,7 @@ async function analyzeCurrent() {
       : { kind: "real", time: data.time, values: data.values };
     state.sourceLabel = data.label;
     render(result);
+    saveHistory(result, state.sourceLabel);
     showToast(`分析完成 · ${Math.round(result.elapsedMs)} ms · ${result.engine === "worker" ? "Worker" : "主线程"} · ${data.label}`);
   } catch (error) {
     if (sequence === analysisSequence) {
@@ -1317,6 +1324,138 @@ function downloadReport() {
   showToast("报告已导出；包含参数、证据与方法边界。");
 }
 
+function summarizeResult(result, source) {
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    createdAt: new Date().toISOString(),
+    source,
+    kind: result.kind,
+    modelLabel: result.unknown ? "暂不推荐模型" : (result.best?.label ?? "—"),
+    unknown: result.unknown,
+    reliabilityLevel: result.reliability.level,
+    reliabilityLabel: result.reliability.label,
+    sampleCount: result.sampleCount,
+    sampleRate: result.sampleRate,
+    healthStatus: result.health.status,
+    bicGap: result.reliability.bicGap ?? null,
+    parameters: (result.unknown ? [] : (result.best?.parameters ?? [])).map((parameter) => ({
+      label: parameter.label,
+      value: parameter.value,
+      unit: parameter.unit,
+      sigma: parameter.sigma ?? null,
+      sigmaKind: parameter.sigmaKind ?? null,
+    })),
+  };
+}
+
+function persistHistory() {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history));
+  } catch {
+    showToast("本地历史保存失败（存储空间不足或被禁用）。", true);
+  }
+}
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    state.history = Array.isArray(parsed)
+      ? parsed.filter((entry) => entry && typeof entry === "object" && entry.createdAt && entry.source).slice(0, HISTORY_LIMIT)
+      : [];
+  } catch {
+    state.history = [];
+  }
+  renderHistory();
+}
+
+function saveHistory(result, source) {
+  state.history.unshift(summarizeResult(result, source));
+  state.history = state.history.slice(0, HISTORY_LIMIT);
+  persistHistory();
+  renderHistory();
+}
+
+function renderHistory() {
+  elements.historyList.replaceChildren();
+  if (!state.history.length) {
+    const empty = document.createElement("p");
+    empty.className = "history-empty";
+    empty.textContent = "暂无历史；完成一次分析后会自动保存摘要。";
+    elements.historyList.append(empty);
+    return;
+  }
+  for (const entry of state.history) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "history-item";
+    const time = document.createElement("span");
+    time.className = "history-time";
+    time.textContent = new Date(entry.createdAt).toLocaleString();
+    const source = document.createElement("span");
+    source.className = "history-source";
+    source.textContent = entry.source;
+    const model = document.createElement("span");
+    model.className = "history-model";
+    model.textContent = `${entry.modelLabel} · ${entry.reliabilityLabel}`;
+    button.append(time, source, model);
+    button.addEventListener("click", () => renderHistoryDetail(entry));
+    elements.historyList.append(button);
+  }
+}
+
+function renderHistoryDetail(entry) {
+  elements.historyDetail.replaceChildren();
+  const note = document.createElement("p");
+  note.className = "history-detail-note";
+  note.textContent = `历史快照 · ${new Date(entry.createdAt).toLocaleString()} · 未重新计算数值，不覆盖当前结果。`;
+  const meta = document.createElement("p");
+  meta.className = "history-detail-meta";
+  meta.textContent = `${entry.source} · ${entry.modelLabel} · ${entry.reliabilityLabel} · ${entry.sampleCount} 点 @ ${entry.sampleRate.toFixed(2)} Hz · 体检 ${entry.healthStatus}`;
+  elements.historyDetail.append(note, meta);
+  if (entry.parameters?.length) {
+    const table = document.createElement("table");
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    for (const text of ["参数", "估计值", "单位"]) {
+      const th = document.createElement("th");
+      th.textContent = text;
+      headRow.append(th);
+    }
+    thead.append(headRow);
+    const tbody = document.createElement("tbody");
+    for (const parameter of entry.parameters) {
+      const row = document.createElement("tr");
+      for (const text of [parameter.label, formatNumber(parameter.value), parameter.unit]) {
+        const cell = document.createElement("td");
+        cell.textContent = text;
+        row.append(cell);
+      }
+      tbody.append(row);
+    }
+    table.append(thead, tbody);
+    const wrap = document.createElement("div");
+    wrap.className = "table-wrap";
+    wrap.append(table);
+    elements.historyDetail.append(wrap);
+  } else {
+    const none = document.createElement("p");
+    none.className = "history-detail-meta";
+    none.textContent = "无可靠参数估计（unknown）。";
+    elements.historyDetail.append(none);
+  }
+  elements.historyDetail.hidden = false;
+}
+
+function clearHistory() {
+  state.history = [];
+  persistHistory();
+  elements.historyDetail.hidden = true;
+  elements.historyDetail.replaceChildren();
+  renderHistory();
+  showToast("本地分析历史已清空。");
+}
+
 function bindEvents() {
   elements.tabs.forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -1413,6 +1552,7 @@ function bindEvents() {
     invalidateResult("Q 列已变更，请重新运行分析。");
   });
   elements.channelButton.addEventListener("click", analyzeAllChannels);
+  elements.historyClear.addEventListener("click", clearHistory);
 
   let resizeTimer = null;
   window.addEventListener("resize", () => {
@@ -1428,6 +1568,7 @@ function bindEvents() {
 
 function init() {
   bindEvents();
+  loadHistory();
   state.data = buildExample("single");
   elements.tabs[0].classList.add("active");
   analyzeCurrent();

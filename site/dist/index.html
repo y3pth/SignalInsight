@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#0b1718" />
     <meta name="description" content="SignalInsight：在浏览器中完成单频/多频信号模型辨识、参数估计、模型竞争与可信度分析。" />
     <title>SignalInsight · 信号可信分析实验台</title>
-    <link rel="stylesheet" href="./styles.css?v=6" />
+    <link rel="stylesheet" href="./styles.css?v=7" />
   </head>
   <body>
     <div class="ambient-grid" aria-hidden="true"></div>
@@ -201,6 +201,13 @@
           </div>
         </article>
 
+        <article class="history-card">
+          <div class="card-head"><div><span>分析历史</span><h3>本地快照 · 仅存摘要</h3></div><button id="history-clear" class="ghost-button" type="button">清空历史</button></div>
+          <p class="history-note">仅保存在本浏览器 localStorage，不含原始序列；点击条目查看只读快照，不会重新计算或覆盖当前结果。</p>
+          <div id="history-list" class="history-list"></div>
+          <div id="history-detail" class="history-detail" hidden></div>
+        </article>
+
         <footer class="workspace-footer">
           <span>SignalInsight v0.1 · 浏览器确定性数值内核</span>
           <span>结论仅适用于当前候选模型库与观测条件</span>
@@ -209,6 +216,6 @@
     </main>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <p id="result-announcer" class="sr-only" role="status" aria-live="polite"></p>
-    <script type="module" src="./app.js?v=6"></script>
+    <script type="module" src="./app.js?v=7"></script>
   </body>
 </html>

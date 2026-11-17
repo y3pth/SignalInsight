@@ -236,6 +236,27 @@ try {
   assert.ok(noise.toast.includes("noise-only.csv"), "noise scenario analyzed the fixture");
   summary.push({ scenario: "noise-fixture", conclusion: noise.conclusion });
 
+  const historyBefore = await evaluate("(() => ({ count: document.querySelectorAll('#history-list .history-item').length, stored: JSON.parse(localStorage.getItem('signalinsight.history.v1') || '[]').length }))()");
+  assert.ok(historyBefore.count >= 3, `history entries: ${historyBefore.count}`);
+  assert.equal(historyBefore.count, historyBefore.stored, "history list matches localStorage");
+  const conclusionBefore = await evaluate("(() => document.querySelector('#conclusion-title')?.textContent)()");
+  await evaluate("(() => { document.querySelector('#history-list .history-item').click(); return true; })()");
+  const detail = await evaluate("(() => ({ hidden: document.querySelector('#history-detail')?.hidden, text: document.querySelector('#history-detail')?.textContent || '' }))()");
+  assert.equal(detail.hidden, false, "history detail opens");
+  assert.ok(detail.text.includes("历史快照"), "history detail labeled as snapshot");
+  const conclusionAfter = await evaluate("(() => document.querySelector('#conclusion-title')?.textContent)()");
+  assert.equal(conclusionAfter, conclusionBefore, "viewing history must not alter the current result");
+
+  await navigate(baseUrl);
+  const historyReload = await evaluate("(() => document.querySelectorAll('#history-list .history-item').length)()");
+  assert.ok(historyReload >= historyBefore.count, `history persists across reload: ${historyReload}`);
+  await evaluate("(() => { document.querySelector('#history-clear').click(); return true; })()");
+  const cleared = await evaluate("(() => ({ items: document.querySelectorAll('#history-list .history-item').length, stored: JSON.parse(localStorage.getItem('signalinsight.history.v1') || '[]').length, empty: document.querySelector('#history-list')?.textContent || '' }))()");
+  assert.equal(cleared.items, 0, "history cleared from list");
+  assert.equal(cleared.stored, 0, "history cleared from storage");
+  assert.ok(cleared.empty.includes("暂无历史"), "history empty state");
+  summary.push({ scenario: "history", entries: historyBefore.count, persisted: historyReload });
+
   const benignNetwork = (text) =>
     text.includes("/functions/v1/app/health") || text.includes("favicon.ico") || text.startsWith("Failed to load resource");
   const realErrors = consoleErrors.filter((text) => !benignNetwork(text));
