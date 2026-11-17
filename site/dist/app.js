@@ -1615,6 +1615,7 @@ init();
   };
 
   const paint = (element, p) => {
+    if (element.classList.contains("is-focused")) return;
     element.style.left = `${p.x}px`;
     element.style.top = `${p.y}px`;
     element.style.width = `${p.w}px`;
@@ -1650,6 +1651,7 @@ init();
     for (const name of active) {
       const item = meta.get(name);
       if (!item || item.element.hidden) continue;
+      if (item.element.classList.contains("is-focused")) continue;
       const scale = tileScale(item.element);
       if (!scale) continue;
       scale.style.transform = "";
@@ -2210,7 +2212,14 @@ init();
   if (grid.clientWidth > 0 && grid.clientHeight > 0) bootstrap();
   else requestAnimationFrame(bootstrap);
 
-  window.SignalInsightLayout = { ensure, addModule, removeModule, reset, fit: scheduleFit };
+  window.SignalInsightLayout = {
+    ensure,
+    addModule,
+    removeModule,
+    reset,
+    fit: scheduleFit,
+    refresh: () => { apply(); fitTiles(); },
+  };
 })();
 
 (() => {
@@ -2320,4 +2329,199 @@ init();
   strip.addEventListener("scroll", sync, { passive: true });
   new ResizeObserver(sync).observe(strip);
   sync();
+})();
+
+/* ---------- Focus mode (double-click zoom) ---------- */
+
+(() => {
+  const layer = document.querySelector("#focus-layer");
+  const scrim = document.querySelector("#focus-scrim");
+  const exit = document.querySelector("#focus-exit");
+  const grid = document.querySelector("#tile-grid");
+  if (!layer || !scrim || !exit || !grid) return;
+
+  const background = [".topbar", ".control-panel", ".workspace", ".taskbar"]
+    .map((selector) => document.querySelector(selector))
+    .filter(Boolean);
+
+  const TIP_LABELS = {
+    summary: "运行摘要",
+    conclusion: "结论说明",
+    history: "保存说明",
+    stress: "压力测试说明",
+    time: "图例",
+    spectrum: "图例",
+    residual: "图例",
+    evidence: "边界与下一步",
+  };
+
+  let phase = "idle";
+  let focused = null;
+  let saved = null;
+  let returnFocus = null;
+
+  const targetRect = () => {
+    const narrow = window.innerWidth < 760;
+    const padX = narrow ? 8 : Math.round(Math.max(18, Math.min(64, window.innerWidth * 0.05)));
+    const padY = narrow ? 8 : Math.round(Math.max(18, Math.min(52, window.innerHeight * 0.055)));
+    return {
+      left: padX,
+      top: padY,
+      width: window.innerWidth - padX * 2,
+      height: window.innerHeight - padY * 2,
+    };
+  };
+
+  const place = (rect) => {
+    if (!focused) return;
+    focused.style.left = `${Math.round(rect.left)}px`;
+    focused.style.top = `${Math.round(rect.top)}px`;
+    focused.style.width = `${Math.round(rect.width)}px`;
+    focused.style.height = `${Math.round(rect.height)}px`;
+  };
+
+  const tileTitle = (tile) => tile.querySelector(".tile-head h3")?.textContent?.trim() || "模块";
+
+  const buildExtra = (tile) => {
+    const tipId = tile.querySelector(".result-info-button")?.getAttribute("aria-describedby");
+    const tip = tipId ? document.getElementById(tipId) : null;
+    if (!tip) return null;
+    const extra = document.createElement("section");
+    extra.className = "focus-extra";
+    const caption = document.createElement("strong");
+    const module = tile.dataset.module;
+    if (module === "health") {
+      caption.textContent = "实验设计摘要";
+      const summary = document.querySelector("#design-tip-summary")?.textContent?.trim();
+      const note = document.createElement("p");
+      note.className = "focus-note";
+      note.style.margin = "0";
+      note.textContent = summary || "当前采样条件足以支撑本页演示。";
+      extra.append(caption, note);
+      return extra;
+    }
+    caption.textContent = TIP_LABELS[module] || "补充说明";
+    extra.append(caption);
+    for (const node of [...tip.childNodes]) {
+      if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) continue;
+      extra.append(node.cloneNode(true));
+    }
+    extra.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id"));
+    return extra;
+  };
+
+  const open = (tile) => {
+    if (phase !== "idle" || !tile || tile.hidden) return;
+    phase = "open";
+    focused = tile;
+    returnFocus = document.activeElement;
+    const rect = tile.getBoundingClientRect();
+    const scale = tile.querySelector(".tile-scale");
+    saved = {
+      left: tile.style.left,
+      top: tile.style.top,
+      width: tile.style.width,
+      height: tile.style.height,
+      scaleStyle: scale?.getAttribute("style") ?? null,
+      home: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+    };
+    // fit engine pins height:100%; content tiles release it so short content centers
+    if (scale && !scale.classList.contains("chart-card")) scale.style.height = "auto";
+    const extra = buildExtra(tile);
+    if (extra) tile.querySelector(".tile-scale")?.append(extra);
+    tile.classList.add("is-focused");
+    tile.style.position = "absolute";
+    tile.style.transition = "none";
+    place(saved.home);
+    layer.append(tile);
+    layer.hidden = false;
+    layer.setAttribute("role", "dialog");
+    layer.setAttribute("aria-modal", "true");
+    layer.setAttribute("aria-label", `${tileTitle(tile)}放大视图`);
+    document.body.classList.add("is-focusing");
+    for (const node of background) node.inert = true;
+    void tile.offsetWidth;
+    requestAnimationFrame(() => {
+      tile.style.transition = "";
+      layer.classList.add("is-visible");
+      place(targetRect());
+    });
+    tile.focus({ preventScroll: true });
+  };
+
+  const finish = () => {
+    const tile = focused;
+    if (!tile) return;
+    tile.classList.remove("is-focused");
+    tile.style.transition = "none";
+    tile.style.position = "";
+    tile.style.left = saved.left;
+    tile.style.top = saved.top;
+    tile.style.width = saved.width;
+    tile.style.height = saved.height;
+    grid.append(tile);
+    const scale = tile.querySelector(".tile-scale");
+    if (scale) {
+      if (saved.scaleStyle === null) scale.removeAttribute("style");
+      else scale.setAttribute("style", saved.scaleStyle);
+    }
+    tile.querySelectorAll(".focus-extra").forEach((node) => node.remove());
+    layer.hidden = true;
+    layer.classList.remove("is-visible");
+    layer.removeAttribute("role");
+    layer.removeAttribute("aria-modal");
+    layer.removeAttribute("aria-label");
+    document.body.classList.remove("is-focusing");
+    for (const node of background) node.inert = false;
+    try { window.SignalInsightLayout?.refresh?.(); } catch { /* layout engine optional */ }
+    void tile.offsetWidth;
+    tile.style.transition = "";
+    returnFocus?.focus?.({ preventScroll: true });
+    phase = "idle";
+    focused = null;
+    saved = null;
+    returnFocus = null;
+  };
+
+  const close = () => {
+    if (phase !== "open" || !focused) return;
+    phase = "close";
+    layer.classList.remove("is-visible");
+    if (saved) place(saved.home);
+    window.setTimeout(finish, 400);
+  };
+
+  document.addEventListener("dblclick", (event) => {
+    if (phase !== "idle") return;
+    const tile = event.target.closest(".tile");
+    if (!tile || tile.hidden || tile.closest("#focus-layer")) return;
+    if (event.target.closest("button, a, input, select, textarea, label, .resize-handle")) return;
+    event.preventDefault();
+    open(tile);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (phase === "open" && event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+      return;
+    }
+    if (phase !== "idle" || event.key !== "Enter") return;
+    const tile = event.target.closest?.(".tile");
+    if (!tile || tile.hidden || tile.closest("#focus-layer")) return;
+    if (event.target.closest("button, a, input, select, textarea, label")) return;
+    event.preventDefault();
+    open(tile);
+  });
+
+  layer.addEventListener("click", (event) => {
+    if (phase !== "open") return;
+    if (event.target.closest(".tile.is-focused")) return;
+    close();
+  });
+
+  window.addEventListener("resize", () => {
+    if (phase === "open") place(targetRect());
+  });
 })();

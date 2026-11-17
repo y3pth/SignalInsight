@@ -439,7 +439,7 @@
     <footer class="taskbar">
       <div class="taskbar-lead">
         <strong>任务栏</strong>
-        <span>拖入右侧 · 边缘缩放</span>
+        <span>拖入右侧 · 边缘缩放 · 双击放大</span>
       </div>
       <div class="task-chips">
         <button class="task-chip" type="button" draggable="true" data-module="summary" data-category="result"><span class="chip-code">SUM</span><span class="chip-label">摘要</span><span class="chip-state">拖入</span></button>
@@ -491,6 +491,10 @@
       </div>
     </div>
     <div id="result-info-tip" class="result-info-tip" role="tooltip" hidden><p id="conclusion-summary" class="result-info-summary">正在准备模型竞争与证据链。</p><div class="result-info-change"><strong>什么会改变结论</strong><ul id="conclusion-change"></ul></div></div>
+    <div id="focus-layer" class="focus-layer" hidden>
+      <div id="focus-scrim" class="focus-scrim" aria-hidden="true"></div>
+      <button id="focus-exit" class="focus-exit" type="button">还原 <kbd>Esc</kbd></button>
+    </div>
     <p id="result-announcer" class="sr-only" role="status" aria-live="polite"></p>
     <script type="module" src="./app.js?v=12"></script>
   </body>
