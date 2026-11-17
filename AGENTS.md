@@ -34,6 +34,6 @@ Do not work directly on `main`. Use a dedicated branch for each task.
 - Do not publish descriptions that imply Python backend deployment or award guarantees.
 - Do not delete unknown work, force-push or rewrite history.
 - Run `node site/test/dsp.test.mjs` and `node site/test/function.test.mjs` after changing analysis or Function behavior.
-- Run `node site/test/static.test.mjs` after changing module imports or version tags; keep every `?v=` tag identical (currently v=7).
+- Run `node site/test/static.test.mjs` after changing module imports or version tags; keep every `?v=` tag identical (currently v=8).
 - Run `node site/test/e2e.mjs` after changing frontend UI behavior (requires Chrome/Edge; zero npm deps).
 - Update `HANDOFF.md` when release state, blocking conditions or direction changes.

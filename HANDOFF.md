@@ -83,6 +83,7 @@ site/.SignalInsight.qoder.site
 - 多通道逐通道独立分析；MAT v5 实数矩阵导入；IQ 单分量复指数分析
 - 结果过期/AI 竞态/Worker 超时/Function 输入重建等架构加固
 - 本地分析历史（localStorage 只读快照，仅存摘要，不含原始序列，不覆盖当前结果）
+- Qwen 回答具体化（提示词要求引用证据数值、解释模型竞争为何如此选、限制结合数据）；用户可选模型（服务端白名单 qwen-plus/max/turbo/long，Key 仅服务端）
 - 拟真 CSV fixtures、零依赖静态检查、AI 数字一致性程序化审计、零依赖 CDP 浏览器 E2E
 
 ---
@@ -388,7 +389,7 @@ P1/P2 已发布并完成线上回归：
 ## 9. Git 状态与分支
 
 - 当前分支：`feat/realistic-fixtures`（从 `feat/trust-lab` 分出）
-- 最近提交：`4003863 feat: add local analysis history with read-only snapshots`
+- 最近提交：`adfa9c9 feat: specific Qwen explanations and user-selectable model whitelist`
 - 转接文档：`TRANSFER.md`
 - 本轮（P1/P2 扩展）提交：
   - `c37c6d0 test: add realistic simulated CSV fixtures and regression suite`
@@ -397,7 +398,8 @@ P1/P2 已发布并完成线上回归：
   - `9f4ae3c test: add programmatic AI numeric-consistency audit`
   - `3478b9c test: add zero-dependency browser E2E via CDP`
   - `4003863 feat: add local analysis history with read-only snapshots`
-- 模块版本：v=7（全部模块/资源统一，`static.test.mjs` 强制一致）
+  - `adfa9c9 feat: specific Qwen explanations and user-selectable model whitelist`
+- 模块版本：v=8（全部模块/资源统一，`static.test.mjs` 强制一致）
 - 状态：本轮改动已通过本地全套测试 + E2E 质检，**尚未发布**；线上仍为信任实验室版本
 - 信任实验室提交：
   - `e45afb0 fix: harden result and AI data flow`
@@ -464,6 +466,23 @@ P1/P2 已发布并完成线上回归：
 6. [已完成] 多通道、MAT v5、IQ 单分量数据模式。
 7. [已发布] 信任实验室最终版本已上线并完成回归。
 
+### 下一阶段：学习模式（规划，未实现）
+
+目标：双模式双页面。**分析模式**即现有全部功能；**学习模式**用内置仿真数据引导学习，讲清"为什么这样选模型"，对极限/问题数据指出"哪里有问题"，先原理分析再结合生活类比帮助理解。
+
+复用现有资产（不需新算法）：`dsp.js` 数值内核、`fixtures/generate.mjs` 仿真数据、`buildDecision`/`inspectData`/`buildExperimentPlan`（证据/体检/设计）、具体化后的 Qwen 解释。学习模式主要是**教学叙事层 + 引导式 UI**。
+
+关键设计：
+1. 课程化场景库：由 fixtures 扩展（干净单频→双频→AM/FM→削顶/漂移/量化/抖动→库外/噪声），每场景含预期结论 + 原理讲解 + 生活类比 + 思考题。
+2. 原理先行：先给确定性原理（频谱/BIC/残差/体检规则），再由 Qwen 生成生活类比（AI 只解释、不改数值）。
+3. 问题诊断：对缺陷数据定位具体体检项（削顶/漂移/量化），解释成因、影响与改进建议（复用 inspectData/buildExperimentPlan）。
+4. 引导式交互：分步揭示（观察→假设→验证→结论），避免直接给答案。
+5. 与分析模式共享数值内核与版本/竞态/unknown 守卫。
+
+风险与边界：生活类比由 AI 生成须约束只基于证据、防误导；课程叙事需人工审核准确性；双页面增加导航/状态复杂度；不引入新模型库（属另立阶段）。
+
+里程碑建议：M1 场景库 + 原理卡片（静态内容）→ M2 Qwen 生活类比 + 问题诊断接入 → M3 引导式分步 UI + 学习进度（localStorage）→ M4 E2E 覆盖学习路径。
+
 ### 比赛
 
 - 天池报名/组队、实名认证、阿里云大学生认证
@@ -491,7 +510,7 @@ P1/P2 已发布并完成线上回归：
 - 公开站点可匿名访问，Function 依赖账号 Secret 和额度。
 - 不应在公开仓库保存密钥、测试数据或赛事受限材料。
 - CN CLI 与当前描述文件格式不兼容；发布统一走桌面端 Sites MCP。
-- 架构自检（2026-11-17）：Worker/DSP 版本一致、结果过期/AI 竞态/Worker 超时回退/Function 白名单重建与限流均严谨。原两处低风险项已修复：模块/资源版本号统一为 v=7（含主线程回退导入，由 `static.test.mjs` 强制一致）；实数 `analyzeSignal` 结果已补 `kind:"real"`，与文档 schema 一致。
+- 架构自检（2026-11-17）：Worker/DSP 版本一致、结果过期/AI 竞态/Worker 超时回退/Function 白名单重建与限流均严谨。原两处低风险项已修复：模块/资源版本号统一为 v=8（含主线程回退导入，由 `static.test.mjs` 强制一致）；实数 `analyzeSignal` 结果已补 `kind:"real"`，与文档 schema 一致。
 - 本地分析历史仅存摘要快照（不含原始序列），只读、不重新计算、不覆盖当前结果/AI/导出；localStorage 上限 20 条，配额不足或被禁用时降级提示，损坏存储自动恢复为空。
 
 ---

@@ -161,7 +161,7 @@ Qoder Sites Edge Function
 3. **结果必须有版本**：`dataVersion` / `resultVersion` / `resultStale` 防止旧结果被 AI/导出/压力测试使用。
 4. **AI 响应必须有请求号**：`aiRequestSequence` 防止旧 AI 响应覆盖新结果。
 5. **Worker 返回摘要，不返回所有候选的大数组**：候选只保留参数、指标、残差摘要；只有最佳序列进入 `series`。
-6. **模块版本统一**：当前所有模块/资源统一 `?v=7`（`index.html` 的 `styles.css`/`app.js`，`app.js` 导入 `dsp.js`/`csv.js`/`mat.js` 与 Worker URL，Worker 内 `dsp.js`）。任何前端改动后递增全部版本标签并保持一致；`static.test.mjs` 强制单一版本，避免主线程回退路径复用旧缓存。
+6. **模块版本统一**：当前所有模块/资源统一 `?v=8`（`index.html` 的 `styles.css`/`app.js`，`app.js` 导入 `dsp.js`/`csv.js`/`mat.js` 与 Worker URL，Worker 内 `dsp.js`）。任何前端改动后递增全部版本标签并保持一致；`static.test.mjs` 强制单一版本，避免主线程回退路径复用旧缓存。
 7. **发布描述是生成的**：`site/.SignalInsight.qoder.site` 由 Sites 工具生成，不要手写字段。
 
 ---
@@ -504,6 +504,8 @@ IQ：`z(t)=c+(u+jv)e^{j2πft}`，同时拟合 I/Q。
 }
 ```
 
+模型选择：前端额外携带可选 `model` 字段；服务端按白名单 `qwen-plus / qwen-max / qwen-turbo / qwen-long` 校验，非法或缺省回退到 `QWEN_MODEL` 环境变量或 `qwen-plus`。模型名不参与证据 payload 重建，API Key 仅服务端读取。
+
 成功响应：
 
 ```js
@@ -672,7 +674,7 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 
 模块缓存注意事项：
 
-- 当前所有模块/资源统一 `?v=7`；
+- 当前所有模块/资源统一 `?v=8`；
 - 修改任何前端文件后，递增全部版本标签（`index.html` 2 处、`app.js` 4 处、Worker 1 处）保持一致；
 - `node site/test/static.test.mjs` 校验版本一致性、导入导出与引用存在，防止回退路径复用旧缓存。
 
