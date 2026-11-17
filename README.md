@@ -22,7 +22,7 @@
 ## 结构
 
 ```text
-site/dist/       线上静态前端与浏览器数值算法
+site/dist/       前端 UI（app.js/index.html/styles.css）+ 后端逻辑（service.js/dsp.js/csv.js/mat.js/worker，DOM-free）
 site/functions/  Qoder Sites Deno Function（Qwen 解释代理）
 site/test/       部署代码回归测试
 site/test/fixtures/  MAT v5 夹具 + 12 个仿真拟真 CSV（generate.mjs / manifest.json，明确标注仿真）
@@ -43,6 +43,7 @@ node site/test/function.test.mjs
 node site/test/fixtures.test.mjs
 node site/test/static.test.mjs
 node site/test/ai-consistency.test.mjs
+node site/test/contract.test.mjs
 node site/test/e2e.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```

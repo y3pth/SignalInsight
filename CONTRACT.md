@@ -67,7 +67,7 @@
 约定：
 - `candidates` 与 `best` **不含** `fitted`/`residual` 大数组（只有 `series` 携带最佳序列）。
 - `unknown===true` 时 `recommendedId===null`，前端不得展示参数结论。
-- `kind` 实数为 `"real"`、IQ 为 `"iq"`（v=8 起实数也带 kind）。
+- `kind` 实数为 `"real"`、IQ 为 `"iq"`（实数与 IQ 均带 kind）。
 
 ## 2. 压力测试结果（stressTest 返回）
 
@@ -102,20 +102,21 @@
   reliability: { level, evidence: [{ label, value, detail, status }], limitations } }
 ```
 
-## 5. service.js API（拆分目标，后端拥有，前端调用）
+## 5. service.js API（已实施，后端拥有，前端调用）
 
-> 拆分实施后生效。均为纯逻辑、返回数据、不访问 DOM。
+> 纯逻辑、返回数据、不访问 DOM（仅用 fetch / Worker / localStorage）。
 
 ```js
 analyzeSignalSafely(time, values) -> Promise<Result>     // Worker 优先 + 主线程回退
 analyzeIqSafely(time, i, q)       -> Promise<Result>
 stressTestSafely(time, values, baseline) -> Promise<StressResult>
-checkAiHealth()                   -> Promise<{ configured, provider, reachable }>
-requestExplanation(payload, model, { signal }) -> Promise<Explanation>  // 含错误细分
+fetchAiHealth()                   -> Promise<{ configured, health, provider }>
+fetchExplanation(payload, model, signal) -> Promise<Explanation>  // 失败抛 Error（AI_ERROR_MESSAGES 细分）
 buildReport(result, sourceLabel)  -> ReportObject        // 纯对象，前端负责下载
 getHistory()                      -> HistoryEntry[]      // localStorage 读取/校验
-addHistory(result, sourceLabel)   -> HistoryEntry[]      // 摘要快照，≤20 条
-clearHistory()                    -> void
+addHistory(result, sourceLabel)   -> { entries: HistoryEntry[], persisted: boolean }
+clearHistoryStorage()             -> { persisted: boolean }
+AI_ERROR_MESSAGES                 // 错误码 → 中文提示映射
 ```
 
 `HistoryEntry`：`{ id, createdAt, source, kind, modelLabel, unknown, reliabilityLevel, reliabilityLabel, sampleCount, sampleRate, healthStatus, bicGap, parameters: [{label,value,unit,sigma,sigmaKind}] }`（不含原始序列）。

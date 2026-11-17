@@ -1,14 +1,22 @@
 import {
-  analyzeSignal,
-  analyzeIqSignal,
   buildAiPayload,
   buildDecision,
   buildExperimentPlan,
-  stressTest,
   templateExplanation,
-} from "./dsp.js?v=8";
-import { parseCsv } from "./csv.js?v=8";
-import { parseMat } from "./mat.js?v=8";
+} from "./dsp.js?v=9";
+import { parseCsv } from "./csv.js?v=9";
+import { parseMat } from "./mat.js?v=9";
+import {
+  analyzeSignalSafely,
+  analyzeIqSafely,
+  stressTestSafely,
+  fetchAiHealth,
+  fetchExplanation,
+  buildReport,
+  getHistory,
+  addHistory,
+  clearHistoryStorage,
+} from "./service.js?v=9";
 
 const elements = {
   tabs: [...document.querySelectorAll(".source-tab")],
@@ -97,8 +105,6 @@ const state = {
 
 const AI_CACHE_LIMIT = 20;
 const aiCache = new Map();
-const HISTORY_KEY = "signalinsight.history.v1";
-const HISTORY_LIMIT = 20;
 
 let toastTimer = null;
 
@@ -404,115 +410,7 @@ async function analyzeAllChannels() {
   }
 }
 
-let analyzerWorker = null;
-let analyzerRequestId = 0;
 let analysisSequence = 0;
-const analyzerPending = new Map();
-const ANALYZER_TIMEOUT_MS = 90000;
-
-function getAnalyzerWorker() {
-  if (analyzerWorker || typeof Worker === "undefined") return analyzerWorker;
-  try {
-    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=8", import.meta.url), { type: "module" });
-    analyzerWorker.addEventListener("message", (event) => {
-      const { id, ok, result, error } = event.data ?? {};
-      const pending = analyzerPending.get(id);
-      if (!pending) return;
-      analyzerPending.delete(id);
-      clearTimeout(pending.timeout);
-      if (ok) pending.resolve(result);
-      else pending.reject(new Error(error || "分析失败。"));
-    });
-    analyzerWorker.addEventListener("error", (event) => {
-      const error = new Error(event.message || "分析 Worker 失败。");
-      for (const pending of analyzerPending.values()) {
-        clearTimeout(pending.timeout);
-        pending.reject(error);
-      }
-      analyzerPending.clear();
-      analyzerWorker?.terminate();
-      analyzerWorker = null;
-    });
-  } catch {
-    analyzerWorker = null;
-  }
-  return analyzerWorker;
-}
-
-function analyzeInWorker(worker, time, values, type = "analyze", baseline = null, qValues = null) {
-  const id = ++analyzerRequestId;
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      const entries = [...analyzerPending.values()];
-      analyzerPending.clear();
-      analyzerWorker?.terminate();
-      analyzerWorker = null;
-      const error = new Error("分析超时，请降低样本量或重试。");
-      error.name = "AnalyzerTimeoutError";
-      for (const pending of entries) {
-        clearTimeout(pending.timeout);
-        pending.reject(error);
-      }
-    }, ANALYZER_TIMEOUT_MS);
-    analyzerPending.set(id, { resolve, reject, timeout });
-    try {
-      worker.postMessage({ id, type, time, values, qValues, baseline });
-    } catch (error) {
-      analyzerPending.delete(id);
-      clearTimeout(timeout);
-      reject(error);
-    }
-  });
-}
-
-async function analyzeSignalSafely(time, values) {
-  const worker = getAnalyzerWorker();
-  if (!worker) {
-    const result = analyzeSignal(time, values);
-    result.engine = "main";
-    return result;
-  }
-  try {
-    const result = await analyzeInWorker(worker, time, values);
-    result.engine = "worker";
-    return result;
-  } catch (error) {
-    if (error instanceof Error && error.name === "AnalyzerTimeoutError") throw error;
-    const result = analyzeSignal(time, values);
-    result.engine = "main";
-    return result;
-  }
-}
-
-async function analyzeIqSafely(time, iValues, qValues) {
-  const worker = getAnalyzerWorker();
-  if (!worker) {
-    const result = analyzeIqSignal(time, iValues, qValues);
-    result.engine = "main";
-    return result;
-  }
-  try {
-    const result = await analyzeInWorker(worker, time, iValues, "iq", null, qValues);
-    result.engine = "worker";
-    return result;
-  } catch (error) {
-    if (error instanceof Error && error.name === "AnalyzerTimeoutError") throw error;
-    const result = analyzeIqSignal(time, iValues, qValues);
-    result.engine = "main";
-    return result;
-  }
-}
-
-async function stressTestSafely(time, values, baseline) {
-  const worker = getAnalyzerWorker();
-  if (!worker) return stressTest(time, values, baseline);
-  try {
-    return await analyzeInWorker(worker, time, values, "stress", baseline);
-  } catch (error) {
-    if (error instanceof Error && error.name === "AnalyzerTimeoutError") throw error;
-    return stressTest(time, values, baseline);
-  }
-}
 
 function invalidateResult(message = "数据已变更，请重新运行分析。") {
   state.resultStale = true;
@@ -1203,32 +1101,11 @@ function amplitudeAt(spectrum, frequency) {
 }
 
 async function checkAiAvailability() {
-  try {
-    const response = await fetch("/functions/v1/app/health", {
-      cache: "no-store",
-      signal: AbortSignal.timeout(8000),
-    });
-    const data = await response.json();
-    state.aiConfigured = Boolean(response.ok && data?.configured);
-    state.aiHealth = state.aiConfigured ? "configured" : "not_configured";
-  } catch {
-    state.aiConfigured = false;
-    state.aiHealth = "unreachable";
-  }
+  const { configured, health } = await fetchAiHealth();
+  state.aiConfigured = configured;
+  state.aiHealth = health;
   if (state.result && !state.resultStale) renderLocalExplanation(state.result);
 }
-
-const AI_ERROR_MESSAGES = {
-  service_not_configured: "Qwen 密钥尚未配置，继续显示确定性规则解释。",
-  upstream_error: "Qwen 上游返回错误，请检查 Key、模型名或额度。",
-  upstream_unavailable: "Qwen 服务暂时不可用，请稍后重试。",
-  invalid_model_output: "Qwen 返回格式不符合要求，请重试。",
-  invalid_upstream_response: "Qwen 返回内容异常，请重试。",
-  payload_too_large: "发送给 Qwen 的摘要过大，请减少数据量。",
-  invalid_payload: "发送给 Qwen 的摘要格式无效。",
-  invalid_json: "请求格式错误。",
-  rate_limited: "请求过于频繁，请稍后再试。",
-};
 
 async function requestQwenExplanation() {
   if (!state.result || state.resultStale || state.busy || !state.aiConfigured) return;
@@ -1248,18 +1125,8 @@ async function requestQwenExplanation() {
   elements.aiButton.textContent = "Qwen 正在解释…";
   elements.aiStatus.textContent = "正在发送结构化数值摘要，不包含原始序列。";
   try {
-    const response = await fetch("/functions/v1/app/explain", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...payload, model }),
-      signal: AbortSignal.timeout(30000),
-    });
-    const data = await response.json().catch(() => null);
-    if (!response.ok || !data?.ok || !data?.explanation) {
-      throw new Error(AI_ERROR_MESSAGES[data?.error] ?? "Qwen 暂不可用，继续显示确定性规则解释。");
-    }
+    const explanation = await fetchExplanation(payload, model, AbortSignal.timeout(30000));
     if (requestId !== state.aiRequestSequence || version !== state.resultVersion || state.resultStale) return;
-    const explanation = data.explanation;
     aiCache.set(cacheKey, explanation);
     if (aiCache.size > AI_CACHE_LIMIT) aiCache.delete(aiCache.keys().next().value);
     renderQwenExplanation(explanation);
@@ -1279,44 +1146,7 @@ async function requestQwenExplanation() {
 
 function downloadReport() {
   if (!state.result || state.resultStale) return;
-  const result = state.result;
-  const report = {
-    product: "SignalInsight",
-    version: "0.1.0-sites",
-    generatedAt: new Date().toISOString(),
-    source: state.sourceLabel,
-    sampleCount: result.sampleCount,
-    sampleRateHz: result.sampleRate,
-    durationSeconds: result.duration,
-    kind: result.kind,
-    recommendedModel: result.recommendedId,
-    unknown: result.unknown,
-    reliability: result.reliability,
-    health: result.health,
-    experimentPlan: buildExperimentPlan(result),
-    modulation: result.best?.modulationView
-      ? {
-          type: result.best.modulationView.type,
-          carrierFrequency: result.best.modulationView.carrierFrequency,
-          modulationFrequency: result.best.modulationView.modulationFrequency,
-          modulationIndex: result.best.modulationView.modulationIndex,
-          frequencyDeviation: result.best.modulationView.frequencyDeviation ?? null,
-          sidebands: result.best.modulationView.sidebands,
-        }
-      : null,
-    candidates: result.candidates.map((candidate) => ({
-      id: candidate.id,
-      label: candidate.label,
-      parameters: candidate.parameters,
-      metrics: candidate.metrics,
-      residualAnalysis: candidate.residualAnalysis,
-    })),
-    method: {
-      spectrum: "Hann-windowed FFT",
-      fitting: "variable projection + golden-section frequency refinement",
-      selection: "BIC with residual evidence",
-    },
-  };
+  const report = buildReport(state.result, state.sourceLabel);
   const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
@@ -1326,55 +1156,15 @@ function downloadReport() {
   showToast("报告已导出；包含参数、证据与方法边界。");
 }
 
-function summarizeResult(result, source) {
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    createdAt: new Date().toISOString(),
-    source,
-    kind: result.kind,
-    modelLabel: result.unknown ? "暂不推荐模型" : (result.best?.label ?? "—"),
-    unknown: result.unknown,
-    reliabilityLevel: result.reliability.level,
-    reliabilityLabel: result.reliability.label,
-    sampleCount: result.sampleCount,
-    sampleRate: result.sampleRate,
-    healthStatus: result.health.status,
-    bicGap: result.reliability.bicGap ?? null,
-    parameters: (result.unknown ? [] : (result.best?.parameters ?? [])).map((parameter) => ({
-      label: parameter.label,
-      value: parameter.value,
-      unit: parameter.unit,
-      sigma: parameter.sigma ?? null,
-      sigmaKind: parameter.sigmaKind ?? null,
-    })),
-  };
-}
-
-function persistHistory() {
-  try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history));
-  } catch {
-    showToast("本地历史保存失败（存储空间不足或被禁用）。", true);
-  }
-}
-
 function loadHistory() {
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    state.history = Array.isArray(parsed)
-      ? parsed.filter((entry) => entry && typeof entry === "object" && entry.createdAt && entry.source).slice(0, HISTORY_LIMIT)
-      : [];
-  } catch {
-    state.history = [];
-  }
+  state.history = getHistory();
   renderHistory();
 }
 
 function saveHistory(result, source) {
-  state.history.unshift(summarizeResult(result, source));
-  state.history = state.history.slice(0, HISTORY_LIMIT);
-  persistHistory();
+  const { entries, persisted } = addHistory(result, source);
+  state.history = entries;
+  if (!persisted) showToast("本地历史保存失败（存储空间不足或被禁用）。", true);
   renderHistory();
 }
 
@@ -1451,7 +1241,7 @@ function renderHistoryDetail(entry) {
 
 function clearHistory() {
   state.history = [];
-  persistHistory();
+  clearHistoryStorage();
   elements.historyDetail.hidden = true;
   elements.historyDetail.replaceChildren();
   renderHistory();

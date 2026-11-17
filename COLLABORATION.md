@@ -105,14 +105,14 @@ git checkout <自己的分支> && git merge integration
 - 2026-11-17 · 前端 · frontend/yyy · 契约1.0 · 重做结论卡视觉 · E2E绿 · 阻塞:需后端加Z字段(已提案)
 ```
 
-## 11. 待实施的拆分计划（后端，需确认后执行）
+## 11. 拆分实施记录（后端，已完成）
 
-目标：把 `app.js` 中的**纯逻辑**抽到 `service.js`（后端），`app.js` 留 DOM/渲染/事件（前端）。
+`app.js` 的纯逻辑已抽到 `service.js`（后端，DOM-free），`app.js` 留 DOM/渲染/事件（前端）。
 
-- 抽出到 `service.js`：`getAnalyzerWorker/analyzeInWorker/analyzeSignalSafely/analyzeIqSafely/stressTestSafely`、`checkAiAvailability` 的 fetch 逻辑、`requestQwenExplanation` 的 fetch/错误细分、`downloadReport` 的报告对象构建（改名 `buildReport`，下载动作留前端）、历史持久化 `getHistory/addHistory/clearHistory`。
-- 留在 `app.js`（前端）：`elements/state`、`render*`、图表、`bindEvents/init`、`showToast`、下载触发、历史渲染。
-- `service.js` 严格 DOM-free；`app.js` import service.js 调用。
-- 新增 `contract.test.mjs` 锁结果形状；生成样例 fixture。
-- 拆分后跑全套 + E2E 确保零行为变化；契约 v1.0 不变（仅内部重组）。
+- `service.js`（后端）：Worker 编排 `analyzeSignalSafely/analyzeIqSafely/stressTestSafely`、`fetchAiHealth`、`fetchExplanation` + `AI_ERROR_MESSAGES`、`buildReport`、历史存储 `getHistory/addHistory/clearHistoryStorage`。
+- `app.js`（前端）：`elements/state`、`render*`、图表、`bindEvents/init`、`showToast`、下载触发、历史渲染、AI 缓存与竞态守卫。
+- `service.js` 严格不访问 DOM；`app.js` import service.js 调用。
+- `contract.test.mjs` 锁结果/载荷/报告形状；样例 fixture 供前端独立开发。
+- 拆分后全套测试 + E2E 全绿，零行为变化；契约 v1.0 形状不变（仅内部重组）；模块版本 v=9。
 
-> 当前 `app.js` 尚未拆分；在确认本计划前，前端改 UI 应优先 `index.html/styles.css`，避免与后端逻辑同时改 `app.js`。
+> 前端可全权改 `app.js` 渲染层与 `index.html/styles.css`；后端逻辑改动只在 `service.js`/`dsp.js`/`functions/*` 等。双方按所有权表并行，集成时由后端统一递增 `?v=`。

@@ -100,6 +100,7 @@ node site/test/function.test.mjs
 node site/test/fixtures.test.mjs
 node site/test/static.test.mjs
 node site/test/ai-consistency.test.mjs
+node site/test/contract.test.mjs
 node site/test/e2e.mjs
 ```
 
@@ -124,7 +125,8 @@ node site/test/e2e.mjs
 浏览器（静态 SPA，无构建步骤）
 ├── site/dist/index.html
 ├── site/dist/styles.css
-├── site/dist/app.js                  # 状态机、输入映射、渲染、AI、导出、事件
+├── site/dist/app.js                  # 前端：UI 状态、输入映射、渲染、事件
+├── site/dist/service.js              # 后端：Worker 编排、AI 请求、导出构建、历史存储（DOM-free）
 ├── site/dist/csv.js                  # CSV 解析
 ├── site/dist/mat.js                  # MAT v5 实数矩阵解析
 ├── site/dist/dsp.js                  # 数值内核（主线程回退 + Worker 共享）
@@ -139,7 +141,7 @@ Qoder Sites Edge Function
 └── site/test/fixtures/        # 12 个仿真拟真 CSV + manifest.json + generate.mjs（明确标注仿真）
 ```
 
-没有 bundler、TypeScript 编译或静态检查；浏览器直接加载 ES module。修改 `site/dist/` 即是修改线上构建产物。
+没有 bundler 或 TypeScript 编译；浏览器直接加载 ES module；有零依赖静态检查（`static.test.mjs`）。修改 `site/dist/` 即是修改线上构建产物。前后端边界见 `CONTRACT.md` / `COLLABORATION.md`。
 
 ### 3.2 各文件职责
 
@@ -147,7 +149,8 @@ Qoder Sites Edge Function
 |---|---|
 | `site/dist/index.html` | 页面结构：输入、映射、结果、结论卡、图表、候选、参数、通道、体检、调制、压力、证据、AI |
 | `site/dist/styles.css` | 深色实验台视觉、响应式、状态/高亮样式 |
-| `site/dist/app.js` | 全部前端状态、CSV/MAT/IQ 映射、Worker 调用、渲染、AI、导出、事件 |
+| `site/dist/app.js` | 前端：UI 状态、CSV/MAT/IQ 映射、渲染、图表、事件、AI 缓存/竞态守卫、下载触发 |
+| `site/dist/service.js` | 后端：Worker 编排（analyze*Iq/stress Safely）、fetchAiHealth/fetchExplanation、buildReport、历史存储（DOM-free） |
 | `site/dist/csv.js` | 分隔符识别、引号/换行解析、列数值化、时间列候选 |
 | `site/dist/mat.js` | MAT v5 解析：数组 flags、维度、变量名、实数/复数矩阵 |
 | `site/dist/dsp.js` | FFT、频谱、实数/复数拟合、AM/FM、IQ、可信度、体检、决策、设计、压力测试 |
@@ -162,7 +165,7 @@ Qoder Sites Edge Function
 3. **结果必须有版本**：`dataVersion` / `resultVersion` / `resultStale` 防止旧结果被 AI/导出/压力测试使用。
 4. **AI 响应必须有请求号**：`aiRequestSequence` 防止旧 AI 响应覆盖新结果。
 5. **Worker 返回摘要，不返回所有候选的大数组**：候选只保留参数、指标、残差摘要；只有最佳序列进入 `series`。
-6. **模块版本统一**：当前所有模块/资源统一 `?v=8`（`index.html` 的 `styles.css`/`app.js`，`app.js` 导入 `dsp.js`/`csv.js`/`mat.js` 与 Worker URL，Worker 内 `dsp.js`）。任何前端改动后递增全部版本标签并保持一致；`static.test.mjs` 强制单一版本，避免主线程回退路径复用旧缓存。
+6. **模块版本统一**：当前所有模块/资源统一 `?v=9`（`index.html` 的 `styles.css`/`app.js`，`app.js` 导入 `dsp.js`/`csv.js`/`mat.js`/`service.js`，`service.js` 导入 `dsp.js` 与 Worker URL，Worker 内 `dsp.js`）。任何前端改动后递增全部版本标签并保持一致；`static.test.mjs` 强制单一版本，避免主线程回退路径复用旧缓存。
 7. **发布描述是生成的**：`site/.SignalInsight.qoder.site` 由 Sites 工具生成，不要手写字段。
 
 ---
@@ -662,6 +665,7 @@ node site/test/function.test.mjs
 node site/test/fixtures.test.mjs
 node site/test/static.test.mjs
 node site/test/ai-consistency.test.mjs
+node site/test/contract.test.mjs
 node site/test/e2e.mjs
 
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
@@ -675,7 +679,7 @@ python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 
 模块缓存注意事项：
 
-- 当前所有模块/资源统一 `?v=8`；
+- 当前所有模块/资源统一 `?v=9`；
 - 修改任何前端文件后，递增全部版本标签（`index.html` 2 处、`app.js` 4 处、Worker 1 处）保持一致；
 - `node site/test/static.test.mjs` 校验版本一致性、导入导出与引用存在，防止回退路径复用旧缓存。
 

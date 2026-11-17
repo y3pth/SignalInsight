@@ -116,10 +116,13 @@ SignalInsight/
 └── site/
     ├── .SignalInsight.qoder.site # 发布描述，不要手改
     ├── dist/
-    │   ├── index.html
-    │   ├── styles.css
-    │   ├── dsp.js                # 浏览器数值核心
-    │   └── app.js                # 状态、图表、CSV、AI 请求
+    │   ├── index.html            # 前端：页面结构
+    │   ├── styles.css            # 前端：视觉
+    │   ├── app.js                # 前端：UI 状态/渲染/事件
+    │   ├── service.js            # 后端：Worker/AI/导出/历史逻辑（DOM-free）
+    │   ├── dsp.js                # 后端：数值核心
+    │   ├── csv.js / mat.js       # 后端：解析
+    │   └── analyzer-worker.js    # 后端：Web Worker
     ├── functions/
     │   ├── index.ts              # Deno.serve
     │   └── handler.ts            # Qwen 代理、校验、降级
@@ -133,6 +136,7 @@ SignalInsight/
         ├── fixtures.test.mjs
         ├── static.test.mjs
         ├── ai-consistency.test.mjs
+        ├── contract.test.mjs
         ├── e2e.mjs              # 零依赖 CDP 浏览器端到端（需 Chrome/Edge）
         └── fixtures/            # 12 个仿真拟真 CSV + manifest.json + generate.mjs
 ```
@@ -316,6 +320,7 @@ node site/test/function.test.mjs
 node site/test/fixtures.test.mjs
 node site/test/static.test.mjs
 node site/test/ai-consistency.test.mjs
+node site/test/contract.test.mjs
 node site/test/e2e.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
@@ -399,7 +404,7 @@ P1/P2 已发布并完成线上回归：
   - `3478b9c test: add zero-dependency browser E2E via CDP`
   - `4003863 feat: add local analysis history with read-only snapshots`
   - `adfa9c9 feat: specific Qwen explanations and user-selectable model whitelist`
-- 模块版本：v=8（全部模块/资源统一，`static.test.mjs` 强制一致）
+- 模块版本：v=9（全部模块/资源统一，`static.test.mjs` 强制一致）
 - 状态：本轮改动已通过本地全套测试 + E2E 质检，**尚未发布**；线上仍为信任实验室版本
 - 信任实验室提交：
   - `e45afb0 fix: harden result and AI data flow`
@@ -510,7 +515,7 @@ P1/P2 已发布并完成线上回归：
 - 公开站点可匿名访问，Function 依赖账号 Secret 和额度。
 - 不应在公开仓库保存密钥、测试数据或赛事受限材料。
 - CN CLI 与当前描述文件格式不兼容；发布统一走桌面端 Sites MCP。
-- 架构自检（2026-11-17）：Worker/DSP 版本一致、结果过期/AI 竞态/Worker 超时回退/Function 白名单重建与限流均严谨。原两处低风险项已修复：模块/资源版本号统一为 v=8（含主线程回退导入，由 `static.test.mjs` 强制一致）；实数 `analyzeSignal` 结果已补 `kind:"real"`，与文档 schema 一致。
+- 架构自检（2026-11-17）：Worker/DSP 版本一致、结果过期/AI 竞态/Worker 超时回退/Function 白名单重建与限流均严谨。原两处低风险项已修复：模块/资源版本号统一为 v=9（含主线程回退导入，由 `static.test.mjs` 强制一致）；实数 `analyzeSignal` 结果已补 `kind:"real"`，与文档 schema 一致。
 - 本地分析历史仅存摘要快照（不含原始序列），只读、不重新计算、不覆盖当前结果/AI/导出；localStorage 上限 20 条，配额不足或被禁用时降级提示，损坏存储自动恢复为空。
 
 ---
@@ -537,8 +542,9 @@ P1/P2 已发布并完成线上回归：
 - 契约：`CONTRACT.md` v1.0（结果/压力/Worker/Function/service.js API）。
 - 前端独立开发样例：`site/test/fixtures/sample-result.json`（单频）、`sample-unknown.json`（噪声）。
 - 集成分支：`integration`（待从 `feat/trust-lab` 创建）；后端 `backend/*`、前端 `frontend/*`。
-- `app.js → service.js` 逻辑/视图拆分计划见 COLLABORATION.md §11，**待用户确认后由后端实施**。
+- `app.js → service.js` 逻辑/视图拆分**已完成**（后端 `service.js` DOM-free，前端 `app.js` 渲染/事件）；详见 COLLABORATION.md §11。`contract.test.mjs` 锁契约形状。
 
 ### 协作日志
 
-- 2026-11-17 · 后端 · feat/trust-lab · 契约1.0 · 产出 COLLABORATION.md/CONTRACT.md + 样例 fixture；删除学习生活类比；拆分计划待确认 · 全套测试+E2E绿 · 阻塞:无 · 下一步:确认后实施 service.js 拆分
+- 2026-11-17 · 后端 · feat/trust-lab · 契约1.0 · 产出 COLLABORATION.md/CONTRACT.md + 样例 fixture；删除学习生活类比 · 全套测试+E2E绿 · 阻塞:无
+- 2026-11-17 · 后端 · backend/service-split · 契约1.0 · 实施 app.js→service.js 拆分（DOM-free）+ contract.test；模块 v=9 · 10 测试+E2E 14 场景全绿，零行为变化 · 阻塞:无 · 下一步:合并 integration，前端按契约并行改 UI
