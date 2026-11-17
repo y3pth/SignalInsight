@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0b1718" />
+    <meta name="description" content="SignalInsight：在浏览器中完成单频/多频信号模型辨识、参数估计、模型竞争与可信度分析。" />
+    <title>SignalInsight · 信号可信分析工作台</title>
+    <link rel="stylesheet" href="./styles.css?v=12" />
+  </head>
+  <body>
+    <div class="ambient-grid" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="SignalInsight 首页">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="brand-copy"><strong>SignalInsight</strong><small>信号可信分析工作台</small></span>
+      </a>
+      <nav class="directory" aria-label="模块目录">
+        <span class="directory-label">目录</span>
+        <button class="directory-button is-active" type="button" data-filter="all">全部</button>
+        <button class="directory-button" type="button" data-filter="chart">图表</button>
+        <button class="directory-button" type="button" data-filter="result">结果</button>
+        <button class="directory-button" type="button" data-filter="evidence">证据</button>
+        <button class="directory-button" type="button" data-filter="ai">AI</button>
+      </nav>
+      <div class="topbar-meta">
+        <button id="rail-toggle" class="rail-toggle" type="button" aria-controls="control-rail" aria-expanded="false">数据</button>
+        <span class="status-pill"><span class="status-dot"></span>本地确定性引擎</span>
+        <span class="topbar-version">StudyHack · Qoder Sites</span>
+      </div>
+    </header>
+
+    <main class="app-shell" id="app-shell">
+      <div id="rail-scrim" class="rail-scrim" hidden></div>
+
+      <aside class="control-panel" id="control-rail" aria-label="数据与实验控制">
+        <div class="rail-scale">
+          <div class="panel-heading">
+            <p class="eyebrow">01 / SIGNAL INPUT</p>
+            <h1>从观测数据到可验证的模型结论</h1>
+            <p class="lede">不是挑一条最漂亮的曲线，而是让多个模型竞争，并明确告诉你不确定性在哪里。</p>
+          </div>
+
+          <section class="control-block">
+            <div class="block-title"><span>数据源</span><span class="micro">单通道</span></div>
+            <div class="source-tabs" role="tablist" aria-label="数据源">
+              <button class="source-tab active" data-example="single" type="button">单频示例</button>
+              <button class="source-tab" data-example="dual" type="button">双频示例</button>
+              <button class="source-tab" data-example="noise" type="button">库外噪声</button>
+            </div>
+            <label class="drop-zone" for="csv-file">
+              <input id="csv-file" type="file" accept=".csv,text/csv" />
+              <span class="drop-icon" aria-hidden="true">↥</span>
+              <span><strong>上传实验 CSV</strong><small>UTF-8 · 时间列 + 单通道数值 · ≤ 10 MB</small></span>
+            </label>
+            <label class="drop-zone mat-drop" for="mat-file">
+              <input id="mat-file" type="file" accept=".mat" />
+              <span class="drop-icon" aria-hidden="true">↥</span>
+              <span><strong>导入 MAT</strong><small>v5 实数矩阵 · 首列时间；单列用采样率</small></span>
+            </label>
+            <label class="mat-rate">MAT 单列采样率 <input id="mat-rate" type="number" min="1" step="1" value="1000" /></label>
+            <div id="mapping-panel" class="mapping-panel" hidden>
+              <label>时间列<select id="time-column"></select></label>
+              <label>信号列<select id="signal-column"></select></label>
+              <label class="iq-toggle"><input id="iq-mode" type="checkbox" /> IQ 模式（当前信号列为 I）</label>
+              <label id="q-column-wrap" hidden>Q 列<select id="q-column"></select></label>
+              <div id="csv-preview" class="csv-preview" hidden></div>
+            </div>
+          </section>
+
+          <section class="control-block compact">
+            <div class="block-title"><span>分析边界</span><span class="micro">v0.1</span></div>
+            <ul class="scope-list">
+              <li><span>候选模型</span><b>单频 / 多频 / AM / FM</b></li>
+              <li><span>采样条件</span><b>近似均匀</b></li>
+              <li><span>数据类型</span><b>实数单通道 / IQ</b></li>
+            </ul>
+            <button id="analyze-button" class="primary-button" type="button">
+              <span>运行可信分析</span><span aria-hidden="true">→</span>
+            </button>
+          </section>
+
+          <div class="privacy-note">
+            <strong>计算边界</strong>
+            <p>数值计算在浏览器本地完成。仅在你点击 AI 解释时，发送结构化摘要，不上传原始序列。</p>
+          </div>
+
+          <section class="rail-legend" aria-label="可信等级图例">
+            <div class="block-title"><span>可信等级</span><span class="micro">按证据汇总</span></div>
+            <ul>
+              <li><i class="reliable" aria-hidden="true"></i><span>可靠</span><small>检查全部通过</small></li>
+              <li><i class="caution" aria-hidden="true"></i><span>谨慎</span><small>存在冲突或弱证据</small></li>
+              <li><i class="unreliable" aria-hidden="true"></i><span>不可靠</span><small>拟合或残差失败</small></li>
+              <li><i class="insufficient" aria-hidden="true"></i><span>证据不足</span><small>样本或分辨率不够</small></li>
+            </ul>
+          </section>
+        </div>
+      </aside>
+
+      <section class="workspace" aria-label="拼图工作区">
+        <div id="tile-grid" class="tile-grid">
+          <article class="tile" data-module="summary" data-category="result" data-chart="false" style="grid-column: 1 / span 12; grid-row: 1 / span 2;" tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">SUM</span><h3>结论摘要</h3></div>
+              <button class="tile-close" type="button" aria-label="将结论摘要移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale">
+              <div class="result-head">
+                <div>
+                  <p class="eyebrow">02 / MODEL COMPETITION</p>
+                  <div class="result-title-row">
+                    <h2 id="recommended-model">正在分析…</h2>
+                    <span id="reliability-badge" class="reliability-badge">—</span>
+                  </div>
+                  <p id="result-subtitle" class="result-subtitle">准备模型候选与残差证据</p>
+                </div>
+                <button id="download-button" class="ghost-button" type="button" disabled>导出报告</button>
+              </div>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="conclusion" data-category="result" data-chart="false" style="grid-column: 1 / span 8; grid-row: 3 / span 4;" tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">TRUST</span><h3>可信结论</h3></div>
+              <button class="tile-close" type="button" aria-label="将可信结论移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale">
+              <article id="conclusion-card" class="conclusion-card" aria-label="可信结论卡">
+                <div class="conclusion-main">
+                  <p class="eyebrow">00 / TRUST SUMMARY</p>
+                  <div class="conclusion-title-row">
+                    <h2 id="conclusion-title">正在分析…</h2>
+                    <span id="conclusion-confidence" class="conclusion-confidence">—</span>
+                  </div>
+                  <p id="conclusion-summary" class="conclusion-summary">正在准备模型竞争与证据链。</p>
+                  <div id="conclusion-evidence" class="conclusion-evidence" aria-label="结论依据"></div>
+                </div>
+                <div class="conclusion-side">
+                  <strong>什么会改变结论</strong>
+                  <ul id="conclusion-change"></ul>
+                </div>
+              </article>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="metrics" data-category="result" data-chart="false" style="grid-column: 9 / span 4; grid-row: 3 / span 4;" tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">MET</span><h3>核心指标</h3></div>
+              <button class="tile-close" type="button" aria-label="将核心指标移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale">
+              <div class="metric-row" aria-label="核心指标">
+                <article class="metric-card"><span>样本 / 采样率</span><strong id="metric-samples">—</strong><small id="metric-rate">—</small></article>
+                <article class="metric-card"><span>拟合解释能力</span><strong id="metric-r2">—</strong><small id="metric-rmse">—</small></article>
+                <article class="metric-card"><span>模型区分度</span><strong id="metric-gap">—</strong><small>BIC 差距</small></article>
+                <article class="metric-card"><span>观测分辨率</span><strong id="metric-resolution">—</strong><small id="metric-duration">—</small></article>
+              </div>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="time" data-category="chart" data-chart="true" style="grid-column: 1 / span 4; grid-row: 7 / span 4;" tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">T-DOM</span><h3>时域</h3></div>
+              <button class="tile-close" type="button" aria-label="将时域移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale chart-card">
+              <div class="card-head"><div><span>时域</span><h3>观测与拟合</h3></div><small id="time-legend">观测 / 拟合</small></div>
+              <canvas id="time-chart" height="230" aria-label="观测信号与拟合曲线"></canvas>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="spectrum" data-category="chart" data-chart="true" style="grid-column: 5 / span 4; grid-row: 7 / span 4;" tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">FFT</span><h3>频域</h3></div>
+              <button class="tile-close" type="button" aria-label="将频域移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale chart-card">
+              <div class="card-head"><div><span>频域</span><h3>幅度谱与候选峰</h3></div><small>Hann 窗</small></div>
+              <canvas id="spectrum-chart" height="230" aria-label="信号幅度谱"></canvas>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="residual" data-category="chart" data-chart="true" style="grid-column: 9 / span 4; grid-row: 7 / span 4;" tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">RESID</span><h3>残差</h3></div>
+              <button class="tile-close" type="button" aria-label="将残差移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale chart-card">
+              <div class="card-head"><div><span>残差</span><h3>模型还遗漏了什么</h3></div><small id="residual-label">残差序列</small></div>
+              <canvas id="residual-chart" height="230" aria-label="模型残差"></canvas>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="candidates" data-category="result" data-chart="false" style="grid-column: 1 / span 6; grid-row: 11 / span 4;" tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">CMP</span><h3>竞争与参数</h3></div>
+              <button class="tile-close" type="button" aria-label="将竞争与参数移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale">
+              <div class="tile-pair">
+                <article class="data-card">
+                  <div class="card-head"><div><span>候选竞争</span><h3>统一口径比较</h3></div><small>同一数据 · 同一指标</small></div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead><tr><th>模型</th><th>R²</th><th>RMSE</th><th>AIC</th><th>BIC</th></tr></thead>
+                      <tbody id="candidate-body"></tbody>
+                    </table>
+                  </div>
+                </article>
+                <article class="data-card">
+                  <div class="card-head"><div><span>推荐参数</span><h3>数学量 + 物理量</h3></div><small id="phase-note">相位相对首样本 · 不确定度为近似</small></div>
+                  <div class="table-wrap">
+                    <table>
+                      <thead><tr><th>参数</th><th>估计值</th><th>单位</th><th>不确定度</th></tr></thead>
+                      <tbody id="parameter-body"></tbody>
+                    </table>
+                  </div>
+                </article>
+              </div>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="evidence" data-category="evidence" data-chart="false" style="grid-column: 7 / span 6; grid-row: 11 / span 4;" tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">EVD</span><h3>证据链</h3></div>
+              <button class="tile-close" type="button" aria-label="将证据链移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale">
+              <article class="evidence-card">
+                <div class="card-head"><div><span>可信度引擎</span><h3>结论背后的证据</h3></div><small>规则汇总，不是概率</small></div>
+                <div id="evidence-list" class="evidence-list"></div>
+                <div class="limitations">
+                  <div><strong>边界</strong><ul id="limitation-list"></ul></div>
+                  <div><strong>下一步</strong><ul id="next-step-list"></ul></div>
+                </div>
+              </article>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="health" data-category="evidence" data-chart="false" style="grid-column: 1 / span 6; grid-row: 15 / span 4;" tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">HLTH</span><h3>体检与设计</h3></div>
+              <button class="tile-close" type="button" aria-label="将体检与设计移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale">
+              <div class="tile-pair">
+                <article class="data-card">
+                  <div class="card-head"><div><span>数据体检</span><h3>先看数据，再谈模型</h3></div><small id="health-status" class="health-status">—</small></div>
+                  <div id="health-list" class="health-list"></div>
+                </article>
+                <article class="data-card">
+                  <div class="card-head"><div><span>实验设计</span><h3>下一轮怎么采</h3></div><small>建议</small></div>
+                  <div id="design-list" class="design-list"></div>
+                </article>
+              </div>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="ai" data-category="ai" data-chart="false" style="grid-column: 7 / span 6; grid-row: 15 / span 4;" tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">AI</span><h3>解释层</h3></div>
+              <button class="tile-close" type="button" aria-label="将解释层移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale">
+              <article class="ai-card">
+                <div class="ai-orb" aria-hidden="true"></div>
+                <div class="card-head"><div><span>AI 解释层</span><h3>把数学结果翻译成通信语言</h3></div><small>Qwen · 结构化摘要</small></div>
+                <p id="ai-summary" class="ai-summary">正在准备确定性解释…</p>
+                <div id="ai-observations" class="ai-observations"></div>
+                <div id="ai-limitations" class="ai-limitations" hidden></div>
+                <div class="ai-actions">
+                  <label class="model-picker">模型
+                    <select id="model-select" aria-label="选择 Qwen 模型">
+                      <option value="qwen-plus">qwen-plus（默认）</option>
+                      <option value="qwen-max">qwen-max</option>
+                      <option value="qwen-turbo">qwen-turbo</option>
+                      <option value="qwen-long">qwen-long</option>
+                    </select>
+                  </label>
+                  <button id="ai-button" class="secondary-button" type="button" disabled>正在检查 AI 服务…</button>
+                  <span id="ai-status" class="ai-status">正在检查 AI 服务…</span>
+                </div>
+              </article>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="stress" data-category="result" data-chart="false" hidden tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">STRESS</span><h3>压力测试</h3></div>
+              <button class="tile-close" type="button" aria-label="将压力测试移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale">
+              <article class="stress-card">
+                <div class="card-head"><div><span>压力测试</span><h3>结论会被什么改变？</h3></div><button id="stress-button" class="ghost-button" type="button" disabled>运行反事实测试</button></div>
+                <p id="stress-summary" class="stress-summary">加噪、缩短观测、降采样，观察推荐模型是否翻转。</p>
+                <div id="stress-list" class="stress-list"></div>
+              </article>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="history" data-category="result" data-chart="false" hidden tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">HIST</span><h3>分析历史</h3></div>
+              <button class="tile-close" type="button" aria-label="将分析历史移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale">
+              <article class="history-card">
+                <div class="card-head"><div><span>分析历史</span><h3>本地快照 · 仅存摘要</h3></div><button id="history-clear" class="ghost-button" type="button">清空历史</button></div>
+                <p class="history-note">仅保存在本浏览器 localStorage，不含原始序列；点击条目查看只读快照，不会重新计算或覆盖当前结果。</p>
+                <div id="history-list" class="history-list"></div>
+                <div id="history-detail" class="history-detail" hidden></div>
+              </article>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="channel" data-category="result" data-chart="false" hidden tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">CHAN</span><h3>多通道</h3></div>
+              <button class="tile-close" type="button" aria-label="将多通道移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale">
+              <article id="channel-card" class="channel-card" hidden>
+                <div class="card-head"><div><span>多通道</span><h3>逐通道独立分析</h3></div><button id="channel-button" class="ghost-button" type="button">分析全部通道</button></div>
+                <p id="channel-summary" class="channel-summary">检测到多个信号列后可批量分析；每个通道独立建模。</p>
+                <div id="channel-list" class="channel-list"></div>
+              </article>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+
+          <article class="tile" data-module="modulation" data-category="chart" data-chart="false" hidden tabindex="0">
+            <header class="tile-head">
+              <div class="tile-identity"><span class="tile-code">MOD</span><h3>调制解构</h3></div>
+              <button class="tile-close" type="button" aria-label="将调制解构移出工作区" title="移出工作区">
+                <svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg>
+              </button>
+            </header>
+            <div class="tile-body"><div class="tile-scale">
+              <article id="modulation-lab" class="modulation-lab" hidden>
+                <div class="card-head"><div><span>调制解构</span><h3>包络 / 瞬时频率 / 边带</h3></div><small id="modulation-type">—</small></div>
+                <div class="modulation-layout">
+                  <div class="modulation-chart-wrap"><canvas id="modulation-chart" height="240" aria-label="调制解构曲线"></canvas></div>
+                  <div class="modulation-side">
+                    <div id="modulation-facts" class="modulation-facts"></div>
+                    <div id="modulation-sidebands" class="modulation-sidebands"></div>
+                  </div>
+                </div>
+              </article>
+            </div></div>
+            <span class="resize-handle n" data-dir="n"></span><span class="resize-handle s" data-dir="s"></span><span class="resize-handle e" data-dir="e"></span><span class="resize-handle w" data-dir="w"></span>
+            <span class="resize-handle ne" data-dir="ne"></span><span class="resize-handle nw" data-dir="nw"></span><span class="resize-handle se" data-dir="se"></span><span class="resize-handle sw" data-dir="sw"></span>
+          </article>
+        </div>
+        <div id="empty-workspace" class="empty-workspace" hidden>
+          <strong>工作区为空</strong>
+          <p>从底部任务栏把模块拖进来，或点击任务栏芯片恢复。</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="taskbar">
+      <div class="taskbar-lead">
+        <strong>任务栏</strong>
+        <span>拖入右侧 · 边缘缩放</span>
+      </div>
+      <div class="task-chips">
+        <button class="task-chip" type="button" draggable="true" data-module="summary" data-category="result"><span class="chip-code">SUM</span><span class="chip-label">摘要</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="conclusion" data-category="result"><span class="chip-code">TRUST</span><span class="chip-label">结论</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="metrics" data-category="result"><span class="chip-code">MET</span><span class="chip-label">指标</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="time" data-category="chart"><span class="chip-code">T-DOM</span><span class="chip-label">时域</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="spectrum" data-category="chart"><span class="chip-code">FFT</span><span class="chip-label">频域</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="residual" data-category="chart"><span class="chip-code">RESID</span><span class="chip-label">残差</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="candidates" data-category="result"><span class="chip-code">CMP</span><span class="chip-label">竞争</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="evidence" data-category="evidence"><span class="chip-code">EVD</span><span class="chip-label">证据</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="health" data-category="evidence"><span class="chip-code">HLTH</span><span class="chip-label">体检</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="ai" data-category="ai"><span class="chip-code">AI</span><span class="chip-label">解释</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="stress" data-category="result"><span class="chip-code">STRESS</span><span class="chip-label">压力</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="history" data-category="result"><span class="chip-code">HIST</span><span class="chip-label">历史</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="channel" data-category="result"><span class="chip-code">CHAN</span><span class="chip-label">多通道</span><span class="chip-state">拖入</span></button>
+        <button class="task-chip" type="button" draggable="true" data-module="modulation" data-category="chart"><span class="chip-code">MOD</span><span class="chip-label">调制</span><span class="chip-state">拖入</span></button>
+      </div>
+      <div class="task-actions">
+        <span id="layout-status" class="layout-status">10 / 14</span>
+        <button id="layout-reset" class="ghost-button" type="button">重置布局</button>
+        <button id="task-run" class="primary-button task-run" type="button">运行分析</button>
+        <button id="task-export" class="ghost-button" type="button" disabled>导出</button>
+      </div>
+    </footer>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <p id="result-announcer" class="sr-only" role="status" aria-live="polite"></p>
+    <script type="module" src="./app.js?v=12"></script>
+  </body>
+</html>
