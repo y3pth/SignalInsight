@@ -414,7 +414,7 @@ P1/P2 已发布并完成线上回归：
   - `e4d6e4c feat: add counterfactual stress testing`
   - `48ad325 feat: add multi-channel, MAT and IQ data modes`
 - `main` 仍为 `ff2b226 refactor: reduce repository to deployed Qoder Sites deliverable`
-- 远端：尚未配置
+- 远端：`origin` = https://github.com/y3pth/SignalInsight.git（私有）；已推送 `integration`/`feat/trust-lab`/`main`。本机访问 GitHub 需代理 `HTTPS_PROXY=http://127.0.0.1:7890`（按命令传入，未持久化 git 配置）；GitHub 直连在本机网络不可达，Gitee 可直连。
 - 不直接修改 `main`；每个任务使用独立分支
 - 提交身份使用仓库历史已有作者，不在全局改写 Git 配置
 
@@ -548,3 +548,4 @@ P1/P2 已发布并完成线上回归：
 
 - 2026-11-17 · 后端 · feat/trust-lab · 契约1.0 · 产出 COLLABORATION.md/CONTRACT.md + 样例 fixture；删除学习生活类比 · 全套测试+E2E绿 · 阻塞:无
 - 2026-11-17 · 后端 · backend/service-split · 契约1.0 · 实施 app.js→service.js 拆分（DOM-free）+ contract.test；模块 v=9 · 10 测试+E2E 14 场景全绿，零行为变化 · 阻塞:无 · 下一步:合并 integration，前端按契约并行改 UI
+- 2026-11-17 · 后端 · integration · 契约1.0 · 配置 origin（GitHub 私有仓库）并经 127.0.0.1:7890 代理推送 integration/feat/trust-lab/main；feat/trust-lab 同步至 integration · 远端分支已验证 · 阻塞:无 · 下一步:前端 clone 后按所有权表并行

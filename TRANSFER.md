@@ -83,7 +83,7 @@ SignalInsight 是一个面向通信与信号处理实验的**浏览器端信号�
   - `48ad325` 多通道 / MAT / IQ
 - `main`：`ff2b226`，明显落后于当前分支
 - 还有分支 `feat/ai-explanations`，包含更早的 AI UI / P1 / P2 工作
-- 远端：尚未配置
+- 远端：`origin` = https://github.com/y3pth/SignalInsight.git（私有）；本机经 `127.0.0.1:7890` 代理访问 GitHub（直连不可达）
 - 本轮提交使用仓库历史作者 `mathcrazy <u4893yhr39@outlook.com>`，通过环境变量提交，没有修改全局 Git 配置
 
 ### 2.3 验证状态
