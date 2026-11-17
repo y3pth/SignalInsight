@@ -2,7 +2,7 @@
 
 > 面向：负责 **UI 设计与渲染** 的前端协作者。
 > 你的搭档（后端）负责数值/逻辑。本文件让你独立上手、并行开发、不冲突。
-> 配套：`COLLABORATION.md`（协作流程）、`CONTRACT.md`（数据契约 v1.0）、`HANDOFF.md`（项目全局）。
+> 配套：`COLLABORATION.md`（协作流程）、`CONTRACT.md`（数据契约 v1.0）、`DATA-FORMATS.md`（数据形状）、`BACKEND-API.md`（接口规范）、`HANDOFF.md`（项目全局）。
 > 更新：2026-11-17 · 模块版本 v=15 · 契约 v1.0
 
 ---

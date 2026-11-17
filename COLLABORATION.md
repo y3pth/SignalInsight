@@ -30,7 +30,7 @@
 | 学习页 | `site/dist/learn.html` + 学习渲染模块 | 前端 |
 | E2E/视觉回归 | `site/test/e2e.mjs` | 前端（后端协助） |
 | 契约 | `CONTRACT.md` | 后端维护，前端遵守 |
-| 状态/交接 | `HANDOFF.md`、`README.md`、`TRANSFER.md` | 双方按节更新 |
+| 状态/交接 | `HANDOFF.md`、`README.md`、`olddoc/TRANSFER.md`（旧档） | 双方按节更新 |
 
 规则：**不编辑对方所有的文件**。确需跨界 → 先在协作日志提案，对方确认后再动。
 

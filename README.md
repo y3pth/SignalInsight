@@ -15,10 +15,12 @@
 - **数据模式：** 实数单/多通道 CSV、MAT v5 实数矩阵、IQ CSV（单分量复指数）
 - **立项背景：** [立项确定书.md](立项确定书.md)
 - **新对话交接：** [HANDOFF.md](HANDOFF.md)
-- **工程转接：** [TRANSFER.md](TRANSFER.md)
+- **工程转接（旧档）：** [olddoc/TRANSFER.md](olddoc/TRANSFER.md)
 - **协作规则：** [AGENTS.md](AGENTS.md)
 - **前后端协作：** [COLLABORATION.md](COLLABORATION.md)
 - **接口契约：** [CONTRACT.md](CONTRACT.md)
+- **数据格式：** [DATA-FORMATS.md](DATA-FORMATS.md)
+- **后端接口：** [BACKEND-API.md](BACKEND-API.md)
 - **前端交接：** [FRONTEND.md](FRONTEND.md)
 - **前端代办：** [FRONTEND-TODO.md](FRONTEND-TODO.md)
 

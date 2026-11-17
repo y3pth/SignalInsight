@@ -14,6 +14,7 @@ The old Python backend and full-platform design were intentionally removed. Do n
 - `site/functions/`: deployed Qoder Sites Edge Function.
 - `site/.SignalInsight.qoder.site`: generated publication descriptor; never hand-edit.
 - `site/test/`: required regression tests for deployed code.
+- Interface specs: `BACKEND-API.md`; data shapes: `DATA-FORMATS.md`; contract: `CONTRACT.md`.
 - Git state and actual test results override all prose.
 
 ## Session start

@@ -2,7 +2,7 @@
 
 > 更新日期：2026-11-17
 > 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；信任实验室功能已发布并完成线上回归。P1/P2 扩展（fixtures/静态检查/AI 审计/E2E/本地历史）已在 `feat/realistic-fixtures` 完成本地质检，**尚未发布**。
-> 这是新对话的首要入口。更完整的工程转接说明见 `TRANSFER.md`。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
+> 这是新对话的首要入口。接口规范见 `BACKEND-API.md`、数据格式见 `DATA-FORMATS.md`；早期工程转接旧档见 `olddoc/TRANSFER.md`。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
 
 ---
 
@@ -398,7 +398,7 @@ P1/P2 已发布并完成线上回归：
 
 - 当前分支：`feat/realistic-fixtures`（从 `feat/trust-lab` 分出）
 - 最近提交：`adfa9c9 feat: specific Qwen explanations and user-selectable model whitelist`
-- 转接文档：`TRANSFER.md`
+- 转接旧档：`olddoc/TRANSFER.md`（接口/数据见 BACKEND-API.md / DATA-FORMATS.md）
 - 本轮（P1/P2 扩展）提交：
   - `c37c6d0 test: add realistic simulated CSV fixtures and regression suite`
   - `23bbd0d fix: unify module version tags and set real result kind`
