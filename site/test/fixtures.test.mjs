@@ -67,7 +67,7 @@ for (const fixture of manifest.fixtures) {
   }
 
   const result = analyzeSignal(time, parsed.signalCandidate.values);
-  assert.notEqual(result.kind, "iq", `${fixture.file} not iq`);
+  assert.equal(result.kind, "real", `${fixture.file} kind`);
   assertResult(result, fixture.expect, fixture.file);
   summary.push({ file: fixture.file, model: result.recommendedId, unknown: result.unknown });
 }

@@ -1228,6 +1228,7 @@ export function analyzeSignal(time, values) {
   const residualSeries = best?.residual ?? values.map((value) => value - mean(values));
   const stripCandidate = ({ fitted, residual, ...summary }) => summary;
   return {
+    kind: "real",
     createdAt: new Date().toISOString(),
     sampleCount: values.length,
     sampleRate,

@@ -6,9 +6,9 @@ import {
   buildExperimentPlan,
   stressTest,
   templateExplanation,
-} from "./dsp.js";
-import { parseCsv } from "./csv.js";
-import { parseMat } from "./mat.js";
+} from "./dsp.js?v=6";
+import { parseCsv } from "./csv.js?v=6";
+import { parseMat } from "./mat.js?v=6";
 
 const elements = {
   tabs: [...document.querySelectorAll(".source-tab")],
@@ -406,7 +406,7 @@ const ANALYZER_TIMEOUT_MS = 90000;
 function getAnalyzerWorker() {
   if (analyzerWorker || typeof Worker === "undefined") return analyzerWorker;
   try {
-    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=5", import.meta.url), { type: "module" });
+    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=6", import.meta.url), { type: "module" });
     analyzerWorker.addEventListener("message", (event) => {
       const { id, ok, result, error } = event.data ?? {};
       const pending = analyzerPending.get(id);
@@ -1279,7 +1279,7 @@ function downloadReport() {
     sampleCount: result.sampleCount,
     sampleRateHz: result.sampleRate,
     durationSeconds: result.duration,
-    kind: result.kind ?? "real",
+    kind: result.kind,
     recommendedModel: result.recommendedId,
     unknown: result.unknown,
     reliability: result.reliability,
