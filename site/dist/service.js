@@ -1,4 +1,4 @@
-import { analyzeSignal, analyzeIqSignal, stressTest, buildExperimentPlan } from "./dsp.js?v=9";
+import { analyzeSignal, analyzeIqSignal, stressTest, buildExperimentPlan } from "./dsp.js?v=10";
 
 let analyzerWorker = null;
 let analyzerRequestId = 0;
@@ -8,7 +8,7 @@ const ANALYZER_TIMEOUT_MS = 90000;
 function getAnalyzerWorker() {
   if (analyzerWorker || typeof Worker === "undefined") return analyzerWorker;
   try {
-    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=9", import.meta.url), { type: "module" });
+    analyzerWorker = new Worker(new URL("./analyzer-worker.js?v=10", import.meta.url), { type: "module" });
     analyzerWorker.addEventListener("message", (event) => {
       const { id, ok, result, error } = event.data ?? {};
       const pending = analyzerPending.get(id);

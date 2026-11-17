@@ -134,6 +134,37 @@ AI_ERROR_MESSAGES                 // 错误码 → 中文提示映射
 3. 后端更新 `contract.test.mjs` 锁定新形状；前端适配。
 4. 加法式新增可选字段无需升主版本，但仍记录 changelog。
 
+## 8. 学习库 API（learn.js，后端拥有，前端学习页调用）
+
+> DOM-free。复用 dsp.js 数值内核与种子信号生成。M1 垂直切片：`clean-single` / `clipped-tone`。
+
+```js
+listScenarios()            -> ScenarioMeta[]   // {id,title,category,difficulty,summary}
+getScenario(id)            -> Scenario | null
+generateScenarioSignal(id) -> { kind, time, values, i?, q? }  // 合成仿真信号
+analyzeScenario(id)        -> { scenario, result, match }     // result=Result；match={ok,checks[]}
+```
+
+`Scenario`：
+
+```js
+{ id, title, category: "clean"|"modulation"|"defect"|"out-of-library", difficulty, summary,
+  signal: { kind, fs, n, seed, components:[{frequency,amplitude,phase}], offset, noiseSigma, clip? },
+  groundTruth: {...},
+  expected: { unknown?, model?, reliability?, health?, healthChecks? },  // 预期分析结论
+  principle: { concept, evidenceIds:[...], points:[...] },               // 结构化原理（绑定证据）
+  diagnosis: null | { issues:[...], causes:[...], improvements:[...] },  // 缺陷场景
+  questions: [...],                                                       // 思考题
+  steps: ["observe","hypothesize","verify","conclude"] }
+```
+
+约定：
+- `principle.points` 是确定性结构化要点，前端渲染为原理卡；自然语言展开由 Qwen（M2）生成，仍只解释不改数值。
+- `analyzeScenario().match.ok` 表示实际分析是否符合预期，供学习页做"对照"反馈。
+- 前端学习页（`learn.html`）消费本 API；样例数据见 `site/test/fixtures/sample-scenario-*.json`。
+- 加法演进：新增场景/字段不破坏既有 API。
+
 ## Changelog
 
 - 1.0（2026-11-17）：冻结当前结果/压力/Worker/Function 形状；定义 service.js 拆分目标 API。
+- 1.0（2026-11-17，加法）：新增 learn.js 学习库 API（§8）与场景 schema；M1 场景 clean-single/clipped-tone。

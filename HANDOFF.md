@@ -120,6 +120,7 @@ SignalInsight/
     │   ├── styles.css            # 前端：视觉
     │   ├── app.js                # 前端：UI 状态/渲染/事件
     │   ├── service.js            # 后端：Worker/AI/导出/历史逻辑（DOM-free）
+    │   ├── learn.js              # 后端：学习库（场景/原理/诊断，DOM-free）
     │   ├── dsp.js                # 后端：数值核心
     │   ├── csv.js / mat.js       # 后端：解析
     │   └── analyzer-worker.js    # 后端：Web Worker
@@ -137,6 +138,7 @@ SignalInsight/
         ├── static.test.mjs
         ├── ai-consistency.test.mjs
         ├── contract.test.mjs
+        ├── learn.test.mjs
         ├── e2e.mjs              # 零依赖 CDP 浏览器端到端（需 Chrome/Edge）
         └── fixtures/            # 12 个仿真拟真 CSV + manifest.json + generate.mjs
 ```
@@ -321,6 +323,7 @@ node site/test/fixtures.test.mjs
 node site/test/static.test.mjs
 node site/test/ai-consistency.test.mjs
 node site/test/contract.test.mjs
+node site/test/learn.test.mjs
 node site/test/e2e.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
@@ -404,7 +407,7 @@ P1/P2 已发布并完成线上回归：
   - `3478b9c test: add zero-dependency browser E2E via CDP`
   - `4003863 feat: add local analysis history with read-only snapshots`
   - `adfa9c9 feat: specific Qwen explanations and user-selectable model whitelist`
-- 模块版本：v=9（全部模块/资源统一，`static.test.mjs` 强制一致）
+- 模块版本：v=10（全部模块/资源统一，`static.test.mjs` 强制一致）
 - 状态：本轮改动已通过本地全套测试 + E2E 质检，**尚未发布**；线上仍为信任实验室版本
 - 信任实验室提交：
   - `e45afb0 fix: harden result and AI data flow`
@@ -471,7 +474,9 @@ P1/P2 已发布并完成线上回归：
 6. [已完成] 多通道、MAT v5、IQ 单分量数据模式。
 7. [已发布] 信任实验室最终版本已上线并完成回归。
 
-### 下一阶段：学习模式（规划，未实现）
+### 学习模式（M1 后端学习库已实现）
+
+进度：后端 `site/dist/learn.js`（DOM-free）已实现 M1 垂直切片——`listScenarios/getScenario/generateScenarioSignal/analyzeScenario` API + 2 场景（clean-single/clipped-tone，含结构化原理/诊断/思考题/步骤）；`learn.test.mjs` 通过；契约 §8 + 样例 `sample-scenario-*.json` 就绪。**前端 `learn.html` 待建**（消费 learn.js，见 FRONTEND.md §15）。M2（Qwen 自然语言展开）/M3（引导 UI+进度）/M4（E2E）后续。
 
 目标：双模式双页面。**分析模式**即现有全部功能；**学习模式**用内置仿真数据引导学习，讲清"为什么这样选模型"，对极限/问题数据指出"哪里有问题"，以原理分析帮助理解。
 

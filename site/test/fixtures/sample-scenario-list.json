@@ -1,0 +1,16 @@
+[
+  {
+    "id": "clean-single",
+    "title": "干净单频信号",
+    "category": "clean",
+    "difficulty": 1,
+    "summary": "一段含轻微噪声的单频正弦。学习如何从频谱识别单一频率成分，并理解为什么不需要更复杂的模型。"
+  },
+  {
+    "id": "clipped-tone",
+    "title": "削顶失真信号",
+    "category": "defect",
+    "difficulty": 2,
+    "summary": "幅值超出量程被削顶的正弦。学习先做数据体检、识别失真，并理解为什么高 R² 也可能不可信。"
+  }
+]

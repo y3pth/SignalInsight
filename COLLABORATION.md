@@ -21,11 +21,13 @@
 | 解析 | `site/dist/csv.js`、`mat.js` | 后端 |
 | Worker | `site/dist/analyzer-worker.js` | 后端 |
 | 逻辑服务（拆分后） | `site/dist/service.js` | 后端 |
+| 学习库 | `site/dist/learn.js` | 后端 |
 | Edge Function | `site/functions/*` | 后端 |
-| 逻辑测试 | `site/test/{dsp,csv,extreme,mat,iq,function,fixtures,ai-consistency,static,contract}.test.mjs` | 后端 |
+| 逻辑测试 | `site/test/{dsp,csv,extreme,mat,iq,function,fixtures,ai-consistency,static,contract,learn}.test.mjs` | 后端 |
 | 页面结构 | `site/dist/index.html` | 前端 |
 | 视觉 | `site/dist/styles.css` | 前端 |
 | UI 控制器/渲染 | `site/dist/app.js`（拆分后） | 前端 |
+| 学习页 | `site/dist/learn.html` + 学习渲染模块 | 前端 |
 | E2E/视觉回归 | `site/test/e2e.mjs` | 前端（后端协助） |
 | 契约 | `CONTRACT.md` | 后端维护，前端遵守 |
 | 状态/交接 | `HANDOFF.md`、`README.md`、`TRANSFER.md` | 双方按节更新 |

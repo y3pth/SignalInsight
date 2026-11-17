@@ -45,6 +45,7 @@ node site/test/fixtures.test.mjs
 node site/test/static.test.mjs
 node site/test/ai-consistency.test.mjs
 node site/test/contract.test.mjs
+node site/test/learn.test.mjs
 node site/test/e2e.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```

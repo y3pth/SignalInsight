@@ -1,4 +1,4 @@
-import { analyzeIqSignal, analyzeSignal, stressTest } from "./dsp.js?v=9";
+import { analyzeIqSignal, analyzeSignal, stressTest } from "./dsp.js?v=10";
 
 self.onmessage = (event) => {
   const { id, type, time, values, qValues, baseline } = event.data ?? {};

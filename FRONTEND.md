@@ -3,7 +3,7 @@
 > 面向：负责 **UI 设计与渲染** 的前端协作者。
 > 你的搭档（后端）负责数值/逻辑。本文件让你独立上手、并行开发、不冲突。
 > 配套：`COLLABORATION.md`（协作流程）、`CONTRACT.md`（数据契约 v1.0）、`HANDOFF.md`（项目全局）。
-> 更新：2026-11-17 · 模块版本 v=9 · 契约 v1.0
+> 更新：2026-11-17 · 模块版本 v=10 · 契约 v1.0
 
 ---
 
@@ -125,7 +125,7 @@ UI 渲染规则：
 
 ## 10. 版本号与缓存（重要）
 
-- 所有模块/资源带 `?v=N`（当前 v=9），`static.test.mjs` 强制单一版本。
+- 所有模块/资源带 `?v=N`（当前 v=10），`static.test.mjs` 强制单一版本。
 - **并行开发期间你不要改 `?v=`**；集成入 `integration` 后由后端统一递增。
 - 改 `index.html` 结构时保留 script/link 的 `?v=` 原值。
 - 本地调试若看到旧行为，强制刷新（Ctrl+F5）或临时改 query 绕过缓存。
@@ -160,7 +160,41 @@ UI 渲染规则：
 - 你的近期目标：UI 视觉/交互重做。后续可能有"学习模式"双页面（规划中，见 HANDOFF §11），届时新增页面/模块，仍共享后端内核。
 - 后端待命可按契约加法提供新数据/功能。
 
-## 15. 关键文件速查
+## 15. 学习模式页面（learn.html）开发指引
+
+后端学习库 `learn.js` 已就绪（M1：`clean-single` / `clipped-tone`）。你建独立 `learn.html` 消费它，与分析页状态隔离。
+
+**API（详见 CONTRACT.md §8）：**
+```js
+import { listScenarios, getScenario, generateScenarioSignal, analyzeScenario } from "./learn.js?v=10";
+listScenarios()      // 场景目录 [{id,title,category,difficulty,summary}]
+getScenario(id)      // 完整场景（principle/diagnosis/questions/steps/expected）
+analyzeScenario(id)  // { scenario, result, match }；result 同分析模式 Result；match.ok=是否符合预期
+```
+
+**样例数据（独立开发，无需后端实时）：**
+- `site/test/fixtures/sample-scenario-list.json`（目录）
+- `sample-scenario-clean.json`（干净单频完整分析）
+- `sample-scenario-defect.json`（削顶缺陷完整分析）
+
+**建议 UI 结构（你全权设计）：**
+1. 场景目录：`listScenarios()` 渲染卡片（标题/类别/难度/简介）。
+2. 场景学习页：
+   - 观察：信号时域/频谱预览（`generateScenarioSignal` + 复用 `drawPlot`，或样例 `result.series`）。
+   - 原理卡：`principle.concept` + `points`；`evidenceIds` 可链接证据。
+   - 分步引导：`steps` = observe→hypothesize→verify→conclude，逐步揭示。
+   - 验证/对照：渲染 `analyzeScenario(id).result`（复用分析模式渲染），`match.ok` 给"符合预期"反馈。
+   - 诊断（缺陷场景）：`diagnosis.issues/causes/improvements`。
+   - 思考题：`questions`；进度：localStorage（前端自有）。
+3. 与分析页导航互通（index.html ↔ learn.html）。
+
+**约束：**
+- 不改 `learn.js`/`dsp.js`（后端）；原理自然语言展开后续由 Qwen（M2）提供，仍只解释不改数值。
+- 复用 Result 渲染规则（unknown 拒绝结论、可信度徽章、体检状态）。
+- `learn.html` 模块 import 带 `?v=10`（与全局一致；集成期后端统一递增）。
+- 学习页 E2E 由你补充。
+
+## 16. 关键文件速查
 
 | 用途 | 文件 |
 |---|---|
@@ -168,6 +202,9 @@ UI 渲染规则：
 | 视觉 | `site/dist/styles.css` |
 | UI 渲染/事件 | `site/dist/app.js` |
 | 后端逻辑 API | `site/dist/service.js`（只读消费） |
+| 学习库 API | `site/dist/learn.js`（只读消费） |
+| 学习页（你建） | `site/dist/learn.html` + 学习渲染 |
+| 学习样例 | `site/test/fixtures/sample-scenario-*.json` |
 | 数据契约 | `CONTRACT.md` |
 | 协作流程 | `COLLABORATION.md` |
 | 全局交接/协作日志 | `HANDOFF.md` |
