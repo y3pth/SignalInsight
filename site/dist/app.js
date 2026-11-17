@@ -525,11 +525,14 @@ const EVIDENCE_CHARTS = {
 function focusEvidence(id) {
   const row = document.querySelector(`[data-evidence-id="${id}"]`);
   if (row) {
-    row.scrollIntoView({ behavior: "smooth", block: "center" });
     row.classList.add("evidence-flash");
     setTimeout(() => row.classList.remove("evidence-flash"), 1800);
   }
   const chartId = EVIDENCE_CHARTS[id];
+  if (chartId) {
+    const tile = document.getElementById(chartId)?.closest(".tile");
+    if (tile) window.SignalInsightLayout?.ensure?.(tile.dataset.module);
+  }
   const card = chartId ? document.getElementById(chartId)?.closest(".chart-card") : null;
   if (card) {
     card.classList.add("chart-flash");
@@ -950,7 +953,10 @@ function chartPalette() {
 function drawPlot(canvas, x, lines, { fill = false, markers = [], xLabel = "", yLabel = "" } = {}) {
   const { context, width, height } = setupCanvas(canvas);
   const palette = chartPalette();
-  const margin = { left: 49, right: 12, top: 18, bottom: 28 };
+  const compact = width < 260;
+  const margin = compact
+    ? { left: 30, right: 8, top: 14, bottom: 22 }
+    : { left: 49, right: 12, top: 18, bottom: 28 };
   const plotWidth = width - margin.left - margin.right;
   const plotHeight = height - margin.top - margin.bottom;
   context.clearRect(0, 0, width, height);
@@ -967,25 +973,26 @@ function drawPlot(canvas, x, lines, { fill = false, markers = [], xLabel = "", y
   const xScale = (value) => margin.left + ((value - xMin) / (xMax - xMin)) * plotWidth;
   const yScale = (value) => margin.top + (1 - (value - yMin) / (yMax - yMin)) * plotHeight;
 
-  context.font = "10px Cascadia Code, Consolas, monospace";
+  context.font = compact ? "8px Cascadia Code, Consolas, monospace" : "10px Cascadia Code, Consolas, monospace";
   context.lineWidth = 1;
-  for (let index = 0; index <= 4; index += 1) {
-    const y = margin.top + (plotHeight * index) / 4;
+  const ySteps = compact ? 2 : 4;
+  for (let index = 0; index <= ySteps; index += 1) {
+    const y = margin.top + (plotHeight * index) / ySteps;
     context.strokeStyle = palette.grid;
     context.beginPath();
     context.moveTo(margin.left, y);
     context.lineTo(width - margin.right, y);
     context.stroke();
     context.fillStyle = palette.text;
-    const value = yMax - ((yMax - yMin) * index) / 4;
-    context.fillText(formatNumber(value, 2), 4, y + 3);
+    const value = yMax - ((yMax - yMin) * index) / ySteps;
+    context.fillText(formatNumber(value, 2), 3, y + 3);
   }
   context.fillStyle = palette.text;
-  context.fillText(formatNumber(xMin, 3), margin.left, height - 7);
+  context.fillText(formatNumber(xMin, 3), margin.left, height - 5);
   const rightLabel = formatNumber(xMax, 3);
-  context.fillText(rightLabel, width - margin.right - context.measureText(rightLabel).width, height - 7);
-  if (xLabel) context.fillText(xLabel, margin.left + plotWidth / 2 - 12, height - 7);
-  if (yLabel) context.fillText(yLabel, 4, 10);
+  context.fillText(rightLabel, width - margin.right - context.measureText(rightLabel).width, height - 5);
+  if (xLabel && !compact) context.fillText(xLabel, margin.left + plotWidth / 2 - 12, height - 7);
+  if (yLabel) context.fillText(yLabel, 3, 9);
 
   for (const line of lines) {
     const points = line.values.map((value, index) => ({
@@ -1368,3 +1375,669 @@ function init() {
 }
 
 init();
+
+/* ---------- Workbench layout ---------- */
+
+(() => {
+  const grid = document.getElementById("tile-grid");
+  if (!grid) return;
+
+  const COLS = 12;
+  const ROWS = 18;
+  const STORAGE_KEY = "signalinsight.workbench.v1";
+  const PREFERRED = {
+    summary: { w: 12, h: 2 },
+    conclusion: { w: 8, h: 4 },
+    metrics: { w: 4, h: 4 },
+    time: { w: 4, h: 4 },
+    spectrum: { w: 4, h: 4 },
+    residual: { w: 4, h: 4 },
+    candidates: { w: 6, h: 4 },
+    evidence: { w: 6, h: 4 },
+    health: { w: 6, h: 4 },
+    ai: { w: 6, h: 4 },
+    stress: { w: 4, h: 4 },
+    history: { w: 4, h: 4 },
+    channel: { w: 4, h: 4 },
+    modulation: { w: 6, h: 4 },
+  };
+  const MINIMUM = {
+    summary: { w: 6, h: 1 },
+    conclusion: { w: 4, h: 2 },
+    metrics: { w: 3, h: 2 },
+    time: { w: 3, h: 3 },
+    spectrum: { w: 3, h: 3 },
+    residual: { w: 3, h: 3 },
+    candidates: { w: 4, h: 3 },
+    evidence: { w: 4, h: 3 },
+    health: { w: 4, h: 3 },
+    ai: { w: 4, h: 3 },
+    stress: { w: 3, h: 3 },
+    history: { w: 3, h: 3 },
+    channel: { w: 3, h: 3 },
+    modulation: { w: 4, h: 3 },
+  };
+
+  const readPlacement = (element) => {
+    const style = element.getAttribute("style") || "";
+    const column = /grid-column:\s*(\d+)\s*\/\s*span\s*(\d+)/.exec(style);
+    const row = /grid-row:\s*(\d+)\s*\/\s*span\s*(\d+)/.exec(style);
+    if (!column || !row) return null;
+    return { x: Number(column[1]), y: Number(row[1]), w: Number(column[2]), h: Number(row[2]) };
+  };
+
+  const meta = new Map();
+  for (const element of grid.querySelectorAll(".tile")) {
+    const name = element.dataset.module;
+    if (!name) continue;
+    meta.set(name, {
+      name,
+      element,
+      chip: document.querySelector(`.task-chip[data-module="${name}"]`),
+      preferred: PREFERRED[name] || { w: 4, h: 4 },
+      minimum: MINIMUM[name] || { w: 3, h: 3 },
+      initial: readPlacement(element),
+    });
+  }
+  if (!meta.size) return;
+
+  const defaultActive = new Set([...meta.values()].filter((item) => !item.element.hidden).map((item) => item.name));
+  const defaultPlacements = new Map();
+  for (const item of meta.values()) {
+    if (item.initial) defaultPlacements.set(item.name, { ...item.initial });
+  }
+
+  let active = new Set(defaultActive);
+  let placements = new Map(defaultPlacements);
+  const autoDone = new Set();
+
+  const body = document.body;
+  const rail = document.getElementById("control-rail");
+  const railToggle = document.getElementById("rail-toggle");
+  const railScrim = document.getElementById("rail-scrim");
+  const railScale = rail?.querySelector(".rail-scale");
+  const emptyState = document.getElementById("empty-workspace");
+  const status = document.getElementById("layout-status");
+  const taskRun = document.getElementById("task-run");
+  const taskExport = document.getElementById("task-export");
+  const taskReset = document.getElementById("layout-reset");
+
+  const notify = (message, type = "info") => {
+    try { showToast(message, type); } catch { /* noop */ }
+  };
+
+  const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  const inBounds = (p) => p.x >= 1 && p.y >= 1 && p.w >= 1 && p.h >= 1 && p.x + p.w - 1 <= COLS && p.y + p.h - 1 <= ROWS;
+  const cloneMap = (map) => new Map([...map].map(([name, p]) => [name, { ...p }]));
+  const priority = (name) => [...meta.keys()].indexOf(name);
+
+  const fits = (placement, map, ignore) => {
+    if (!inBounds(placement)) return false;
+    for (const [name, other] of map) {
+      if (name === ignore) continue;
+      if (overlaps(placement, other)) return false;
+    }
+    return true;
+  };
+
+  const findFree = (map, w, h) => {
+    for (let y = 1; y <= ROWS - h + 1; y += 1) {
+      for (let x = 1; x <= COLS - w + 1; x += 1) {
+        const candidate = { x, y, w, h };
+        if (fits(candidate, map)) return candidate;
+      }
+    }
+    return null;
+  };
+
+  const layoutValid = (names, map) => {
+    for (const name of names) {
+      const placement = map.get(name);
+      if (!placement || !inBounds(placement)) return false;
+    }
+    const list = [...names].map((name) => map.get(name));
+    for (let i = 0; i < list.length; i += 1) {
+      for (let j = i + 1; j < list.length; j += 1) {
+        if (overlaps(list[i], list[j])) return false;
+      }
+    }
+    return true;
+  };
+
+  const restore = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+      if (!saved || !Array.isArray(saved.active)) return;
+      const names = saved.active.filter((name) => meta.has(name));
+      const map = new Map();
+      for (const name of names) {
+        const raw = saved.placements?.[name];
+        if (!Array.isArray(raw) || raw.length !== 4) continue;
+        const placement = { x: Math.round(raw[0]), y: Math.round(raw[1]), w: Math.round(raw[2]), h: Math.round(raw[3]) };
+        if (inBounds(placement)) map.set(name, placement);
+      }
+      if (map.size !== names.length || !layoutValid(names, map)) return;
+      active = new Set(names);
+      placements = map;
+    } catch { /* keep defaults */ }
+  };
+
+  const persist = () => {
+    try {
+      const stored = {};
+      for (const name of active) {
+        const p = placements.get(name);
+        if (p) stored[name] = [p.x, p.y, p.w, p.h];
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ active: [...active], placements: stored }));
+    } catch { /* storage unavailable */ }
+  };
+
+  const save = () => persist();
+
+  const flash = (name) => {
+    const element = meta.get(name)?.element;
+    if (!element || element.hidden) return;
+    element.classList.add("tile-pulse");
+    window.setTimeout(() => element.classList.remove("tile-pulse"), 1100);
+  };
+
+  const apply = ({ repaint = true } = {}) => {
+    for (const item of meta.values()) {
+      const isActive = active.has(item.name);
+      item.element.hidden = !isActive;
+      if (isActive) {
+        const p = placements.get(item.name);
+        if (p) {
+          item.element.style.gridColumn = `${p.x} / span ${p.w}`;
+          item.element.style.gridRow = `${p.y} / span ${p.h}`;
+        }
+      }
+      if (item.chip) {
+        item.chip.classList.toggle("is-placed", isActive);
+        const stateLabel = item.chip.querySelector(".chip-state");
+        if (stateLabel) stateLabel.textContent = isActive ? "已放置" : "拖入";
+      }
+    }
+    if (status) status.textContent = `${active.size} / ${meta.size}`;
+    if (emptyState) emptyState.hidden = active.size > 0;
+    if (repaint) scheduleFit();
+  };
+
+  const tileScale = (element) => element.querySelector(".tile-scale");
+
+  const fitTiles = () => {
+    let changed = false;
+    for (const name of active) {
+      const item = meta.get(name);
+      if (!item || item.element.hidden) continue;
+      const body = item.element.querySelector(".tile-body");
+      const scale = tileScale(item.element);
+      if (!body || !scale) continue;
+      scale.style.transform = "";
+      scale.style.width = "100%";
+      scale.style.height = "100%";
+      const availWidth = body.clientWidth - 10;
+      const availHeight = body.clientHeight - 10;
+      if (availWidth <= 0 || availHeight <= 0) continue;
+      const isChart = item.element.dataset.chart === "true";
+      let heightRatio = 1;
+      if (!isChart) {
+        scale.classList.add("is-measuring");
+        scale.style.height = "auto";
+        heightRatio = Math.max(1, scale.scrollHeight / availHeight);
+        scale.classList.remove("is-measuring");
+        scale.style.height = "100%";
+      }
+      let ratio = Math.max(heightRatio, Math.max(1, scale.scrollWidth / availWidth));
+      for (const inner of scale.querySelectorAll(".data-card, .table-wrap")) {
+        if (inner.clientWidth > 0 && inner.scrollWidth > inner.clientWidth + 2) {
+          ratio = Math.max(ratio, inner.scrollWidth / inner.clientWidth);
+        }
+      }
+      if (ratio > 1.015) {
+        const s = Math.max(0.52, 1 / ratio);
+        scale.style.width = `${100 / s}%`;
+        scale.style.height = `${100 / s}%`;
+        scale.style.transform = `scale(${s})`;
+        scale.dataset.fit = String(s.toFixed(2));
+        changed = true;
+      } else if (scale.dataset.fit !== "1") {
+        scale.dataset.fit = "1";
+        changed = true;
+      }
+    }
+    if (changed) refreshCharts();
+  };
+
+  let chartTimer = null;
+  const refreshCharts = () => {
+    window.clearTimeout(chartTimer);
+    chartTimer = window.setTimeout(() => {
+      try {
+        if (typeof state !== "undefined" && state.result) {
+          renderCharts(state.result);
+          if (state.result.best?.modulationView && !meta.get("modulation")?.element.hidden) drawModulationChart(state.result);
+        }
+      } catch { /* charts redraw on next analysis */ }
+    }, 60);
+  };
+
+  let fitTimer = null;
+  const scheduleFit = () => {
+    window.clearTimeout(fitTimer);
+    fitTimer = window.setTimeout(() => {
+      fitTiles();
+      fitRail();
+    }, 40);
+  };
+
+  const fitRail = () => {
+    if (!railScale || !rail) return;
+    railScale.style.transform = "";
+    railScale.style.width = "100%";
+    const available = rail.clientHeight - 24;
+    if (available <= 0) return;
+    const natural = railScale.scrollHeight;
+    if (natural > available + 1) {
+      const s = Math.max(0.7, available / natural);
+      railScale.style.width = `${100 / s}%`;
+      railScale.style.transform = `scale(${s})`;
+    }
+  };
+
+  const tryPack = (names, sizes) => {
+    const map = new Map();
+    for (const name of names) {
+      const size = sizes.get(name);
+      const placement = findFree(map, size.w, size.h);
+      if (!placement) return null;
+      map.set(name, placement);
+    }
+    return map;
+  };
+
+  const repack = (names) => {
+    const ordered = [...names].sort((a, b) => {
+      const pa = placements.get(a);
+      const pb = placements.get(b);
+      if (pa && pb) return pa.y - pb.y || pa.x - pb.x;
+      if (pa) return -1;
+      if (pb) return 1;
+      return priority(a) - priority(b);
+    });
+    for (const factor of [1, 0.92, 0.84, 0.76, 0.68, 0.6]) {
+      const sizes = new Map();
+      for (const name of ordered) {
+        const item = meta.get(name);
+        const base = placements.get(name) || item.preferred;
+        sizes.set(name, {
+          w: Math.max(item.minimum.w, Math.min(COLS, Math.round(base.w * factor))),
+          h: Math.max(item.minimum.h, Math.min(ROWS, Math.round(base.h * factor))),
+        });
+      }
+      const packed = tryPack(ordered, sizes);
+      if (packed) return packed;
+    }
+    return null;
+  };
+
+  const resolveConflicts = (pinned) => {
+    const result = new Map([[pinned, placements.get(pinned)]]);
+    const rest = [...active].filter((name) => name !== pinned).sort((a, b) => {
+      const pa = placements.get(a);
+      const pb = placements.get(b);
+      if (pa && pb) return pa.y - pb.y || pa.x - pb.x;
+      return priority(a) - priority(b);
+    });
+    for (const name of rest) {
+      const item = meta.get(name);
+      const current = placements.get(name);
+      if (!current) return null;
+      if (fits(current, result)) {
+        result.set(name, current);
+        continue;
+      }
+      let candidate = findFree(result, current.w, current.h);
+      if (!candidate) {
+        for (let h = current.h - 1; h >= item.minimum.h && !candidate; h -= 1) {
+          candidate = findFree(result, current.w, h);
+        }
+      }
+      if (!candidate) {
+        for (let w = current.w - 1; w >= item.minimum.w && !candidate; w -= 1) {
+          candidate = findFree(result, w, item.minimum.h);
+        }
+      }
+      if (!candidate) return null;
+      result.set(name, candidate);
+    }
+    return result;
+  };
+
+  const commit = (name, placement) => {
+    const snapshot = cloneMap(placements);
+    placements.set(name, placement);
+    const resolved = resolveConflicts(name);
+    if (!resolved) {
+      placements = snapshot;
+      apply();
+      notify("空间不足，已保留原布局。", "error");
+      return false;
+    }
+    placements = resolved;
+    apply();
+    save();
+    flash(name);
+    return true;
+  };
+
+  const addModule = (name, { quiet = false } = {}) => {
+    const item = meta.get(name);
+    if (!item) return false;
+    if (active.has(name)) {
+      flash(name);
+      return true;
+    }
+    const direct = findFree(placements, item.preferred.w, item.preferred.h);
+    if (direct) {
+      active.add(name);
+      placements.set(name, direct);
+      apply();
+      save();
+      flash(name);
+      return true;
+    }
+    const packed = repack([...active, name]);
+    if (packed) {
+      active.add(name);
+      placements = packed;
+      apply();
+      save();
+      flash(name);
+      if (!quiet) notify("工作区已自动压缩，所有模块均已放入。");
+      return true;
+    }
+    if (!quiet) notify("工作区已满，请先移除一个模块。", "error");
+    return false;
+  };
+
+  const removeModule = (name) => {
+    if (!active.has(name)) return;
+    active.delete(name);
+    placements.delete(name);
+    apply();
+    save();
+    notify(`${meta.get(name)?.element.querySelector(".tile-head h3")?.textContent || name} 已移入任务栏。`);
+  };
+
+  const reset = () => {
+    active = new Set(defaultActive);
+    placements = cloneMap(defaultPlacements);
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
+    apply();
+    notify("布局已恢复默认。");
+  };
+
+  const ensure = (name) => {
+    if (!name || !meta.has(name)) return false;
+    if (active.has(name)) {
+      flash(name);
+      return true;
+    }
+    return addModule(name, { quiet: true });
+  };
+
+  const cellSize = () => {
+    const rect = grid.getBoundingClientRect();
+    const styles = getComputedStyle(grid);
+    const gapX = Number.parseFloat(styles.columnGap) || 6;
+    const gapY = Number.parseFloat(styles.rowGap) || 6;
+    return {
+      width: (rect.width - gapX * (COLS - 1)) / COLS,
+      height: (rect.height - gapY * (ROWS - 1)) / ROWS,
+      left: rect.left,
+      top: rect.top,
+    };
+  };
+
+  const pointerCell = (clientX, clientY) => {
+    const cell = cellSize();
+    return {
+      col: Math.min(COLS, Math.max(1, Math.floor((clientX - cell.left) / cell.width) + 1)),
+      row: Math.min(ROWS, Math.max(1, Math.floor((clientY - cell.top) / cell.height) + 1)),
+    };
+  };
+
+  const ghost = document.createElement("div");
+  ghost.className = "tile-drop-ghost";
+  ghost.hidden = true;
+  grid.appendChild(ghost);
+
+  const showGhost = (p) => {
+    ghost.hidden = false;
+    ghost.style.gridColumn = `${p.x} / span ${p.w}`;
+    ghost.style.gridRow = `${p.y} / span ${p.h}`;
+  };
+  const hideGhost = () => { ghost.hidden = true; };
+
+  let gesture = null;
+
+  const onPointerMove = (event) => {
+    if (!gesture) return;
+    if (!gesture.moved && Math.abs(event.clientX - gesture.startX) + Math.abs(event.clientY - gesture.startY) < 4) return;
+    gesture.moved = true;
+    event.preventDefault();
+    if (gesture.type === "move") {
+      const cell = cellSize();
+      const target = pointerCell(event.clientX, event.clientY);
+      const x = Math.min(COLS - gesture.placement.w + 1, Math.max(1, target.col - gesture.offsetX));
+      const y = Math.min(ROWS - gesture.placement.h + 1, Math.max(1, target.row - gesture.offsetY));
+      gesture.target = { ...gesture.placement, x, y };
+      showGhost(gesture.target);
+      return;
+    }
+    const cell = cellSize();
+    const dx = Math.round((event.clientX - gesture.startX) / cell.width);
+    const dy = Math.round((event.clientY - gesture.startY) / cell.height);
+    const start = gesture.placement;
+    const min = meta.get(gesture.name).minimum;
+    let { x, y, w, h } = start;
+    if (gesture.dir.includes("e")) w = start.w + dx;
+    if (gesture.dir.includes("s")) h = start.h + dy;
+    if (gesture.dir.includes("w")) {
+      w = start.w - dx;
+      x = start.x + dx;
+    }
+    if (gesture.dir.includes("n")) {
+      h = start.h - dy;
+      y = start.y + dy;
+    }
+    if (w < min.w) {
+      if (gesture.dir.includes("w")) x = start.x + start.w - min.w;
+      w = min.w;
+    }
+    if (h < min.h) {
+      if (gesture.dir.includes("n")) y = start.y + start.h - min.h;
+      h = min.h;
+    }
+    x = Math.max(1, Math.min(x, COLS - min.w + 1));
+    y = Math.max(1, Math.min(y, ROWS - min.h + 1));
+    w = Math.max(min.w, Math.min(w, COLS - x + 1));
+    h = Math.max(min.h, Math.min(h, ROWS - y + 1));
+    gesture.target = { x, y, w, h };
+    showGhost(gesture.target);
+  };
+
+  const endGesture = () => {
+    if (!gesture) return;
+    const current = gesture;
+    gesture = null;
+    hideGhost();
+    document.body.classList.remove("is-layout-gesture");
+    current.element.classList.remove("is-dragging");
+    if (!current.moved || !current.target) return;
+    const changed = current.type === "move"
+      ? current.target.x !== current.placement.x || current.target.y !== current.placement.y
+      : current.target.w !== current.placement.w || current.target.h !== current.placement.h || current.target.x !== current.placement.x || current.target.y !== current.placement.y;
+    if (!changed) return;
+    commit(current.name, current.target);
+  };
+
+  window.addEventListener("pointermove", onPointerMove, { passive: false });
+  window.addEventListener("pointerup", endGesture);
+  window.addEventListener("pointercancel", endGesture);
+
+  grid.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0) return;
+    if (event.target.closest(".tile-close")) return;
+    const handle = event.target.closest(".resize-handle");
+    const head = event.target.closest(".tile-head");
+    if (!handle && !head) return;
+    const element = event.target.closest(".tile");
+    const name = element?.dataset.module;
+    const placement = placements.get(name);
+    if (!name || !placement || element.hidden) return;
+    event.preventDefault();
+    const point = pointerCell(event.clientX, event.clientY);
+    if (handle) {
+      gesture = {
+        type: "resize",
+        name,
+        element,
+        placement: { ...placement },
+        dir: handle.dataset.dir || "se",
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+        target: null,
+      };
+    } else {
+      gesture = {
+        type: "move",
+        name,
+        element,
+        placement: { ...placement },
+        offsetX: point.col - placement.x,
+        offsetY: point.row - placement.y,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+        target: null,
+      };
+      element.classList.add("is-dragging");
+    }
+    document.body.classList.add("is-layout-gesture");
+  });
+
+  grid.addEventListener("click", (event) => {
+    const close = event.target.closest(".tile-close");
+    if (!close) return;
+    const name = close.closest(".tile")?.dataset.module;
+    if (name) removeModule(name);
+  });
+
+  for (const item of meta.values()) {
+    item.chip?.addEventListener("click", () => {
+      if (active.has(item.name)) {
+        flash(item.name);
+        return;
+      }
+      addModule(item.name);
+    });
+    item.chip?.addEventListener("dragstart", (event) => {
+      event.dataTransfer?.setData("text/plain", item.name);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "copy";
+      item.chip.classList.add("is-dragging");
+    });
+    item.chip?.addEventListener("dragend", () => item.chip.classList.remove("is-dragging"));
+  }
+
+  grid.addEventListener("dragover", (event) => {
+    if (!event.dataTransfer?.types.includes("text/plain")) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    grid.classList.add("is-drop-target");
+  });
+  grid.addEventListener("dragleave", (event) => {
+    if (!grid.contains(event.relatedTarget)) grid.classList.remove("is-drop-target");
+  });
+  grid.addEventListener("drop", (event) => {
+    event.preventDefault();
+    grid.classList.remove("is-drop-target");
+    const name = event.dataTransfer?.getData("text/plain");
+    if (name) addModule(name);
+  });
+
+  document.querySelectorAll(".directory-button").forEach((button) => {
+    button.addEventListener("click", () => {
+      document.querySelectorAll(".directory-button").forEach((other) => other.classList.remove("is-active"));
+      button.classList.add("is-active");
+      const filter = button.dataset.filter;
+      for (const item of meta.values()) {
+        item.element.classList.toggle("is-filtered", filter !== "all" && item.element.dataset.category !== filter);
+      }
+    });
+  });
+
+  const setRail = (open) => {
+    body.classList.toggle("rail-open", open);
+    railToggle?.setAttribute("aria-expanded", String(open));
+    if (railScrim) railScrim.hidden = !open;
+    if (open) window.setTimeout(fitRail, 40);
+  };
+  railToggle?.addEventListener("click", () => setRail(!body.classList.contains("rail-open")));
+  railScrim?.addEventListener("click", () => setRail(false));
+  taskReset?.addEventListener("click", reset);
+
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      setRail(false);
+      hideGhost();
+      endGesture();
+    }
+  });
+
+  if (taskRun) {
+    taskRun.addEventListener("click", () => document.getElementById("analyze-button")?.click());
+  }
+  if (taskExport) {
+    taskExport.addEventListener("click", () => document.getElementById("download-button")?.click());
+  }
+  const analyzeButton = document.getElementById("analyze-button");
+  const downloadButton = document.getElementById("download-button");
+  const syncActions = () => {
+    if (taskRun && analyzeButton) taskRun.disabled = analyzeButton.disabled;
+    if (taskExport && downloadButton) taskExport.disabled = downloadButton.disabled;
+  };
+  if (analyzeButton) new MutationObserver(syncActions).observe(analyzeButton, { attributes: true, attributeFilter: ["disabled"] });
+  if (downloadButton) new MutationObserver(syncActions).observe(downloadButton, { attributes: true, attributeFilter: ["disabled"] });
+  syncActions();
+
+  const autoWatch = (id, module) => {
+    const target = document.getElementById(id);
+    if (!target) return;
+    const check = () => {
+      if (target.hidden || autoDone.has(module)) return;
+      autoDone.add(module);
+      addModule(module, { quiet: true });
+    };
+    new MutationObserver(check).observe(target, { attributes: true, attributeFilter: ["hidden"] });
+    check();
+  };
+  autoWatch("channel-card", "channel");
+  autoWatch("modulation-lab", "modulation");
+
+  new MutationObserver(scheduleFit).observe(grid, { childList: true, subtree: true, characterData: true });
+  window.addEventListener("resize", () => {
+    window.setTimeout(fitRail, 30);
+    scheduleFit();
+  });
+
+  restore();
+  apply();
+  fitRail();
+  window.setTimeout(() => { fitTiles(); fitRail(); }, 120);
+
+  window.SignalInsightLayout = { ensure, addModule, removeModule, reset, fit: scheduleFit };
+})();

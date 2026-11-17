@@ -561,3 +561,4 @@ P1/P2 已发布并完成线上回归：
 - 2026-11-17 · 后端 · backend/generator · 契约1.0(加法§9) · 数据流审计（边界全正确；混叠固有局限已记录）；新增 generator.js 随机数据产生器（17 条件/真值感知结论/混叠揭示），learn.js 复用 synthesizeSignal；generator.test；模块 v=13 · 12 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html + 实验沙盒
 - 2026-11-17 · 后端 · backend/generator-conditions · 契约1.0 · generator.js 扩至 29 条件（谐波/脉冲/掉零/近频/过调制/极弱/少周期/恰Nyquist/工频/时间重复/NaN/超长）；合成器加 dropout/spikes/nan/duplicateTime 修饰；generator.test 29 条件断言；模块 v=14 · 12 测试+E2E绿 · 阻塞:无 · 下一步:前端实验沙盒
 - 2026-11-17 · 后端 · backend/outcome-notes · 契约1.0 · classifyOutcome 解释数据驱动自适应（真实误差/R²/BIC/具体原因/精度分级/缺陷成因），新增 buildExperimentPayload 供 Qwen 展开；generator.test 加变化性断言；模块 v=15 · 12 测试+E2E绿 · 阻塞:无 · 下一步:前端实验沙盒
+- 2026-11-17 · 后端代集成 · frontend/ui-redesign · 前端误传 main 根目录的 3 文件（app.js/index.html/styles.css）移入 site/dist/、基于 integration 开分支、?v=12→15；static+11 后端测试+E2E 14 场景全绿（分析页 UI 完整覆盖分析态后端功能）；产出 FRONTEND-TODO.md（学习模式 UI 代办：learn.html/沙盒/M2）· 阻塞:无 · 下一步:前端按 TODO 建学习页
