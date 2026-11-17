@@ -18,6 +18,7 @@
 - **协作规则：** [AGENTS.md](AGENTS.md)
 - **前后端协作：** [COLLABORATION.md](COLLABORATION.md)
 - **接口契约：** [CONTRACT.md](CONTRACT.md)
+- **前端交接：** [FRONTEND.md](FRONTEND.md)
 
 ## 结构
 
