@@ -155,4 +155,33 @@ response = await handler(
 );
 assert.equal(response.status, 400);
 
+const explainWithContent = (content) => {
+  globalThis.fetch = async () => Response.json({ choices: [{ message: { content } }] });
+  return handler(new Request("https://site.test/functions/v1/app/explain", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(validPayload),
+  }));
+};
+
+response = await explainWithContent('```json\n{"summary":"围栏测试","observations":["o1"],"limitations":["l1"]}\n```');
+assert.equal(response.status, 200);
+assert.equal((await response.json()).explanation.summary, "围栏测试");
+
+response = await explainWithContent('{"summary":"截断测试","observations":["o1","o2"],"limitations":["l1"');
+assert.equal(response.status, 200);
+const truncated = await response.json();
+assert.equal(truncated.explanation.summary, "截断测试");
+assert.deepEqual(truncated.explanation.observations, ["o1", "o2"]);
+
+response = await explainWithContent('{"summary":"仅摘要"}');
+assert.equal(response.status, 200);
+const summaryOnly = await response.json();
+assert.equal(summaryOnly.explanation.summary, "仅摘要");
+assert.deepEqual(summaryOnly.explanation.observations, []);
+
+response = await explainWithContent(" totally not json ");
+assert.equal(response.status, 502);
+assert.equal((await response.json()).error, "invalid_model_output");
+
 console.log("Function tests passed");

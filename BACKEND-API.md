@@ -97,7 +97,8 @@
 - 请求体：`AiPayload` + 可选 `model`（≤64 KiB）。
 - 服务端 `validatePayload` 白名单重建（不信任原始字段）：unknown 布尔、sampleCount 整数 64–500000、sampleRate>0、candidates≤6、parameters≤20、reliability.level 枚举、evidence≤10。
 - 成功 200：`Explanation`（DATA-FORMATS §10）。
-- Qwen：temperature 0.5、max_tokens 1200、上游 25s 超时。
+- Qwen：temperature 0.6、max_tokens 1600、上游 25s 超时。提示词要求多元化表达 + 数值溯源 + 严谨（区分拟合与物理、不确定度近似）。
+- `parseModelText` 加固：去 Markdown 围栏、截断 JSON 自动补全括号/引号、summary-only 降级；降低 `invalid_model_output`。
 
 ### POST /functions/v1/app/learn-explain（M2）
 - 请求体：`LearnPayload` + 可选 `model`。

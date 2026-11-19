@@ -139,32 +139,62 @@ function buildPrompt(payload: Record<string, unknown>): string {
     "3) limitations 给 2-4 条，必须结合本数据的实际条件（观测时长决定的 1/T 分辨率、采样率、数据体检异常、候选库边界），不要复制通用免责声明。",
     "若 unknown=true，明确指出是哪条证据不足（无显著峰 / 主峰显著度低 / R² 过低）导致拒绝结论，并给出可操作的改进方向。",
     "若推荐 AM/FM，解释调制结构（载波、边带、调制指数/频偏）意味着什么，以及为何优于纯音调模型。",
+    "表达多元化：依据本数据的特点组织语言，变换句式与开头，避免每次相同的模板化表达；讲解角度可围绕模型竞争、参数含义、残差证据、数据质量灵活选择。",
+    "准确严谨：引用的每个数值必须能在下方 JSON 中找到出处，不得改变量级/单位，不得编造未给出的参数；区分『拟合优度』与『物理真实性』；不确定度是近似标准误或 1/T 分辨率，不是严格置信区间；AM/FM 是候选模型而非物理机制的唯一证明。",
+    "输出前自检：核对所引数值与 JSON 一致；证据不足时不强行给参数结论；limitations 必须针对本数据而非通用免责。",
     "语气自然、像助教讲解，结合数据讲道理；用简体中文。",
     "只返回严格 JSON，不要 Markdown 代码块：{\"summary\":\"...\",\"observations\":[\"...\"],\"limitations\":[\"...\"]}",
     `确定性分析结果：${JSON.stringify(payload)}`,
   ].join("\n");
 }
 
+function repairTruncatedJson(input: string): string {
+  let text = input.replace(/\s+$/, "");
+  const stack: string[] = [];
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (char === "\\") escaped = true;
+      else if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') inString = true;
+    else if (char === "{") stack.push("}");
+    else if (char === "[") stack.push("]");
+    else if (char === "}" || char === "]") stack.pop();
+  }
+  if (inString) text += '"';
+  text = text.replace(/,\s*$/, "");
+  while (stack.length) text += stack.pop();
+  return text;
+}
+
 function parseModelText(content: string): Explanation | null {
-  const start = content.indexOf("{");
-  const end = content.lastIndexOf("}");
-  if (start < 0 || end <= start) return null;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content.slice(start, end + 1));
-  } catch {
-    return null;
+  const stripped = content.replace(/```(?:json|javascript|js)?/gi, "").trim();
+  const start = stripped.indexOf("{");
+  if (start < 0) return null;
+  const candidate = stripped.slice(start);
+  let parsed: unknown = null;
+  const end = candidate.lastIndexOf("}");
+  if (end > 0) {
+    try { parsed = JSON.parse(candidate.slice(0, end + 1)); } catch { parsed = null; }
+  }
+  if (!parsed) {
+    try { parsed = JSON.parse(repairTruncatedJson(candidate)); } catch { parsed = null; }
   }
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
   const record = parsed as Record<string, unknown>;
+  const summary = clip(record.summary, 1200);
+  if (!summary) return null;
   const observations = Array.isArray(record.observations)
     ? record.observations.map((item) => clip(item, 400)).filter(Boolean).slice(0, 6)
     : [];
   const limitations = Array.isArray(record.limitations)
     ? record.limitations.map((item) => clip(item, 400)).filter(Boolean).slice(0, 4)
     : [];
-  const summary = clip(record.summary, 1200);
-  if (!summary || observations.length === 0) return null;
   return { summary, observations, limitations };
 }
 
@@ -226,6 +256,9 @@ function buildLearnPrompt(payload: Record<string, unknown>): string {
     "2) observations 给 3-6 条循序渐进的讲解要点，每条结合一个证据或原理点，解释其物理或通信含义。",
     "3) limitations 给 2-4 条学习提醒或常见误区（如候选库边界、不确定度近似、数据质量先于结论）。",
     "若该场景含 diagnosis（问题数据），讲清问题成因与改进方向；若 unknown=true，讲清为何拒绝结论。",
+    "表达多元化：按本场景特点变换句式与讲解顺序，避免模板化开头；可用类比帮助理解，但类比不得引入 JSON 之外的数值或虚构机制。",
+    "准确严谨：所引数值必须出自下方 JSON，不得改变量级/单位或编造参数；区分拟合优度与物理真实性；不确定度为近似而非严格置信区间；候选模型不等于物理证明。",
+    "输出前自检：核对数值与 JSON 一致，确保循序渐进且无空泛套话。",
     "语气自然、像助教讲解，用简体中文；只返回严格 JSON，不要 Markdown 代码块：{\"summary\":\"...\",\"observations\":[\"...\"],\"limitations\":[\"...\"]}",
     `学习场景证据：${JSON.stringify(payload)}`,
   ].join("\n");
@@ -289,8 +322,8 @@ export async function handler(request: Request): Promise<Response> {
       },
       body: JSON.stringify({
         model,
-        temperature: 0.5,
-        max_tokens: 1200,
+        temperature: 0.6,
+        max_tokens: 1600,
         messages: [
           {
             role: "system",
