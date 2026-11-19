@@ -407,7 +407,7 @@ P1/P2 已发布并完成线上回归：
   - `3478b9c test: add zero-dependency browser E2E via CDP`
   - `4003863 feat: add local analysis history with read-only snapshots`
   - `adfa9c9 feat: specific Qwen explanations and user-selectable model whitelist`
-- 模块版本：v=15（全部模块/资源统一，`static.test.mjs` 强制一致）
+- 模块版本：v=12（全部模块/资源统一，`static.test.mjs` 强制一致）
 - 状态：本轮改动已通过本地全套测试 + E2E 质检，**尚未发布**；线上仍为信任实验室版本
 - 信任实验室提交：
   - `e45afb0 fix: harden result and AI data flow`
@@ -476,7 +476,7 @@ P1/P2 已发布并完成线上回归：
 
 ### 学习模式（M1 后端学习库已实现）
 
-进度：后端 `site/dist/learn.js`（DOM-free）已实现 **M1+M2**——`listScenarios/getScenario/generateScenarioSignal/analyzeScenario/buildLearnPayload` API + **15 场景（含 IQ）**（clean/modulation/defect/out-of-library，含结构化原理/诊断/思考题/步骤）；M2 Qwen 原理展开经 `/functions/v1/app/learn-explain` + `service.fetchLearnExplanation`（文本-only、不改数值、白名单、共享限流）；`learn.test.mjs`/`function.test`/`ai-consistency` 覆盖；契约 §4/§8 + 样例 `sample-scenario-*.json` 就绪。**前端 `learn.html` 待建**（消费 learn.js + M2，见 FRONTEND.md §15）。M3（引导 UI+进度）/M4（学习页 E2E）由前端后续。随机数据产生器 `generator.js`（29 条件、真值感知结论分类、混叠/边界揭示）已就绪，供学习实验沙盒使用。结论解释 `outcome.notes` 已改为**数据驱动自适应**（随实际 R²/频率/幅值误差/BIC/分辨率/具体拒绝原因变化），并提供 `buildExperimentPayload` 供 Qwen `/learn-explain` 自然语言展开。
+进度：后端 `site/dist/learn.js`（DOM-free）已实现 **M1+M2**——`listScenarios/getScenario/generateScenarioSignal/analyzeScenario/buildLearnPayload` API + **15 场景（含 IQ）**（clean/modulation/defect/out-of-library，含结构化原理/诊断/思考题/步骤）；M2 Qwen 原理展开经 `/functions/v1/app/learn-explain` + `service.fetchLearnExplanation`（文本-only、不改数值、白名单、共享限流）；`learn.test.mjs`/`function.test`/`ai-consistency` 覆盖；契约 §4/§8 + 样例 `sample-scenario-*.json` 就绪。**前端学习页 `learn.html` 已建**（learn-app.js 消费 learn.js + M2，见 FRONTEND.md §15）。**实验沙盒 generator.js 已删除**（2026-11-18），信号合成器内联回 learn.js，场景仍 15 个。剩余前端代办见 FRONTEND-TODO.md（学习页打磨 / M2 验证 / 学习页 E2E）。
 
 目标：双模式双页面。**分析模式**即现有全部功能；**学习模式**用内置仿真数据引导学习，讲清"为什么这样选模型"，对极限/问题数据指出"哪里有问题"，以原理分析帮助理解。
 
@@ -563,3 +563,4 @@ P1/P2 已发布并完成线上回归：
 - 2026-11-17 · 后端 · backend/outcome-notes · 契约1.0 · classifyOutcome 解释数据驱动自适应（真实误差/R²/BIC/具体原因/精度分级/缺陷成因），新增 buildExperimentPayload 供 Qwen 展开；generator.test 加变化性断言；模块 v=15 · 12 测试+E2E绿 · 阻塞:无 · 下一步:前端实验沙盒
 - 2026-11-17 · 后端代集成 · frontend/ui-redesign · 前端误传 main 根目录的 3 文件（app.js/index.html/styles.css）移入 site/dist/、基于 integration 开分支、?v=12→15；static+11 后端测试+E2E 14 场景全绿（分析页 UI 完整覆盖分析态后端功能）；产出 FRONTEND-TODO.md（学习模式 UI 代办：learn.html/沙盒/M2）· 阻塞:无 · 下一步:前端按 TODO 建学习页
 - 2026-11-18 · 后端 · backend/reconcile · 合并 origin/UI（fea7659，含学习页 learn-app/learn.html/charts）+ integration 后端，前端 UI 原样未改；修复 P1 版本统一 v=12/P2 恢复 generator.js/P3 用 integration learn.js/P5 E2E 压力断言适配；P6 学习进度为前端设计不动；static+11 测试+E2E 14 场景+学习页实测全绿；详见 INTEGRATION-ISSUES.md · 阻塞:无 · 下一步:前端补实验沙盒 UI
+- 2026-11-18 · 后端 · backend/remove-sandbox · 安全审计（XSS：CSV 表头/AI 解释/learn-app 全转义，无 eval，Key 仅服务端，后端白名单+注入防护——未发现漏洞）；按需求删除实验沙盒 generator.js + generator.test，合成器内联回 learn.js（场景仍 15）；清理 CONTRACT§9/BACKEND-API/DATA-FORMATS/FRONTEND/FRONTEND-TODO/README/AGENTS 沙盒引用；版本 v=12 · static+11 测试+E2E 全绿 · 阻塞:无

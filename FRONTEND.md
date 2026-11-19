@@ -374,26 +374,7 @@ try {
 - 模型选择复用分析页 `#model-select` 或学习页自有选择器（白名单 qwen-plus/max/turbo/long）。
 - 不变量：AI 输出纯文本，绝不回写数值/可信等级；缓存可按 payload+model（参考分析页 `aiCache`）。
 
-### 15.16 随机数据产生器（generator.js，实验沙盒）
-
-后端提供 `generator.js`，随机生成**严格模拟真实条件**的数据并分析，告诉用户"这种条件会得到什么结果"。
-
-```js
-import { CONDITION_CATALOG, runExperiment, generateRandomSignal } from "./generator.js?v=15";
-CONDITION_CATALOG;  // 29 种条件菜单：clean/noisy/clipped/quantized/drift/jitter/aliasing/near-nyquist/short/multi/am/fm/iq/chirp/noise/invalid-short/invalid-jitter/harmonics/spike/dropout/close-tones/over-modulation/weak-signal/few-cycles/exact-nyquist/mains-hum/invalid-nonincreasing/invalid-nan/invalid-toolong
-const exp = runExperiment({ condition: "aliasing", seed: 42 });
-// exp = { params, groundTruth, conditions, data, result, outcome }
-// outcome.verdict: correct-model | caution-boundary | unreliable-defect | unknown-rejected | aliasing-warning | input-rejected
-// outcome.notes: 数据驱动的结论解释（随实际 R²/频率/幅值误差/BIC/分辨率/具体原因变化，非固定模板）
-```
-
-- UI 建议：条件选择器（`CONDITION_CATALOG`）+ "随机生成"（`condition:"random"`）+ seed 输入（可复现）→ 展示 `data` 波形/频谱 + `result` 分析 + `groundTruth` 真值对照 + `outcome.notes` 结论。
-- 教学重点：`aliasing` 展示"真频超 Nyquist → 分析得混叠假频"；`invalid-*` 展示边界拒绝；defect 展示体检诊断。
-- 大样本（>5 万）宜用 service Worker 分析 `data`，而非 `runExperiment` 主线程。
-- **解释变化**：`outcome.notes` 已数据驱动（不同实验不同解释）。若需更大的自然语言变化，用 `buildExperimentPayload(exp)` + `fetchLearnExplanation(payload, model, signal)`（M2 `/learn-explain`，温度 0.5）；本地无 Function 时降级到 `outcome.notes`。
-- 产生器 DOM-free，只读消费；不改 `generator.js`（后端）。
-
-> 完成本节即可独立交付 learn.html（15 场景 + M2 原理展开 + 随机实验沙盒 + 降级）。需新场景/条件/字段写 HANDOFF 协作日志，后端加法提供。
+> 完成本节即可独立交付 learn.html（15 场景 + M2 原理展开 + 降级）。需新场景/字段写 HANDOFF 协作日志，后端加法提供。
 
 ## 16. 关键文件速查
 

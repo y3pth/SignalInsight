@@ -172,34 +172,6 @@ buildLearnPayload(scenario, result) -> LearnPayload           // M2：供 /learn
 - 前端学习页（`learn.html`）消费本 API；样例数据见 `site/test/fixtures/sample-scenario-*.json`。
 - 加法演进：新增场景/字段不破坏既有 API。
 
-## 9. 数据产生器 API（generator.js，后端拥有，前端学习/实验调用）
-
-> DOM-free。严格模拟真实采集条件（AWGN/量化/削顶/漂移/抖动/混叠等），生成带真值的信号并可运行分析给出结论。
-
-```js
-synthesizeSignal(params)        -> { kind, time, values } | { kind, time, i, q }
-randomSignalParams(options)     -> params      // options:{condition?,seed?,fs?,n?}；condition="random" 随机选
-describeConditions(params)      -> { groundTruth, conditions[] }
-generateRandomSignal(options)   -> { params, groundTruth, conditions, data }
-runExperiment(options)          -> { params, groundTruth, conditions, data, result, outcome }
-classifyOutcome(result, params, groundTruth, error) -> outcome
-buildExperimentPayload(experiment) -> LearnPayload   // 供 /learn-explain 做 Qwen 自然语言展开
-CONDITION_CATALOG               -> [{id,label,description}]  // 29 种条件
-```
-
-`outcome.verdict` ∈ `correct-model | caution-boundary | unreliable-defect | unknown-rejected | aliasing-warning | input-rejected`；含 `{rejected,unknown,reliability,model,modelFrequency,modelAmplitude,healthIssues[],aliasing,frequencyError,amplitudeError,r2,bicGap,notes[]}`。
-
-**结论解释数据驱动**：`notes` 随实际数据变化——引用真实 R²/RMSE/频率与幅值误差/BIC 差距/分辨率，给出具体拒绝原因（无峰 / 低 R² / 库外）、缺陷成因与混叠补救建议，并按精度分级措辞；不同实验得到不同解释。如需更大的自然语言变化，前端用 `buildExperimentPayload(experiment)` 调 `fetchLearnExplanation`（M2 `/learn-explain`，温度 0.5）。
-
-条件覆盖（29）：clean/noisy/clipped/quantized/drift/jitter/aliasing/near-nyquist/short/multi/am/fm/iq/chirp/noise/invalid-short/invalid-jitter/harmonics/spike/dropout/close-tones/over-modulation/weak-signal/few-cycles/exact-nyquist/mains-hum/invalid-nonincreasing/invalid-nan/invalid-toolong。
-
-约定：
-- `groundTruth` 记录真实参数（频率/幅值/调制/采样率/Nyquist），供学习对照。
-- **混叠真值感知**：真实频率超 Nyquist 时 `outcome.aliasing=true`，notes 说明真频与混叠假频（分析本身无法从采样区分，属采样定理固有局限）。
-- 边界非法输入（<64 样本、抖动>5% 等）→ `input-rejected`，notes 解释拒绝原因。
-- `runExperiment` 用主线程 dsp 分析；大样本前端宜改用 service Worker 路径。
-- 加法演进：新增条件/字段不破坏既有 API。
-
 ## Changelog
 
 - 1.0（2026-11-17）：冻结当前结果/压力/Worker/Function 形状；定义 service.js 拆分目标 API。
@@ -208,3 +180,4 @@ CONDITION_CATALOG               -> [{id,label,description}]  // 29 种条件
 - 1.0（2026-11-17，加法）：学习库扩至 15 场景（含 IQ）；新增 generator.js 数据产生器 API（§9，17 条件 + 真值感知结论分类）。
 - 1.0（2026-11-17，加法）：generator.js 扩至 29 条件（谐波/脉冲/掉零/近频/过调制/极弱/少周期/恰 Nyquist/工频/时间重复/NaN/超长）。
 - 1.0（2026-11-17，加法）：classifyOutcome 解释改为数据驱动自适应；新增 buildExperimentPayload 供 Qwen 展开。
+- 1.1（2026-11-18，移除）：删除实验沙盒 generator.js（§9 作废）；信号合成器内联回 learn.js（场景仍 15 个）；模块版本统一 v=12。

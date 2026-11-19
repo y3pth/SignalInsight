@@ -13,10 +13,9 @@
 输入(time,values[,i,q])
   → dsp.analyzeSignal / analyzeIqSignal → Result
   → dsp.stressTest → StressResult
-  → generator.runExperiment → Experiment{params,groundTruth,conditions,data,result,outcome}
   → learn.analyzeScenario → {scenario,result,match}
   → dsp.buildAiPayload(Result) → AiPayload → handler /explain → Explanation
-  → learn.buildLearnPayload / generator.buildExperimentPayload → LearnPayload → /learn-explain → Explanation
+  → learn.buildLearnPayload → LearnPayload → /learn-explain → Explanation
   → service.buildReport(Result) → ReportObject
   → service.addHistory(Result) → HistoryEntry
 前端 app.js render* 消费上述对象绘图/填表。
@@ -141,36 +140,16 @@ Variant = { id:string, label:string, recommendedModel:string, reliability:string
 ```
 variant.id ∈ noise20 / noise10 / half / downsample2。仅实数、≤50000 样本。
 
-## 9. Generator（数据产生器）
+## 9. Learn（学习库）
 
-**params（合成参数）**
+**signal（场景合成参数，learn.js 内部 synthesizeSignal）**
 ```js
 { kind?:"real"|"iq", waveform?:"tones"|"am"|"fm"|"chirp"|"drift"|"noise"|"iq",
-  fs:number, n:number, seed:number, condition?:string,
+  fs:number, n:number, seed:number,
   components?:[{frequency,amplitude,phase}], offset?:number, noiseSigma?:number,
   clip?:number, quantizeBits?:number, quantizeRange?:number, driftEnd?:number, jitterPercent?:number,
   carrierFrequency?, carrierAmplitude?, carrierPhase?, modulationFrequency?, modulationIndex?, modulationPhase?,
-  amplitude?, phase?, startFrequency?, endFrequency?, iOffset?, qOffset?,
-  spikes?:{count,amplitude}, dropout?:{startFraction,endFraction}, nanCount?:number, duplicateTime?:boolean }
-```
-
-**Experiment（runExperiment 返回）**
-```js
-{ params, groundTruth, conditions: string[],
-  data: {kind,time,values} | {kind,time,i,q} | null,   // 拒绝时 null
-  result: Result | null,
-  outcome: Outcome }
-```
-
-**groundTruth**：`{ fs, n, nyquist, waveform, kind, frequency?, amplitude?, components?, carrierFrequency?, modulationFrequency?, modulationIndex?, startFrequency?, endFrequency? }`
-
-**Outcome（结论分类）**
-```js
-{ verdict: "correct-model"|"caution-boundary"|"unreliable-defect"|"unknown-rejected"|"aliasing-warning"|"input-rejected",
-  rejected:boolean, unknown:boolean|null, reliability:string|null, model:string|null,
-  modelFrequency:number|null, modelAmplitude:number|null, healthIssues:string[],
-  aliasing:boolean, frequencyError:number|null, amplitudeError:number|null, r2:number|null, bicGap:number|null,
-  notes:string[] }   // 数据驱动解释，随实际数值变化
+  amplitude?, phase?, startFrequency?, endFrequency?, iOffset?, qOffset? }
 ```
 
 **ScenarioMeta / Scenario（learn.js）**
@@ -194,7 +173,7 @@ Scenario = ScenarioMeta & { signal:params, groundTruth, expected:{unknown?,model
 ```
 前端额外附 `model`（白名单 qwen-plus/max/turbo/long）。
 
-**LearnPayload（buildLearnPayload / buildExperimentPayload，发 /learn-explain）**
+**LearnPayload（buildLearnPayload，发 /learn-explain）**
 ```js
 { scenarioId:string, title:string, category:string, concept:string, points:string[],
   evidence:[{label,value,detail,status}], recommendedModel:string|null, unknown:boolean|null,

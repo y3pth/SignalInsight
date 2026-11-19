@@ -59,4 +59,4 @@
 - **P5 已修**：E2E 压力断言适配前端结构（计数 `#stress-list .stress-item`=4，summary 读 `.stress-verdict`）；未改前端。
 - **P6 不动**：学习进度手动标记属前端设计行为，未改前端 UI。
 - 质检：static(v=12) + 11 Node 测试 + E2E 14 场景 + 学习页浏览器实测全绿。
-- 遗留：实验沙盒 UI（P2 的 UI 侧）仍待前端按 FRONTEND-TODO 补建（generator.js 后端已就绪）。
+- 后续（2026-11-18）：实验沙盒功能已按需求**删除**（generator.js + generator.test 移除，信号合成器内联回 learn.js，场景仍 15）；P2 不再适用。安全审计（XSS/注入/Key 泄露）**未发现漏洞**。

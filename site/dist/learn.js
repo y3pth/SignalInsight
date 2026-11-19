@@ -1,5 +1,70 @@
 import { analyzeSignal, analyzeIqSignal } from "./dsp.js?v=12";
-import { synthesizeSignal } from "./generator.js?v=12";
+
+const TAU = 2 * Math.PI;
+
+function seededNoise(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state += 0x6d2b79f5;
+    let t = state;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function gaussian(random) {
+  const u = Math.max(random(), 1e-12);
+  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * random());
+}
+
+function synthesizeSignal(params) {
+  const fs = params.fs;
+  const n = params.n;
+  const random = seededNoise(params.seed ?? 1);
+  const duration = (n - 1) / fs;
+  const jitter = params.jitterPercent ? params.jitterPercent / 100 : 0;
+  const time = Array.from({ length: n }, (_, index) =>
+    index / fs + (jitter ? (random() - 0.5) * 2 * jitter / fs : 0),
+  );
+  if (params.waveform === "iq") {
+    const i = time.map((t) => (params.iOffset ?? 0) + params.amplitude * Math.cos(TAU * params.carrierFrequency * t + (params.phase ?? 0)) + (params.noiseSigma ? params.noiseSigma * gaussian(random) : 0));
+    const q = time.map((t) => (params.qOffset ?? 0) + params.amplitude * Math.sin(TAU * params.carrierFrequency * t + (params.phase ?? 0)) + (params.noiseSigma ? params.noiseSigma * gaussian(random) : 0));
+    return { kind: "iq", time, i, q };
+  }
+  const values = time.map((t) => {
+    let value = params.offset ?? 0;
+    switch (params.waveform ?? "tones") {
+      case "am":
+        value += params.carrierAmplitude * (1 + params.modulationIndex * Math.cos(TAU * params.modulationFrequency * t + (params.modulationPhase ?? 0))) * Math.cos(TAU * params.carrierFrequency * t + (params.carrierPhase ?? 0));
+        break;
+      case "fm":
+        value += params.carrierAmplitude * Math.cos(TAU * params.carrierFrequency * t + params.modulationIndex * Math.sin(TAU * params.modulationFrequency * t + (params.modulationPhase ?? 0)) + (params.carrierPhase ?? 0));
+        break;
+      case "chirp": {
+        const rate = (params.endFrequency - params.startFrequency) / (2 * duration);
+        value += params.amplitude * Math.sin(TAU * (params.startFrequency * t + rate * t * t));
+        break;
+      }
+      case "drift":
+        for (const component of params.components ?? []) value += component.amplitude * Math.sin(TAU * component.frequency * t + (component.phase ?? 0));
+        value += (params.driftEnd ?? 0) * (t / duration);
+        break;
+      case "noise":
+        break;
+      default:
+        for (const component of params.components ?? []) value += component.amplitude * Math.sin(TAU * component.frequency * t + (component.phase ?? 0));
+    }
+    if (params.noiseSigma) value += params.noiseSigma * gaussian(random);
+    if (params.quantizeBits) {
+      const step = (2 * params.quantizeRange) / 2 ** params.quantizeBits;
+      value = Math.round(value / step) * step;
+    }
+    if (params.clip != null) value = Math.max(-params.clip, Math.min(params.clip, value));
+    return value;
+  });
+  return { kind: params.kind ?? "real", time, values };
+}
 
 const SCENARIOS = [
   {

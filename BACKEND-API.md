@@ -3,7 +3,7 @@
 > 版本：v=15 · 契约 v1.0 · 更新 2026-11-17
 > 后端 = DOM-free 纯逻辑模块。本表给出每个接口的签名、参数、返回、错误与约束。
 > 数据形状详见 `DATA-FORMATS.md`；契约总则见 `CONTRACT.md`。
-> 模块：`dsp.js`（数值内核）/ `service.js`（编排）/ `learn.js`（学习库）/ `generator.js`（产生器）/ `analyzer-worker.js`（Worker）/ `functions/*`（Edge Function）。
+> 模块：`dsp.js`（数值内核）/ `service.js`（编排）/ `learn.js`（学习库）/ `analyzer-worker.js`（Worker）/ `functions/*`（Edge Function）。
 
 ---
 
@@ -74,25 +74,7 @@
 
 ---
 
-## 4. generator.js — 数据产生器（29 条件）
-
-| 接口 | 签名 | 返回 |
-|---|---|---|
-| synthesizeSignal | `(params)` | `{kind,time,values}\|{kind,time,i,q}`（真实模拟合成） |
-| randomSignalParams | `(options:{condition?,seed?,fs?,n?})` | `params`（condition="random" 随机选；同 seed 可复现） |
-| describeConditions | `(params)` | `{groundTruth, conditions:string[]}` |
-| generateRandomSignal | `(options)` | `{params,groundTruth,conditions,data}` |
-| runExperiment | `(options:{condition?,seed?,params?})` | `Experiment{params,groundTruth,conditions,data,result,outcome}`；非法输入→outcome.input-rejected |
-| classifyOutcome | `(result, params, groundTruth, error)` | `Outcome`（数据驱动解释） |
-| buildExperimentPayload | `(experiment)` | `LearnPayload`（供 /learn-explain） |
-| CONDITION_CATALOG | const | `[{id,label,description}]`（29） |
-
-**Outcome.verdict**：correct-model / caution-boundary / unreliable-defect / unknown-rejected / aliasing-warning / input-rejected。形状见 DATA-FORMATS §9。
-**混叠真值感知**：真频>Nyquist 时 aliasing=true，notes 对照真频/假频并给补救采样率。
-
----
-
-## 5. analyzer-worker.js — Worker 协议
+## 4. analyzer-worker.js — Worker 协议
 
 ```js
 // 请求（service → worker）
@@ -105,7 +87,7 @@
 
 ---
 
-## 6. Edge Function HTTP（functions/handler.ts）
+## 5. Edge Function HTTP（functions/handler.ts）
 
 ### GET /functions/v1/app/health
 - 响应 200：`{ ok:true, configured:boolean, provider:"dashscope-compatible" }`
@@ -140,9 +122,9 @@
 
 ---
 
-## 7. 全局不变量与约束
+## 6. 全局不变量与约束
 1. **AI 只解释**：Explanation 纯文本，绝不回写数值/可信等级；Key 仅服务端，不进前端/响应/日志。
-2. **后端 DOM-free**：dsp/service/learn/generator/worker 不访问 document；UI 全在前端 app.js。
+2. **后端 DOM-free**：dsp/service/learn/worker 不访问 document；UI 全在前端 app.js。
 3. **加法演进**：新增可选字段/函数不破坏既有契约；破坏性变更升契约版本+双方确认。
 4. **版本一致**：所有模块/资源 ?v=N 统一（当前 15），static.test 强制。
 5. **输入边界**：64–500000 样本、近似均匀（抖动≤5%）、时间严格递增、有限值；越界拒绝。
@@ -152,12 +134,11 @@
 
 ---
 
-## 8. 前端调用速查
+## 7. 前端调用速查
 ```js
 import { analyzeSignalSafely, analyzeIqSafely, stressTestSafely, fetchAiHealth,
          fetchExplanation, fetchLearnExplanation, buildReport,
-         getHistory, addHistory, clearHistoryStorage } from "./service.js?v=15";
-import { buildAiPayload, buildDecision, buildExperimentPlan, templateExplanation } from "./dsp.js?v=15";
-import { listScenarios, getScenario, analyzeScenario, buildLearnPayload } from "./learn.js?v=15";
-import { CONDITION_CATALOG, runExperiment, buildExperimentPayload } from "./generator.js?v=15";
+         getHistory, addHistory, clearHistoryStorage } from "./service.js?v=12";
+import { buildAiPayload, buildDecision, buildExperimentPlan, templateExplanation } from "./dsp.js?v=12";
+import { listScenarios, getScenario, analyzeScenario, buildLearnPayload } from "./learn.js?v=12";
 ```
