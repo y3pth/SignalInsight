@@ -1,7 +1,7 @@
 # SignalInsight 新对话交接书
 
 > 更新日期：2026-11-17
-> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线；信任实验室功能已发布并完成线上回归。P1/P2 扩展（fixtures/静态检查/AI 审计/E2E/本地历史）已在 `feat/realistic-fixtures` 完成本地质检，**尚未发布**。
+> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线。分析页重设计 + 学习页（15 场景）+ AI 加固/严谨化已发布上线（action `4bcf140b`），在线验证 AI 稳定且严谨。
 > 这是新对话的首要入口。接口规范见 `BACKEND-API.md`、数据格式见 `DATA-FORMATS.md`；早期工程转接旧档见 `olddoc/TRANSFER.md`。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
 
 ---
@@ -25,7 +25,7 @@ SignalInsight 最初规划为 Vue + FastAPI + SQLite 的完整信号分析平台
 - 生命周期：active
 - Site ID：`01a1e4bb-ea05-7b36-88f4-72a743ddb34d`
 - Project ID：`01a1e4bb-ea05-7036-8eea-6bdc90a0ab26`
-- 当前线上发布 action：`2751a5c0-6fea-48f6-9a4b-887c1e95c0bb`
+- 当前线上发布 action：`4bcf140b-7292-4cb3-88b8-de809f68f8f8`
 - 当前 Function：`app`，edge runtime，已发布
 - Function `required_secret_names`：`["DASHSCOPE_API_KEY"]`
 - 站点 Secret：`DASHSCOPE_API_KEY` 已配置
@@ -408,7 +408,7 @@ P1/P2 已发布并完成线上回归：
   - `4003863 feat: add local analysis history with read-only snapshots`
   - `adfa9c9 feat: specific Qwen explanations and user-selectable model whitelist`
 - 模块版本：v=12（全部模块/资源统一，`static.test.mjs` 强制一致）
-- 状态：本轮改动已通过本地全套测试 + E2E 质检，**尚未发布**；线上仍为信任实验室版本
+- 状态：分析页重设计 + 学习页 + AI 加固已发布上线（action `4bcf140b`）；在线验证 `/explain` 与 `/learn-explain` 稳定（无 invalid_model_output）、模型名称与证据解读严谨
 - 信任实验室提交：
   - `e45afb0 fix: harden result and AI data flow`
   - `d5d7834 feat: add a deterministic trust conclusion card`
@@ -564,3 +564,4 @@ P1/P2 已发布并完成线上回归：
 - 2026-11-17 · 后端代集成 · frontend/ui-redesign · 前端误传 main 根目录的 3 文件（app.js/index.html/styles.css）移入 site/dist/、基于 integration 开分支、?v=12→15；static+11 后端测试+E2E 14 场景全绿（分析页 UI 完整覆盖分析态后端功能）；产出 FRONTEND-TODO.md（学习模式 UI 代办：learn.html/沙盒/M2）· 阻塞:无 · 下一步:前端按 TODO 建学习页
 - 2026-11-18 · 后端 · backend/reconcile · 合并 origin/UI（fea7659，含学习页 learn-app/learn.html/charts）+ integration 后端，前端 UI 原样未改；修复 P1 版本统一 v=12/P2 恢复 generator.js/P3 用 integration learn.js/P5 E2E 压力断言适配；P6 学习进度为前端设计不动；static+11 测试+E2E 14 场景+学习页实测全绿；详见 INTEGRATION-ISSUES.md · 阻塞:无 · 下一步:前端补实验沙盒 UI
 - 2026-11-18 · 后端 · backend/remove-sandbox · 安全审计（XSS：CSV 表头/AI 解释/learn-app 全转义，无 eval，Key 仅服务端，后端白名单+注入防护——未发现漏洞）；按需求删除实验沙盒 generator.js + generator.test，合成器内联回 learn.js（场景仍 15）；清理 CONTRACT§9/BACKEND-API/DATA-FORMATS/FRONTEND/FRONTEND-TODO/README/AGENTS 沙盒引用；版本 v=12 · static+11 测试+E2E 全绿 · 阻塞:无
+- 2026-11-18 · 后端 · backend/ai-harden · AI 加固：parseModelText 去围栏/截断修复/summary-only 降级；提示词多元化+数值/名称/术语/证据纪律；temp 0.6/max_tokens 1600 · 发布上线 action 4bcf140b（经用户明确授权）· 在线验证 /explain×3 + /learn-explain 全成功，模型名称正确（单频模型非 FM）、证据解读正确（1136×为显著度比值非 FFT 点数）· 阻塞:无
