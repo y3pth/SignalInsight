@@ -49,3 +49,14 @@
 3. 对齐 stress-list 渲染契约（P5）。
 4. 前端补实验沙盒 UI（P2，consume generator.runExperiment）。
 5. 统一版本、跑全套 + E2E 验证后合并 integration。
+
+## 五、处理结果（2026-11-18，backend/reconcile）
+已合并前端 UI（**原样保留，未改前端**）+ integration 后端，并修复：
+- **P1 已修**：后端版本统一到前端的 v=12（service/learn/generator/worker），static.test 通过。
+- **P2 已修**：恢复 generator.js（29 条件产生器回归 site/dist）。
+- **P3 已修**：采用 integration 的 learn.js（委托 generator.synthesizeSignal），API 与 learn-app.js 兼容。
+- **P4 已处理**：以 integration 为后端基线合并 origin/UI。
+- **P5 已修**：E2E 压力断言适配前端结构（计数 `#stress-list .stress-item`=4，summary 读 `.stress-verdict`）；未改前端。
+- **P6 不动**：学习进度手动标记属前端设计行为，未改前端 UI。
+- 质检：static(v=12) + 11 Node 测试 + E2E 14 场景 + 学习页浏览器实测全绿。
+- 遗留：实验沙盒 UI（P2 的 UI 侧）仍待前端按 FRONTEND-TODO 补建（generator.js 后端已就绪）。

@@ -255,11 +255,11 @@ try {
     const start = Date.now();
     let rows = 0;
     while (Date.now() - start < 60000) {
-      rows = document.querySelector('#stress-list')?.children.length || 0;
+      rows = document.querySelectorAll('#stress-list .stress-item').length;
       if (rows >= 4) break;
       await new Promise((r) => setTimeout(r, 200));
     }
-    return { rows, summary: document.querySelector('#stress-summary')?.textContent || '' };
+    return { rows, summary: document.querySelector('#stress-list .stress-verdict')?.textContent || document.querySelector('#stress-summary')?.textContent || '' };
   })()`);
   assert.equal(stress.rows, 4, `stress variants: ${stress.rows}`);
   assert.ok(stress.summary.length > 0, "stress summary present");

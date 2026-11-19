@@ -3,9 +3,10 @@ import {
   buildDecision,
   buildExperimentPlan,
   templateExplanation,
-} from "./dsp.js?v=15";
-import { parseCsv } from "./csv.js?v=15";
-import { parseMat } from "./mat.js?v=15";
+} from "./dsp.js?v=12";
+import { parseCsv } from "./csv.js?v=12";
+import { parseMat } from "./mat.js?v=12";
+import { drawPlot } from "./charts.js?v=12";
 import {
   analyzeSignalSafely,
   analyzeIqSafely,
@@ -16,7 +17,7 @@ import {
   getHistory,
   addHistory,
   clearHistoryStorage,
-} from "./service.js?v=15";
+} from "./service.js?v=12";
 
 const elements = {
   tabs: [...document.querySelectorAll(".source-tab")],
@@ -43,13 +44,15 @@ const elements = {
   healthStatus: document.querySelector("#health-status"),
   healthList: document.querySelector("#health-list"),
   designList: document.querySelector("#design-list"),
+  healthTipList: document.querySelector("#health-tip-list"),
+  designTipList: document.querySelector("#design-tip-list"),
+  designTipSummary: document.querySelector("#design-tip-summary"),
   modulationLab: document.querySelector("#modulation-lab"),
   modulationType: document.querySelector("#modulation-type"),
   modulationChart: document.querySelector("#modulation-chart"),
   modulationFacts: document.querySelector("#modulation-facts"),
   modulationSidebands: document.querySelector("#modulation-sidebands"),
   stressButton: document.querySelector("#stress-button"),
-  stressSummary: document.querySelector("#stress-summary"),
   stressList: document.querySelector("#stress-list"),
   channelCard: document.querySelector("#channel-card"),
   channelButton: document.querySelector("#channel-button"),
@@ -78,6 +81,7 @@ const elements = {
   modelSelect: document.querySelector("#model-select"),
   timeLegend: document.querySelector("#time-legend"),
   toast: document.querySelector("#toast"),
+  themeToggle: document.querySelector("#theme-toggle"),
   resultAnnouncer: document.querySelector("#result-announcer"),
   historyList: document.querySelector("#history-list"),
   historyDetail: document.querySelector("#history-detail"),
@@ -105,6 +109,7 @@ const state = {
 
 const AI_CACHE_LIMIT = 20;
 const aiCache = new Map();
+const THEME_KEY = "signalinsight.theme";
 
 let toastTimer = null;
 
@@ -114,6 +119,37 @@ function showToast(message, error = false) {
   elements.toast.classList.add("show");
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => elements.toast.classList.remove("show"), 3600);
+}
+
+function applyTheme(theme, { persist = true } = {}) {
+  const light = theme === "light";
+  document.documentElement.dataset.theme = light ? "light" : "dark";
+  if (persist) {
+    try { localStorage.setItem(THEME_KEY, light ? "light" : "dark"); } catch { /* storage unavailable */ }
+  }
+  const toggle = elements.themeToggle;
+  if (toggle) {
+    toggle.dataset.target = light ? "dark" : "light";
+    toggle.textContent = light ? "深色" : "浅色";
+    toggle.setAttribute("aria-label", light ? "切换到深色模式" : "切换到浅色模式");
+  }
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = light ? "#f2f7f3" : "#0b1718";
+  if (state.result) {
+    requestAnimationFrame(() => {
+      renderCharts(state.result);
+      if (state.result.best?.modulationView) drawModulationChart(state.result);
+    });
+  }
+}
+
+function initTheme() {
+  let saved = "dark";
+  try { saved = localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark"; } catch { /* storage unavailable */ }
+  applyTheme(saved, { persist: false });
+  elements.themeToggle?.addEventListener("click", () => {
+    applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
+  });
 }
 
 function formatNumber(value, digits = 4) {
@@ -439,7 +475,6 @@ function invalidateResult(message = "数据已变更，请重新运行分析。"
   elements.modulationSidebands.replaceChildren();
   elements.stressButton.disabled = true;
   elements.stressButton.textContent = "运行反事实测试";
-  elements.stressSummary.textContent = "等待当前分析完成。";
   elements.stressList.replaceChildren();
 }
 
@@ -480,7 +515,6 @@ async function analyzeCurrent() {
     elements.modulationSidebands.replaceChildren();
     elements.stressButton.disabled = true;
     elements.stressButton.textContent = "运行反事实测试";
-    elements.stressSummary.textContent = "等待当前分析完成。";
     elements.stressList.replaceChildren();
     const data = selectedSignal();
     const sampleLength = data.kind === "iq" ? data.i.length : data.values.length;
@@ -584,7 +618,38 @@ function renderHealth(result) {
   });
   elements.healthList.replaceChildren(...healthRows);
 
+  const tipRow = (status, label, detail, meta) => {
+    const item = document.createElement("li");
+    const dot = document.createElement("span");
+    dot.className = `evidence-dot ${status === "pass" ? "" : status}`;
+    const copy = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = label;
+    copy.append(title);
+    if (detail) {
+      const note = document.createElement("small");
+      note.textContent = detail;
+      copy.append(note);
+    }
+    if (meta) {
+      const value = document.createElement("span");
+      value.className = "tip-value";
+      value.textContent = meta;
+      copy.append(value);
+    }
+    item.append(dot, copy);
+    return item;
+  };
+  const checkStatus = { pass: "通过", warn: "警告", fail: "异常" };
+  elements.healthTipList.replaceChildren(...(health?.checks ?? []).map((check) => (
+    tipRow(check.status, check.label, check.detail, checkStatus[check.status] ?? check.status)
+  )));
+
   const plan = buildExperimentPlan(result);
+  elements.designTipSummary.textContent = plan.summary;
+  elements.designTipList.replaceChildren(...plan.items.map((item) => (
+    tipRow(item.status, item.label, item.detail, `${item.value} · ${item.status === "pass" ? "已满足" : "待处理"}`)
+  )));
   const summary = document.createElement("p");
   summary.className = "design-summary";
   summary.textContent = plan.summary;
@@ -669,7 +734,10 @@ function renderModulation(result) {
 }
 
 function renderStress(result) {
-  elements.stressList.replaceChildren(...result.variants.map((variant) => {
+  const summary = document.createElement("p");
+  summary.className = "stress-verdict";
+  summary.textContent = result.summary;
+  elements.stressList.replaceChildren(summary, ...result.variants.map((variant) => {
     const row = document.createElement("div");
     row.className = `stress-item${variant.flipped ? " flip" : ""}`;
     const title = document.createElement("strong");
@@ -698,7 +766,6 @@ async function runStressTest() {
   }
   elements.stressButton.disabled = true;
   elements.stressButton.textContent = "测试中…";
-  elements.stressSummary.textContent = "正在生成扰动场景并重新分析…";
   elements.stressList.replaceChildren();
   try {
     const baseline = {
@@ -709,11 +776,10 @@ async function runStressTest() {
     if (!result || !Array.isArray(result.variants)) {
       throw new Error("压力测试返回格式无效，请刷新页面后重试。");
     }
-    elements.stressSummary.textContent = result.summary;
     renderStress(result);
   } catch (error) {
     if (!state.resultStale) {
-      elements.stressSummary.textContent = error instanceof Error ? error.message : "压力测试失败。";
+      showToast(error instanceof Error ? error.message : "压力测试失败。", true);
     }
   } finally {
     if (!state.resultStale) {
@@ -750,11 +816,6 @@ function render(result) {
   const stressAvailable = result.kind !== "iq" && result.sampleCount <= 50000;
   elements.stressButton.disabled = !stressAvailable;
   elements.stressButton.textContent = stressAvailable ? "运行反事实测试" : result.kind === "iq" ? "IQ 模式暂不支持" : "样本过大不可用";
-  elements.stressSummary.textContent = result.kind === "iq"
-    ? "IQ 模式暂不支持反事实压力测试。"
-    : stressAvailable
-      ? "加噪、缩短观测、降采样，观察推荐模型是否翻转。"
-      : "压力测试仅支持 5 万点以内，避免多轮分析过慢。";
   elements.stressList.replaceChildren();
   elements.metricSamples.textContent = `${result.sampleCount.toLocaleString()} 点`;
   elements.metricRate.textContent = `${result.sampleRate.toFixed(2)} Hz · Nyq ${result.nyquist.toFixed(1)} Hz`;
@@ -927,126 +988,6 @@ function downsample(x, series, maxPoints = 1600) {
     x: indices.map((index) => x[index]),
     series: series.map((values) => indices.map((index) => values[index])),
   };
-}
-
-function setupCanvas(canvas) {
-  const rect = canvas.getBoundingClientRect();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.width = Math.max(1, Math.round(rect.width * dpr));
-  canvas.height = Math.max(1, Math.round(rect.height * dpr));
-  const context = canvas.getContext("2d");
-  context.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { context, width: rect.width, height: rect.height };
-}
-
-function chartPalette() {
-  const styles = getComputedStyle(document.documentElement);
-  return {
-    text: styles.getPropertyValue("--site-muted").trim() || "#8aa09a",
-    grid: styles.getPropertyValue("--site-border").trim() || "rgba(169,213,196,.15)",
-    accent: styles.getPropertyValue("--site-accent").trim() || "#56e3a5",
-    warn: styles.getPropertyValue("--warn").trim() || "#f7bc63",
-    cyan: styles.getPropertyValue("--cyan").trim() || "#77d7ff",
-  };
-}
-
-function drawPlot(canvas, x, lines, { fill = false, markers = [], xLabel = "", yLabel = "" } = {}) {
-  const { context, width, height } = setupCanvas(canvas);
-  const palette = chartPalette();
-  const compact = width < 260;
-  const margin = compact
-    ? { left: 30, right: 8, top: 14, bottom: 22 }
-    : { left: 49, right: 12, top: 18, bottom: 28 };
-  const plotWidth = width - margin.left - margin.right;
-  const plotHeight = height - margin.top - margin.bottom;
-  context.clearRect(0, 0, width, height);
-  const values = lines.flatMap((line) => line.values).filter(Number.isFinite);
-  if (!x.length || !values.length) return;
-  let xMin = Math.min(...x);
-  let xMax = Math.max(...x);
-  let yMin = Math.min(...values);
-  let yMax = Math.max(...values);
-  if (xMin === xMax) { xMin -= 1; xMax += 1; }
-  const yPad = Math.max((yMax - yMin) * 0.1, 1e-9);
-  yMin -= yPad;
-  yMax += yPad;
-  const xScale = (value) => margin.left + ((value - xMin) / (xMax - xMin)) * plotWidth;
-  const yScale = (value) => margin.top + (1 - (value - yMin) / (yMax - yMin)) * plotHeight;
-
-  context.font = compact ? "8px Cascadia Code, Consolas, monospace" : "10px Cascadia Code, Consolas, monospace";
-  context.lineWidth = 1;
-  const ySteps = compact ? 2 : 4;
-  for (let index = 0; index <= ySteps; index += 1) {
-    const y = margin.top + (plotHeight * index) / ySteps;
-    context.strokeStyle = palette.grid;
-    context.beginPath();
-    context.moveTo(margin.left, y);
-    context.lineTo(width - margin.right, y);
-    context.stroke();
-    context.fillStyle = palette.text;
-    const value = yMax - ((yMax - yMin) * index) / ySteps;
-    context.fillText(formatNumber(value, 2), 3, y + 3);
-  }
-  context.fillStyle = palette.text;
-  context.fillText(formatNumber(xMin, 3), margin.left, height - 5);
-  const rightLabel = formatNumber(xMax, 3);
-  context.fillText(rightLabel, width - margin.right - context.measureText(rightLabel).width, height - 5);
-  if (xLabel && !compact) context.fillText(xLabel, margin.left + plotWidth / 2 - 12, height - 7);
-  if (yLabel) context.fillText(yLabel, 3, 9);
-
-  for (const line of lines) {
-    const points = line.values.map((value, index) => ({
-      x: xScale(x[index]),
-      y: yScale(value),
-    }));
-    if (fill) {
-      context.beginPath();
-      context.moveTo(points[0].x, margin.top + plotHeight);
-      for (const point of points) context.lineTo(point.x, point.y);
-      context.lineTo(points.at(-1).x, margin.top + plotHeight);
-      context.closePath();
-      const gradient = context.createLinearGradient(0, margin.top, 0, margin.top + plotHeight);
-      gradient.addColorStop(0, colorWithAlpha(palette.cyan, 0.22));
-      gradient.addColorStop(1, colorWithAlpha(palette.cyan, 0.01));
-      context.fillStyle = gradient;
-      context.fill();
-    }
-    context.beginPath();
-    points.forEach((point, index) => {
-      if (index === 0) context.moveTo(point.x, point.y);
-      else context.lineTo(point.x, point.y);
-    });
-    context.strokeStyle = line.color === "accent" ? palette.accent : line.color === "warn" ? palette.warn : palette.cyan;
-    context.lineWidth = line.width || 1.4;
-    context.lineJoin = "round";
-    context.stroke();
-  }
-  markers.forEach((marker, index) => {
-    const px = xScale(marker.x);
-    const py = yScale(marker.y);
-    context.strokeStyle = colorWithAlpha(palette.warn, 0.5);
-    context.setLineDash([3, 4]);
-    context.beginPath();
-    context.moveTo(px, margin.top);
-    context.lineTo(px, margin.top + plotHeight);
-    context.stroke();
-    context.setLineDash([]);
-    context.fillStyle = palette.warn;
-    context.beginPath();
-    context.arc(px, py, 3, 0, Math.PI * 2);
-    context.fill();
-    if (index < 3) {
-      context.fillStyle = palette.text;
-      context.fillText(`${marker.label}`, Math.min(px + 5, width - 74), margin.top + 12 + index * 13);
-    }
-  });
-}
-
-function colorWithAlpha(color, alpha) {
-  if (!color.startsWith("#")) return `rgba(119,215,255,${alpha})`;
-  const value = color.slice(1);
-  const bigint = parseInt(value.length === 3 ? value.split("").map((char) => char + char).join("") : value, 16);
-  return `rgba(${(bigint >> 16) & 255},${(bigint >> 8) & 255},${bigint & 255},${alpha})`;
 }
 
 function renderCharts(result) {
@@ -1366,6 +1307,7 @@ function bindEvents() {
 }
 
 function init() {
+  initTheme();
   bindEvents();
   loadHistory();
   state.data = buildExample("single");
@@ -1376,49 +1318,68 @@ function init() {
 
 init();
 
-/* ---------- Workbench layout ---------- */
+/* ---------- Workbench layout (pixel canvas) ---------- */
 
 (() => {
   const grid = document.getElementById("tile-grid");
   if (!grid) return;
 
   const COLS = 12;
-  const ROWS = 18;
-  const STORAGE_KEY = "signalinsight.workbench.v1";
+  const ROWS = 22;
+  const GAP = 6;
+  const SNAP = 20;
+  const STORAGE_KEY = "signalinsight.workbench.v2";
+  const LEGACY_KEY = "signalinsight.workbench.v1";
   const PREFERRED = {
     summary: { w: 12, h: 2 },
     conclusion: { w: 8, h: 4 },
     metrics: { w: 4, h: 4 },
-    time: { w: 4, h: 4 },
-    spectrum: { w: 4, h: 4 },
-    residual: { w: 4, h: 4 },
-    candidates: { w: 6, h: 4 },
-    evidence: { w: 6, h: 4 },
-    health: { w: 6, h: 4 },
-    ai: { w: 6, h: 4 },
-    stress: { w: 4, h: 4 },
-    history: { w: 4, h: 4 },
-    channel: { w: 4, h: 4 },
+    time: { w: 4, h: 5 },
+    spectrum: { w: 4, h: 5 },
+    residual: { w: 4, h: 5 },
+    candidates: { w: 7, h: 5 },
+    evidence: { w: 5, h: 5 },
+    health: { w: 6, h: 6 },
+    ai: { w: 6, h: 6 },
+    stress: { w: 4, h: 5 },
+    history: { w: 4, h: 5 },
+    channel: { w: 4, h: 5 },
     modulation: { w: 6, h: 4 },
   };
   const MINIMUM = {
-    summary: { w: 6, h: 1 },
-    conclusion: { w: 4, h: 2 },
-    metrics: { w: 3, h: 2 },
+    summary: { w: 3, h: 2 },
+    conclusion: { w: 4, h: 3 },
+    metrics: { w: 3, h: 4 },
     time: { w: 3, h: 3 },
     spectrum: { w: 3, h: 3 },
     residual: { w: 3, h: 3 },
-    candidates: { w: 4, h: 3 },
-    evidence: { w: 4, h: 3 },
-    health: { w: 4, h: 3 },
-    ai: { w: 4, h: 3 },
+    candidates: { w: 7, h: 5 },
+    evidence: { w: 4, h: 4 },
+    health: { w: 4, h: 4 },
+    ai: { w: 4, h: 5 },
     stress: { w: 3, h: 3 },
-    history: { w: 3, h: 3 },
-    channel: { w: 3, h: 3 },
-    modulation: { w: 4, h: 3 },
+    history: { w: 2, h: 3 },
+    channel: { w: 4, h: 4 },
+    modulation: { w: 5, h: 4 },
+  };
+  const MINIMUM_PX = {
+    summary: { w: 300, h: 68 },
+    conclusion: { w: 300, h: 120 },
+    metrics: { w: 240, h: 150 },
+    time: { w: 240, h: 150 },
+    spectrum: { w: 240, h: 150 },
+    residual: { w: 240, h: 150 },
+    candidates: { w: 500, h: 160 },
+    evidence: { w: 310, h: 176 },
+    health: { w: 300, h: 160 },
+    ai: { w: 300, h: 210 },
+    stress: { w: 300, h: 110 },
+    history: { w: 200, h: 120 },
+    channel: { w: 300, h: 150 },
+    modulation: { w: 310, h: 150 },
   };
 
-  const readPlacement = (element) => {
+  const readCells = (element) => {
     const style = element.getAttribute("style") || "";
     const column = /grid-column:\s*(\d+)\s*\/\s*span\s*(\d+)/.exec(style);
     const row = /grid-row:\s*(\d+)\s*\/\s*span\s*(\d+)/.exec(style);
@@ -1436,20 +1397,20 @@ init();
       chip: document.querySelector(`.task-chip[data-module="${name}"]`),
       preferred: PREFERRED[name] || { w: 4, h: 4 },
       minimum: MINIMUM[name] || { w: 3, h: 3 },
-      initial: readPlacement(element),
+      initial: readCells(element),
     });
   }
   if (!meta.size) return;
 
+  const order = [...meta.keys()];
   const defaultActive = new Set([...meta.values()].filter((item) => !item.element.hidden).map((item) => item.name));
-  const defaultPlacements = new Map();
+  const defaultCells = new Map();
   for (const item of meta.values()) {
-    if (item.initial) defaultPlacements.set(item.name, { ...item.initial });
+    if (item.initial) defaultCells.set(item.name, { ...item.initial });
   }
 
   let active = new Set(defaultActive);
-  let placements = new Map(defaultPlacements);
-  const autoDone = new Set();
+  let placements = new Map();
 
   const body = document.body;
   const rail = document.getElementById("control-rail");
@@ -1466,60 +1427,171 @@ init();
     try { showToast(message, type); } catch { /* noop */ }
   };
 
-  const overlaps = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-  const inBounds = (p) => p.x >= 1 && p.y >= 1 && p.w >= 1 && p.h >= 1 && p.x + p.w - 1 <= COLS && p.y + p.h - 1 <= ROWS;
-  const cloneMap = (map) => new Map([...map].map(([name, p]) => [name, { ...p }]));
-  const priority = (name) => [...meta.keys()].indexOf(name);
+  const box = () => ({ w: grid.clientWidth, h: grid.clientHeight });
 
-  const fits = (placement, map, ignore) => {
-    if (!inBounds(placement)) return false;
+  const cellRect = (x, y, w, h) => {
+    const { w: width, h: height } = box();
+    const colW = Math.max(1, (width - GAP * (COLS - 1)) / COLS);
+    const rowH = Math.max(1, (height - GAP * (ROWS - 1)) / ROWS);
+    return {
+      x: Math.round((x - 1) * (colW + GAP)),
+      y: Math.round((y - 1) * (rowH + GAP)),
+      w: Math.max(1, Math.round(w * colW + (w - 1) * GAP)),
+      h: Math.max(1, Math.round(h * rowH + (h - 1) * GAP)),
+    };
+  };
+
+  const minSize = (name) => {
+    const minimum = meta.get(name)?.minimum || { w: 3, h: 3 };
+    const floor = MINIMUM_PX[name] || { w: 150, h: 86 };
+    const cell = cellRect(1, 1, minimum.w, minimum.h);
+    return {
+      w: Math.max(floor.w, cell.w),
+      h: Math.max(floor.h, cell.h),
+    };
+  };
+
+  const preferredSize = (name) => {
+    const preferred = meta.get(name)?.preferred || { w: 4, h: 4 };
+    return cellRect(1, 1, preferred.w, preferred.h);
+  };
+
+  const overlaps = (a, b) => a.x < b.x + b.w - 0.5 && a.x + a.w > b.x + 0.5 && a.y < b.y + b.h - 0.5 && a.y + a.h > b.y + 0.5;
+
+  const clampPlacement = (name, p) => {
+    const { w: width, h: height } = box();
+    const min = minSize(name);
+    const w = Math.min(width, Math.max(min.w, p.w));
+    const h = Math.min(height, Math.max(min.h, p.h));
+    const x = Math.max(0, Math.min(p.x, width - w));
+    const y = Math.max(0, Math.min(p.y, height - h));
+    return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
+  };
+
+  const fits = (rect, skip, map = placements) => {
+    const { w: width, h: height } = box();
+    if (rect.x < -0.5 || rect.y < -0.5 || rect.x + rect.w > width + 0.5 || rect.y + rect.h > height + 0.5) return false;
     for (const [name, other] of map) {
-      if (name === ignore) continue;
-      if (overlaps(placement, other)) return false;
+      if (name === skip) continue;
+      if (overlaps(rect, other)) return false;
     }
     return true;
   };
 
-  const findFree = (map, w, h) => {
-    for (let y = 1; y <= ROWS - h + 1; y += 1) {
-      for (let x = 1; x <= COLS - w + 1; x += 1) {
-        const candidate = { x, y, w, h };
-        if (fits(candidate, map)) return candidate;
+  const findSpot = (w, h, skip, map = placements) => {
+    const { w: width, h: height } = box();
+    if (w > width || h > height) return null;
+    for (let y = 0; y <= height - h; y += 8) {
+      for (let x = 0; x <= width - w; x += 8) {
+        const rect = { x, y, w, h };
+        if (fits(rect, skip, map)) return rect;
       }
     }
     return null;
   };
 
-  const layoutValid = (names, map) => {
-    for (const name of names) {
-      const placement = map.get(name);
-      if (!placement || !inBounds(placement)) return false;
+  const nearestSpot = (rect, skip) => {
+    const { w: width, h: height } = box();
+    const xs = new Set([0, width - rect.w]);
+    const ys = new Set([0, height - rect.h]);
+    for (const [name, other] of placements) {
+      if (name === skip) continue;
+      xs.add(other.x);
+      xs.add(other.x + other.w);
+      xs.add(other.x - rect.w);
+      xs.add(other.x + other.w - rect.w);
+      ys.add(other.y);
+      ys.add(other.y + other.h);
+      ys.add(other.y - rect.h);
+      ys.add(other.y + other.h - rect.h);
     }
-    const list = [...names].map((name) => map.get(name));
-    for (let i = 0; i < list.length; i += 1) {
-      for (let j = i + 1; j < list.length; j += 1) {
-        if (overlaps(list[i], list[j])) return false;
+    let best = null;
+    let bestDistance = Infinity;
+    for (const rawX of xs) {
+      const x = Math.max(0, Math.min(rawX, width - rect.w));
+      for (const rawY of ys) {
+        const y = Math.max(0, Math.min(rawY, height - rect.h));
+        const candidate = { x, y, w: rect.w, h: rect.h };
+        if (!fits(candidate, skip)) continue;
+        const distance = (x - rect.x) ** 2 + (y - rect.y) ** 2;
+        if (distance < bestDistance) {
+          best = candidate;
+          bestDistance = distance;
+        }
       }
     }
-    return true;
+    if (best) return { x: Math.round(best.x), y: Math.round(best.y), w: rect.w, h: rect.h };
+    return findSpot(rect.w, rect.h, skip);
+  };
+
+  const normalize = () => {
+    const { w: width, h: height } = box();
+    for (const name of order) {
+      const placement = placements.get(name);
+      if (!placement) continue;
+      const w = Math.min(width, Math.max(1, placement.w));
+      const h = Math.min(height, Math.max(1, placement.h));
+      const x = Math.max(0, Math.min(placement.x, width - w));
+      const y = Math.max(0, Math.min(placement.y, height - h));
+      placements.set(name, { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) });
+    }
+    for (const name of order) {
+      const placement = placements.get(name);
+      if (!placement) continue;
+      if (!fits(placement, name)) {
+        const spot = nearestSpot(placement, name);
+        if (spot) placements.set(name, spot);
+      }
+    }
+  };
+
+  const resetToDefaults = () => {
+    active = new Set(defaultActive);
+    placements = new Map();
+    for (const [name, cells] of defaultCells) {
+      if (active.has(name)) placements.set(name, cellRect(cells.x, cells.y, cells.w, cells.h));
+    }
   };
 
   const restore = () => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-      if (!saved || !Array.isArray(saved.active)) return;
-      const names = saved.active.filter((name) => meta.has(name));
-      const map = new Map();
-      for (const name of names) {
-        const raw = saved.placements?.[name];
-        if (!Array.isArray(raw) || raw.length !== 4) continue;
-        const placement = { x: Math.round(raw[0]), y: Math.round(raw[1]), w: Math.round(raw[2]), h: Math.round(raw[3]) };
-        if (inBounds(placement)) map.set(name, placement);
+      if (saved && Array.isArray(saved.active)) {
+        const names = saved.active.filter((name) => meta.has(name));
+        const map = new Map();
+        for (const name of names) {
+          const raw = saved.placements?.[name];
+          if (!Array.isArray(raw) || raw.length !== 4) continue;
+          const placement = { x: Number(raw[0]), y: Number(raw[1]), w: Number(raw[2]), h: Number(raw[3]) };
+          if (![placement.x, placement.y, placement.w, placement.h].every(Number.isFinite)) continue;
+          if (placement.w <= 0 || placement.h <= 0) continue;
+          map.set(name, placement);
+        }
+        if (map.size === names.length && names.length) {
+          active = new Set(names);
+          placements = map;
+          normalize();
+          return;
+        }
       }
-      if (map.size !== names.length || !layoutValid(names, map)) return;
-      active = new Set(names);
-      placements = map;
-    } catch { /* keep defaults */ }
+      const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || "null");
+      if (legacy && Array.isArray(legacy.active)) {
+        const names = legacy.active.filter((name) => meta.has(name));
+        const map = new Map();
+        for (const name of names) {
+          const raw = legacy.placements?.[name];
+          if (!Array.isArray(raw) || raw.length !== 4) continue;
+          map.set(name, cellRect(Number(raw[0]), Number(raw[1]), Number(raw[2]), Number(raw[3])));
+        }
+        if (map.size === names.length && names.length) {
+          active = new Set(names);
+          placements = map;
+          normalize();
+          return;
+        }
+      }
+    } catch { /* use defaults */ }
+    resetToDefaults();
   };
 
   const persist = () => {
@@ -1527,9 +1599,9 @@ init();
       const stored = {};
       for (const name of active) {
         const p = placements.get(name);
-        if (p) stored[name] = [p.x, p.y, p.w, p.h];
+        if (p) stored[name] = [Math.round(p.x), Math.round(p.y), Math.round(p.w), Math.round(p.h)];
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ active: [...active], placements: stored }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ active: [...active], placements: stored, viewport: [grid.clientWidth, grid.clientHeight] }));
     } catch { /* storage unavailable */ }
   };
 
@@ -1542,6 +1614,14 @@ init();
     window.setTimeout(() => element.classList.remove("tile-pulse"), 1100);
   };
 
+  const paint = (element, p) => {
+    if (element.classList.contains("is-focused")) return;
+    element.style.left = `${p.x}px`;
+    element.style.top = `${p.y}px`;
+    element.style.width = `${p.w}px`;
+    element.style.height = `${p.h}px`;
+  };
+
   const apply = ({ repaint = true } = {}) => {
     for (const item of meta.values()) {
       const isActive = active.has(item.name);
@@ -1549,8 +1629,9 @@ init();
       if (isActive) {
         const p = placements.get(item.name);
         if (p) {
-          item.element.style.gridColumn = `${p.x} / span ${p.w}`;
-          item.element.style.gridRow = `${p.y} / span ${p.h}`;
+          item.element.style.gridColumn = "";
+          item.element.style.gridRow = "";
+          paint(item.element, p);
         }
       }
       if (item.chip) {
@@ -1567,47 +1648,16 @@ init();
   const tileScale = (element) => element.querySelector(".tile-scale");
 
   const fitTiles = () => {
-    let changed = false;
     for (const name of active) {
       const item = meta.get(name);
       if (!item || item.element.hidden) continue;
-      const body = item.element.querySelector(".tile-body");
+      if (item.element.classList.contains("is-focused")) continue;
       const scale = tileScale(item.element);
-      if (!body || !scale) continue;
+      if (!scale) continue;
       scale.style.transform = "";
       scale.style.width = "100%";
       scale.style.height = "100%";
-      const availWidth = body.clientWidth - 10;
-      const availHeight = body.clientHeight - 10;
-      if (availWidth <= 0 || availHeight <= 0) continue;
-      const isChart = item.element.dataset.chart === "true";
-      let heightRatio = 1;
-      if (!isChart) {
-        scale.classList.add("is-measuring");
-        scale.style.height = "auto";
-        heightRatio = Math.max(1, scale.scrollHeight / availHeight);
-        scale.classList.remove("is-measuring");
-        scale.style.height = "100%";
-      }
-      let ratio = Math.max(heightRatio, Math.max(1, scale.scrollWidth / availWidth));
-      for (const inner of scale.querySelectorAll(".data-card, .table-wrap")) {
-        if (inner.clientWidth > 0 && inner.scrollWidth > inner.clientWidth + 2) {
-          ratio = Math.max(ratio, inner.scrollWidth / inner.clientWidth);
-        }
-      }
-      if (ratio > 1.015) {
-        const s = Math.max(0.52, 1 / ratio);
-        scale.style.width = `${100 / s}%`;
-        scale.style.height = `${100 / s}%`;
-        scale.style.transform = `scale(${s})`;
-        scale.dataset.fit = String(s.toFixed(2));
-        changed = true;
-      } else if (scale.dataset.fit !== "1") {
-        scale.dataset.fit = "1";
-        changed = true;
-      }
     }
-    if (changed) refreshCharts();
   };
 
   let chartTimer = null;
@@ -1622,6 +1672,24 @@ init();
       } catch { /* charts redraw on next analysis */ }
     }, 60);
   };
+
+  const chartSizes = new WeakMap();
+  const chartObserver = new ResizeObserver((entries) => {
+    let changed = false;
+    for (const entry of entries) {
+      const rect = entry.target.getBoundingClientRect();
+      const size = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+      if (chartSizes.get(entry.target) !== size) {
+        chartSizes.set(entry.target, size);
+        changed = true;
+      }
+    }
+    if (changed) refreshCharts();
+  });
+  for (const item of meta.values()) {
+    const canvas = item.element.querySelector("canvas");
+    if (canvas) chartObserver.observe(canvas);
+  }
 
   let fitTimer = null;
   const scheduleFit = () => {
@@ -1646,92 +1714,6 @@ init();
     }
   };
 
-  const tryPack = (names, sizes) => {
-    const map = new Map();
-    for (const name of names) {
-      const size = sizes.get(name);
-      const placement = findFree(map, size.w, size.h);
-      if (!placement) return null;
-      map.set(name, placement);
-    }
-    return map;
-  };
-
-  const repack = (names) => {
-    const ordered = [...names].sort((a, b) => {
-      const pa = placements.get(a);
-      const pb = placements.get(b);
-      if (pa && pb) return pa.y - pb.y || pa.x - pb.x;
-      if (pa) return -1;
-      if (pb) return 1;
-      return priority(a) - priority(b);
-    });
-    for (const factor of [1, 0.92, 0.84, 0.76, 0.68, 0.6]) {
-      const sizes = new Map();
-      for (const name of ordered) {
-        const item = meta.get(name);
-        const base = placements.get(name) || item.preferred;
-        sizes.set(name, {
-          w: Math.max(item.minimum.w, Math.min(COLS, Math.round(base.w * factor))),
-          h: Math.max(item.minimum.h, Math.min(ROWS, Math.round(base.h * factor))),
-        });
-      }
-      const packed = tryPack(ordered, sizes);
-      if (packed) return packed;
-    }
-    return null;
-  };
-
-  const resolveConflicts = (pinned) => {
-    const result = new Map([[pinned, placements.get(pinned)]]);
-    const rest = [...active].filter((name) => name !== pinned).sort((a, b) => {
-      const pa = placements.get(a);
-      const pb = placements.get(b);
-      if (pa && pb) return pa.y - pb.y || pa.x - pb.x;
-      return priority(a) - priority(b);
-    });
-    for (const name of rest) {
-      const item = meta.get(name);
-      const current = placements.get(name);
-      if (!current) return null;
-      if (fits(current, result)) {
-        result.set(name, current);
-        continue;
-      }
-      let candidate = findFree(result, current.w, current.h);
-      if (!candidate) {
-        for (let h = current.h - 1; h >= item.minimum.h && !candidate; h -= 1) {
-          candidate = findFree(result, current.w, h);
-        }
-      }
-      if (!candidate) {
-        for (let w = current.w - 1; w >= item.minimum.w && !candidate; w -= 1) {
-          candidate = findFree(result, w, item.minimum.h);
-        }
-      }
-      if (!candidate) return null;
-      result.set(name, candidate);
-    }
-    return result;
-  };
-
-  const commit = (name, placement) => {
-    const snapshot = cloneMap(placements);
-    placements.set(name, placement);
-    const resolved = resolveConflicts(name);
-    if (!resolved) {
-      placements = snapshot;
-      apply();
-      notify("空间不足，已保留原布局。", "error");
-      return false;
-    }
-    placements = resolved;
-    apply();
-    save();
-    flash(name);
-    return true;
-  };
-
   const addModule = (name, { quiet = false } = {}) => {
     const item = meta.get(name);
     if (!item) return false;
@@ -1739,19 +1721,47 @@ init();
       flash(name);
       return true;
     }
-    const direct = findFree(placements, item.preferred.w, item.preferred.h);
-    if (direct) {
+    const { w: width, h: height } = box();
+    const min = minSize(name);
+    const preferred = preferredSize(name);
+    let spot = null;
+    for (const factor of [1, 0.85, 0.7]) {
+      const w = Math.max(min.w, Math.min(width, Math.round(preferred.w * factor)));
+      const h = Math.max(min.h, Math.min(height, Math.round(preferred.h * factor)));
+      spot = findSpot(w, h, name);
+      if (spot) break;
+    }
+    if (spot) {
       active.add(name);
-      placements.set(name, direct);
+      placements.set(name, spot);
       apply();
       save();
       flash(name);
       return true;
     }
-    const packed = repack([...active, name]);
-    if (packed) {
-      active.add(name);
+    const activeOrder = order
+      .filter((other) => active.has(other))
+      .sort((a, b) => (placements.get(a)?.y ?? 0) - (placements.get(b)?.y ?? 0) || (placements.get(a)?.x ?? 0) - (placements.get(b)?.x ?? 0));
+    for (const factor of [0.92, 0.84, 0.76, 0.68, 0.6, 0.52]) {
+      const packed = new Map();
+      let failed = false;
+      for (const other of activeOrder) {
+        const source = placements.get(other);
+        const otherMin = minSize(other);
+        const w = Math.max(otherMin.w, Math.min(width, Math.round(source.w * factor)));
+        const h = Math.max(otherMin.h, Math.min(height, Math.round(source.h * factor)));
+        const slot = findSpot(w, h, other, packed);
+        if (!slot) { failed = true; break; }
+        packed.set(other, slot);
+      }
+      if (failed) continue;
+      const w = Math.max(min.w, Math.min(width, Math.round(preferred.w * factor)));
+      const h = Math.max(min.h, Math.min(height, Math.round(preferred.h * factor)));
+      const slot = findSpot(w, h, name, packed);
+      if (!slot) continue;
+      packed.set(name, slot);
       placements = packed;
+      active.add(name);
       apply();
       save();
       flash(name);
@@ -1772,9 +1782,11 @@ init();
   };
 
   const reset = () => {
-    active = new Set(defaultActive);
-    placements = cloneMap(defaultPlacements);
-    try { localStorage.removeItem(STORAGE_KEY); } catch { /* noop */ }
+    resetToDefaults();
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(LEGACY_KEY);
+    } catch { /* noop */ }
     apply();
     notify("布局已恢复默认。");
   };
@@ -1788,100 +1800,244 @@ init();
     return addModule(name, { quiet: true });
   };
 
-  const cellSize = () => {
-    const rect = grid.getBoundingClientRect();
-    const styles = getComputedStyle(grid);
-    const gapX = Number.parseFloat(styles.columnGap) || 6;
-    const gapY = Number.parseFloat(styles.rowGap) || 6;
-    return {
-      width: (rect.width - gapX * (COLS - 1)) / COLS,
-      height: (rect.height - gapY * (ROWS - 1)) / ROWS,
-      left: rect.left,
-      top: rect.top,
-    };
+  const linesFor = (name) => {
+    const { w: width, h: height } = box();
+    const xs = [0, width];
+    const ys = [0, height];
+    for (const [other, rect] of placements) {
+      if (other === name) continue;
+      xs.push(rect.x, rect.x + rect.w);
+      ys.push(rect.y, rect.y + rect.h);
+    }
+    return { xs, ys };
   };
 
-  const pointerCell = (clientX, clientY) => {
-    const cell = cellSize();
-    return {
-      col: Math.min(COLS, Math.max(1, Math.floor((clientX - cell.left) / cell.width) + 1)),
-      row: Math.min(ROWS, Math.max(1, Math.floor((clientY - cell.top) / cell.height) + 1)),
-    };
+  const snapAxis = (edges, lines) => {
+    let best = null;
+    for (const line of lines) {
+      for (const edge of edges) {
+        const delta = line - edge;
+        if (Math.abs(delta) <= SNAP && (!best || Math.abs(delta) < Math.abs(best.delta))) {
+          best = { delta, line };
+        }
+      }
+    }
+    return best;
   };
-
-  const ghost = document.createElement("div");
-  ghost.className = "tile-drop-ghost";
-  ghost.hidden = true;
-  grid.appendChild(ghost);
-
-  const showGhost = (p) => {
-    ghost.hidden = false;
-    ghost.style.gridColumn = `${p.x} / span ${p.w}`;
-    ghost.style.gridRow = `${p.y} / span ${p.h}`;
-  };
-  const hideGhost = () => { ghost.hidden = true; };
 
   let gesture = null;
+  let raf = 0;
+  let lastFrame = 0;
+  let settleTimer = 0;
+
+  const clearSettle = () => {
+    if (!settleTimer) return;
+    window.clearTimeout(settleTimer);
+    settleTimer = 0;
+    grid.querySelectorAll(".tile.is-settling").forEach((element) => element.classList.remove("is-settling"));
+    apply();
+  };
+
+  const tick = (now) => {
+    if (!gesture || gesture.type !== "move") {
+      raf = 0;
+      return;
+    }
+    const g = gesture;
+    if (!g.target) {
+      lastFrame = now;
+      raf = requestAnimationFrame(tick);
+      return;
+    }
+    const dt = Math.min(48, Math.max(8, now - lastFrame || 16));
+    lastFrame = now;
+    const steps = dt / 16.667;
+    const age = Math.min(1, (now - g.startedAt) / 320);
+    const follow = 0.1 + 0.14 * age;
+    const k = 1 - Math.pow(1 - follow, steps);
+    g.visual.x += (g.target.x - g.visual.x) * k;
+    g.visual.y += (g.target.y - g.visual.y) * k;
+    const { w: width, h: height } = box();
+    g.visual.x = Math.max(0, Math.min(g.visual.x, width - g.rect.w));
+    g.visual.y = Math.max(0, Math.min(g.visual.y, height - g.rect.h));
+    g.element.style.left = `${g.visual.x.toFixed(2)}px`;
+    g.element.style.top = `${g.visual.y.toFixed(2)}px`;
+    raf = requestAnimationFrame(tick);
+  };
+
+  const startTick = () => {
+    cancelAnimationFrame(raf);
+    lastFrame = performance.now();
+    raf = requestAnimationFrame(tick);
+  };
 
   const onPointerMove = (event) => {
     if (!gesture) return;
-    if (!gesture.moved && Math.abs(event.clientX - gesture.startX) + Math.abs(event.clientY - gesture.startY) < 4) return;
-    gesture.moved = true;
+    const g = gesture;
+    if (!g.moved && Math.abs(event.clientX - g.startX) + Math.abs(event.clientY - g.startY) < 3) return;
+    g.moved = true;
     event.preventDefault();
-    if (gesture.type === "move") {
-      const cell = cellSize();
-      const target = pointerCell(event.clientX, event.clientY);
-      const x = Math.min(COLS - gesture.placement.w + 1, Math.max(1, target.col - gesture.offsetX));
-      const y = Math.min(ROWS - gesture.placement.h + 1, Math.max(1, target.row - gesture.offsetY));
-      gesture.target = { ...gesture.placement, x, y };
-      showGhost(gesture.target);
+    const bounds = grid.getBoundingClientRect();
+    const { w: width, h: height } = box();
+
+    if (g.type === "move") {
+      const x = event.clientX - bounds.left - g.offsetX;
+      const y = event.clientY - bounds.top - g.offsetY;
+      const clampedX = Math.max(0, Math.min(x, width - g.rect.w));
+      const clampedY = Math.max(0, Math.min(y, height - g.rect.h));
+      const { xs, ys } = linesFor(g.name);
+      const snapX = snapAxis([clampedX, clampedX + g.rect.w], xs);
+      const snapY = snapAxis([clampedY, clampedY + g.rect.h], ys);
+      const snappedX = Math.max(0, Math.min(clampedX + (snapX?.delta || 0), width - g.rect.w));
+      const snappedY = Math.max(0, Math.min(clampedY + (snapY?.delta || 0), height - g.rect.h));
+      const snapped = { x: Math.round(snappedX), y: Math.round(snappedY), w: g.rect.w, h: g.rect.h };
+      const snapable = (snapX || snapY) && fits(snapped, g.name);
+      g.target = snapable
+        ? snapped
+        : { x: Math.round(clampedX), y: Math.round(clampedY), w: g.rect.w, h: g.rect.h };
       return;
     }
-    const cell = cellSize();
-    const dx = Math.round((event.clientX - gesture.startX) / cell.width);
-    const dy = Math.round((event.clientY - gesture.startY) / cell.height);
-    const start = gesture.placement;
-    const min = meta.get(gesture.name).minimum;
-    let { x, y, w, h } = start;
-    if (gesture.dir.includes("e")) w = start.w + dx;
-    if (gesture.dir.includes("s")) h = start.h + dy;
-    if (gesture.dir.includes("w")) {
-      w = start.w - dx;
-      x = start.x + dx;
+
+    const dx = event.clientX - g.startX;
+    const dy = event.clientY - g.startY;
+    const start = g.rect;
+    const dir = g.dir;
+    let left = start.x;
+    let top = start.y;
+    let right = start.x + start.w;
+    let bottom = start.y + start.h;
+    if (dir.includes("e")) right += dx;
+    if (dir.includes("w")) left += dx;
+    if (dir.includes("s")) bottom += dy;
+    if (dir.includes("n")) top += dy;
+
+    left = Math.max(0, left);
+    top = Math.max(0, top);
+    right = Math.min(width, right);
+    bottom = Math.min(height, bottom);
+
+    const min = minSize(g.name);
+    if (right - left < min.w) {
+      if (dir.includes("w")) left = right - min.w;
+      else right = left + min.w;
     }
-    if (gesture.dir.includes("n")) {
-      h = start.h - dy;
-      y = start.y + dy;
+    if (bottom - top < min.h) {
+      if (dir.includes("n")) top = bottom - min.h;
+      else bottom = top + min.h;
     }
-    if (w < min.w) {
-      if (gesture.dir.includes("w")) x = start.x + start.w - min.w;
-      w = min.w;
+
+    const { xs, ys } = linesFor(g.name);
+    if (dir.includes("e")) {
+      const snap = snapAxis([right], xs);
+      if (snap) right += snap.delta;
     }
-    if (h < min.h) {
-      if (gesture.dir.includes("n")) y = start.y + start.h - min.h;
-      h = min.h;
+    if (dir.includes("w")) {
+      const snap = snapAxis([left], xs);
+      if (snap) left += snap.delta;
     }
-    x = Math.max(1, Math.min(x, COLS - min.w + 1));
-    y = Math.max(1, Math.min(y, ROWS - min.h + 1));
-    w = Math.max(min.w, Math.min(w, COLS - x + 1));
-    h = Math.max(min.h, Math.min(h, ROWS - y + 1));
-    gesture.target = { x, y, w, h };
-    showGhost(gesture.target);
+    if (dir.includes("s")) {
+      const snap = snapAxis([bottom], ys);
+      if (snap) bottom += snap.delta;
+    }
+    if (dir.includes("n")) {
+      const snap = snapAxis([top], ys);
+      if (snap) top += snap.delta;
+    }
+
+    const startRight = start.x + start.w;
+    const startBottom = start.y + start.h;
+    for (const [other, rect] of placements) {
+      if (other === g.name) continue;
+      const verticalOverlap = top < rect.y + rect.h && bottom > rect.y;
+      const horizontalOverlap = left < rect.x + rect.w && right > rect.x;
+      if (verticalOverlap) {
+        if (dir.includes("e") && rect.x >= startRight - 0.5) right = Math.min(right, rect.x);
+        if (dir.includes("w") && rect.x + rect.w <= start.x + 0.5) left = Math.max(left, rect.x + rect.w);
+      }
+      if (horizontalOverlap) {
+        if (dir.includes("s") && rect.y >= startBottom - 0.5) bottom = Math.min(bottom, rect.y);
+        if (dir.includes("n") && rect.y + rect.h <= start.y + 0.5) top = Math.max(top, rect.y + rect.h);
+      }
+    }
+
+    if (dir.includes("e")) right = Math.max(right, left + min.w);
+    if (dir.includes("w")) left = Math.min(left, right - min.w);
+    if (dir.includes("s")) bottom = Math.max(bottom, top + min.h);
+    if (dir.includes("n")) top = Math.min(top, bottom - min.h);
+
+    left = Math.max(0, left);
+    top = Math.max(0, top);
+    right = Math.min(width, right);
+    bottom = Math.min(height, bottom);
+
+    const next = {
+      x: Math.round(left),
+      y: Math.round(top),
+      w: Math.round(right - left),
+      h: Math.round(bottom - top),
+    };
+    g.target = next;
+    paint(g.element, next);
   };
 
   const endGesture = () => {
     if (!gesture) return;
-    const current = gesture;
+    const g = gesture;
     gesture = null;
-    hideGhost();
+    cancelAnimationFrame(raf);
+    raf = 0;
     document.body.classList.remove("is-layout-gesture");
-    current.element.classList.remove("is-dragging");
-    if (!current.moved || !current.target) return;
-    const changed = current.type === "move"
-      ? current.target.x !== current.placement.x || current.target.y !== current.placement.y
-      : current.target.w !== current.placement.w || current.target.h !== current.placement.h || current.target.x !== current.placement.x || current.target.y !== current.placement.y;
-    if (!changed) return;
-    commit(current.name, current.target);
+    grid.classList.remove("is-arranging");
+    if (!g.moved) {
+      g.element.classList.remove("is-lifted");
+      return;
+    }
+    let final = g.target;
+    if (g.type === "move" && final) {
+      if (!fits(final, g.name)) {
+        const spot = nearestSpot(final, g.name);
+        if (spot) {
+          final = spot;
+          notify("已自动避让相邻模块。");
+        } else {
+          final = { ...g.rect };
+          notify("空间不足，已保留原位置。", "error");
+        }
+      }
+    }
+    if (!final) {
+      g.element.classList.remove("is-lifted");
+      return;
+    }
+    const element = g.element;
+    element.classList.remove("is-lifted");
+    element.classList.add("is-settling");
+    paint(element, final);
+    placements.set(g.name, { ...final });
+    save();
+    window.clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(() => {
+      settleTimer = 0;
+      element.classList.remove("is-settling");
+      apply();
+      fitTiles();
+      flash(g.name);
+    }, 210);
+  };
+
+  const cancelGesture = () => {
+    if (!gesture) return;
+    const g = gesture;
+    gesture = null;
+    cancelAnimationFrame(raf);
+    raf = 0;
+    document.body.classList.remove("is-layout-gesture");
+    grid.classList.remove("is-arranging");
+    g.element.classList.remove("is-lifted");
+    g.element.classList.remove("is-settling");
+    paint(g.element, g.rect);
+    placements.set(g.name, { ...g.rect });
+    apply();
   };
 
   window.addEventListener("pointermove", onPointerMove, { passive: false });
@@ -1891,6 +2047,7 @@ init();
   grid.addEventListener("pointerdown", (event) => {
     if (event.button !== 0) return;
     if (event.target.closest(".tile-close")) return;
+    if (event.target.closest(".result-info-button")) return;
     const handle = event.target.closest(".resize-handle");
     const head = event.target.closest(".tile-head");
     if (!handle && !head) return;
@@ -1898,14 +2055,15 @@ init();
     const name = element?.dataset.module;
     const placement = placements.get(name);
     if (!name || !placement || element.hidden) return;
+    clearSettle();
     event.preventDefault();
-    const point = pointerCell(event.clientX, event.clientY);
+    const bounds = grid.getBoundingClientRect();
     if (handle) {
       gesture = {
         type: "resize",
         name,
         element,
-        placement: { ...placement },
+        rect: { ...placement },
         dir: handle.dataset.dir || "se",
         startX: event.clientX,
         startY: event.clientY,
@@ -1917,15 +2075,19 @@ init();
         type: "move",
         name,
         element,
-        placement: { ...placement },
-        offsetX: point.col - placement.x,
-        offsetY: point.row - placement.y,
+        rect: { ...placement },
+        visual: { ...placement },
+        offsetX: event.clientX - bounds.left - placement.x,
+        offsetY: event.clientY - bounds.top - placement.y,
+        startedAt: performance.now(),
         startX: event.clientX,
         startY: event.clientY,
         moved: false,
         target: null,
       };
-      element.classList.add("is-dragging");
+      element.classList.add("is-lifted");
+      grid.classList.add("is-arranging");
+      startTick();
     }
     document.body.classList.add("is-layout-gesture");
   });
@@ -1993,8 +2155,7 @@ init();
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       setRail(false);
-      hideGhost();
-      endGesture();
+      cancelGesture();
     }
   });
 
@@ -2014,6 +2175,7 @@ init();
   if (downloadButton) new MutationObserver(syncActions).observe(downloadButton, { attributes: true, attributeFilter: ["disabled"] });
   syncActions();
 
+  const autoDone = new Set();
   const autoWatch = (id, module) => {
     const target = document.getElementById(id);
     if (!target) return;
@@ -2029,15 +2191,337 @@ init();
   autoWatch("modulation-lab", "modulation");
 
   new MutationObserver(scheduleFit).observe(grid, { childList: true, subtree: true, characterData: true });
+
+  let resizeTimer = 0;
   window.addEventListener("resize", () => {
     window.setTimeout(fitRail, 30);
-    scheduleFit();
+    window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(() => {
+      normalize();
+      apply();
+    }, 120);
   });
 
-  restore();
-  apply();
-  fitRail();
-  window.setTimeout(() => { fitTiles(); fitRail(); }, 120);
+  const bootstrap = () => {
+    restore();
+    apply();
+    fitRail();
+    window.setTimeout(() => { fitTiles(); fitRail(); }, 120);
+  };
 
-  window.SignalInsightLayout = { ensure, addModule, removeModule, reset, fit: scheduleFit };
+  if (grid.clientWidth > 0 && grid.clientHeight > 0) bootstrap();
+  else requestAnimationFrame(bootstrap);
+
+  window.SignalInsightLayout = {
+    ensure,
+    addModule,
+    removeModule,
+    reset,
+    fit: scheduleFit,
+    refresh: () => { apply(); fitTiles(); },
+  };
+})();
+
+(() => {
+  const pairs = [
+    ["#summary-info-button", "#summary-info-tip"],
+    ["#result-info-button", "#result-info-tip"],
+    ["#history-info-button", "#history-info-tip"],
+    ["#stress-info-button", "#stress-info-tip"],
+    ["#time-info-button", "#time-info-tip"],
+    ["#spectrum-info-button", "#spectrum-info-tip"],
+    ["#residual-info-button", "#residual-info-tip"],
+    ["#evidence-info-button", "#evidence-info-tip"],
+    ["#health-info-button", "#health-info-tip"],
+  ];
+  const closers = [];
+  for (const [buttonSelector, tipSelector] of pairs) {
+    const button = document.querySelector(buttonSelector);
+    const tip = document.querySelector(tipSelector);
+    if (!button || !tip) continue;
+    let hovered = false;
+    let focused = false;
+
+    const place = () => {
+      tip.hidden = false;
+      const anchor = button.getBoundingClientRect();
+      const rect = tip.getBoundingClientRect();
+      const gap = 8;
+      const left = Math.max(8, Math.min(anchor.right - rect.width, window.innerWidth - rect.width - 8));
+      let top = anchor.bottom + gap;
+      if (top + rect.height > window.innerHeight - 8) top = Math.max(8, anchor.top - gap - rect.height);
+      tip.style.left = `${Math.round(left)}px`;
+      tip.style.top = `${Math.round(top)}px`;
+    };
+
+    const sync = () => {
+      if (hovered || focused) place();
+      else tip.hidden = true;
+    };
+
+    closers.push(() => { hovered = false; focused = false; tip.hidden = true; });
+    button.addEventListener("pointerenter", () => { hovered = true; sync(); });
+    button.addEventListener("pointerleave", () => { hovered = false; sync(); });
+    button.addEventListener("focus", () => { focused = true; sync(); });
+    button.addEventListener("blur", () => { focused = false; sync(); });
+    window.addEventListener("resize", () => { if (hovered || focused) place(); });
+  }
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closers.forEach((close) => close());
+  });
+})();
+
+/* ---------- History list compact / scroll ---------- */
+
+(() => {
+  const list = document.querySelector("#history-list");
+  if (!list) return;
+  const fit = () => {
+    const items = list.querySelectorAll(".history-item");
+    if (!items.length) {
+      list.classList.remove("is-scrollable", "is-single");
+      return;
+    }
+    const gap = parseFloat(getComputedStyle(list).rowGap) || 0;
+    const itemHeight = items[0].offsetHeight;
+    const twoFit = list.clientHeight >= itemHeight * 2 + gap - 0.5;
+    list.classList.toggle("is-scrollable", twoFit);
+    list.classList.toggle("is-single", !twoFit);
+    if (!twoFit) list.scrollTop = 0;
+  };
+  new ResizeObserver(fit).observe(list);
+  new MutationObserver(fit).observe(list, { childList: true });
+  fit();
+})();
+
+/* ---------- Taskbar chip strip (vertical wheel → horizontal, glow indicator) ---------- */
+
+(() => {
+  const bar = document.querySelector(".taskbar");
+  const strip = bar?.querySelector(".task-chips");
+  const glow = bar?.querySelector(".task-glow");
+  if (!bar || !strip || !glow) return;
+
+  const maxScroll = () => strip.scrollWidth - strip.clientWidth;
+
+  const sync = () => {
+    const scrollable = maxScroll() > 2;
+    bar.classList.toggle("has-chip-scroll", scrollable);
+    if (!scrollable) return;
+    const trackRect = strip.getBoundingClientRect();
+    const barRect = bar.getBoundingClientRect();
+    const view = strip.clientWidth;
+    const width = Math.max(28, (view / strip.scrollWidth) * view);
+    const left = trackRect.left - barRect.left - bar.clientLeft + (strip.scrollLeft / strip.scrollWidth) * view;
+    glow.style.width = `${Math.round(width)}px`;
+    glow.style.transform = `translateX(${Math.round(left)}px)`;
+  };
+
+  strip.addEventListener("wheel", (event) => {
+    if (event.ctrlKey || maxScroll() <= 2) return;
+    const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    if (!delta) return;
+    event.preventDefault();
+    const step = event.deltaMode === 1 ? delta * 32 : event.deltaMode === 2 ? delta * strip.clientWidth : delta;
+    strip.scrollLeft += step;
+  }, { passive: false });
+
+  strip.addEventListener("scroll", sync, { passive: true });
+  new ResizeObserver(sync).observe(strip);
+  sync();
+})();
+
+/* ---------- Focus mode (double-click zoom) ---------- */
+
+(() => {
+  const layer = document.querySelector("#focus-layer");
+  const scrim = document.querySelector("#focus-scrim");
+  const exit = document.querySelector("#focus-exit");
+  const grid = document.querySelector("#tile-grid");
+  if (!layer || !scrim || !exit || !grid) return;
+
+  const background = [".topbar", ".control-panel", ".workspace", ".taskbar"]
+    .map((selector) => document.querySelector(selector))
+    .filter(Boolean);
+
+  const TIP_LABELS = {
+    summary: "运行摘要",
+    conclusion: "结论说明",
+    history: "保存说明",
+    stress: "压力测试说明",
+    time: "图例",
+    spectrum: "图例",
+    residual: "图例",
+    evidence: "边界与下一步",
+  };
+
+  let phase = "idle";
+  let focused = null;
+  let saved = null;
+  let returnFocus = null;
+
+  const targetRect = () => {
+    const narrow = window.innerWidth < 760;
+    const padX = narrow ? 8 : Math.round(Math.max(18, Math.min(64, window.innerWidth * 0.05)));
+    const padY = narrow ? 8 : Math.round(Math.max(18, Math.min(52, window.innerHeight * 0.055)));
+    return {
+      left: padX,
+      top: padY,
+      width: window.innerWidth - padX * 2,
+      height: window.innerHeight - padY * 2,
+    };
+  };
+
+  const place = (rect) => {
+    if (!focused) return;
+    focused.style.left = `${Math.round(rect.left)}px`;
+    focused.style.top = `${Math.round(rect.top)}px`;
+    focused.style.width = `${Math.round(rect.width)}px`;
+    focused.style.height = `${Math.round(rect.height)}px`;
+  };
+
+  const tileTitle = (tile) => tile.querySelector(".tile-head h3")?.textContent?.trim() || "模块";
+
+  const buildExtra = (tile) => {
+    const tipId = tile.querySelector(".result-info-button")?.getAttribute("aria-describedby");
+    const tip = tipId ? document.getElementById(tipId) : null;
+    if (!tip) return null;
+    const extra = document.createElement("section");
+    extra.className = "focus-extra";
+    const caption = document.createElement("strong");
+    const module = tile.dataset.module;
+    if (module === "health") {
+      caption.textContent = "实验设计摘要";
+      const summary = document.querySelector("#design-tip-summary")?.textContent?.trim();
+      const note = document.createElement("p");
+      note.className = "focus-note";
+      note.style.margin = "0";
+      note.textContent = summary || "当前采样条件足以支撑本页演示。";
+      extra.append(caption, note);
+      return extra;
+    }
+    caption.textContent = TIP_LABELS[module] || "补充说明";
+    extra.append(caption);
+    for (const node of [...tip.childNodes]) {
+      if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) continue;
+      extra.append(node.cloneNode(true));
+    }
+    extra.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id"));
+    return extra;
+  };
+
+  const open = (tile) => {
+    if (phase !== "idle" || !tile || tile.hidden) return;
+    phase = "open";
+    focused = tile;
+    returnFocus = document.activeElement;
+    const rect = tile.getBoundingClientRect();
+    const scale = tile.querySelector(".tile-scale");
+    saved = {
+      left: tile.style.left,
+      top: tile.style.top,
+      width: tile.style.width,
+      height: tile.style.height,
+      scaleStyle: scale?.getAttribute("style") ?? null,
+      home: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+    };
+    // fit engine pins height:100%; content tiles release it so short content centers
+    if (scale && !scale.classList.contains("chart-card")) scale.style.height = "auto";
+    const extra = buildExtra(tile);
+    if (extra) tile.querySelector(".tile-scale")?.append(extra);
+    tile.classList.add("is-focused");
+    tile.style.position = "absolute";
+    tile.style.transition = "none";
+    place(saved.home);
+    layer.append(tile);
+    layer.hidden = false;
+    layer.setAttribute("role", "dialog");
+    layer.setAttribute("aria-modal", "true");
+    layer.setAttribute("aria-label", `${tileTitle(tile)}放大视图`);
+    document.body.classList.add("is-focusing");
+    for (const node of background) node.inert = true;
+    void tile.offsetWidth;
+    requestAnimationFrame(() => {
+      tile.style.transition = "";
+      layer.classList.add("is-visible");
+      place(targetRect());
+    });
+    tile.focus({ preventScroll: true });
+  };
+
+  const finish = () => {
+    const tile = focused;
+    if (!tile) return;
+    tile.classList.remove("is-focused");
+    tile.style.transition = "none";
+    tile.style.position = "";
+    tile.style.left = saved.left;
+    tile.style.top = saved.top;
+    tile.style.width = saved.width;
+    tile.style.height = saved.height;
+    grid.append(tile);
+    const scale = tile.querySelector(".tile-scale");
+    if (scale) {
+      if (saved.scaleStyle === null) scale.removeAttribute("style");
+      else scale.setAttribute("style", saved.scaleStyle);
+    }
+    tile.querySelectorAll(".focus-extra").forEach((node) => node.remove());
+    layer.hidden = true;
+    layer.classList.remove("is-visible");
+    layer.removeAttribute("role");
+    layer.removeAttribute("aria-modal");
+    layer.removeAttribute("aria-label");
+    document.body.classList.remove("is-focusing");
+    for (const node of background) node.inert = false;
+    try { window.SignalInsightLayout?.refresh?.(); } catch { /* layout engine optional */ }
+    void tile.offsetWidth;
+    tile.style.transition = "";
+    returnFocus?.focus?.({ preventScroll: true });
+    phase = "idle";
+    focused = null;
+    saved = null;
+    returnFocus = null;
+  };
+
+  const close = () => {
+    if (phase !== "open" || !focused) return;
+    phase = "close";
+    layer.classList.remove("is-visible");
+    if (saved) place(saved.home);
+    window.setTimeout(finish, 400);
+  };
+
+  document.addEventListener("dblclick", (event) => {
+    if (phase !== "idle") return;
+    const tile = event.target.closest(".tile");
+    if (!tile || tile.hidden || tile.closest("#focus-layer")) return;
+    if (event.target.closest("button, a, input, select, textarea, label, .resize-handle")) return;
+    event.preventDefault();
+    open(tile);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (phase === "open" && event.key === "Escape") {
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+      return;
+    }
+    if (phase !== "idle" || event.key !== "Enter") return;
+    const tile = event.target.closest?.(".tile");
+    if (!tile || tile.hidden || tile.closest("#focus-layer")) return;
+    if (event.target.closest("button, a, input, select, textarea, label")) return;
+    event.preventDefault();
+    open(tile);
+  });
+
+  layer.addEventListener("click", (event) => {
+    if (phase !== "open") return;
+    if (event.target.closest(".tile.is-focused")) return;
+    close();
+  });
+
+  window.addEventListener("resize", () => {
+    if (phase === "open") place(targetRect());
+  });
 })();
