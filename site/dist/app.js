@@ -476,6 +476,7 @@ function invalidateResult(message = "数据已变更，请重新运行分析。"
   elements.stressButton.disabled = true;
   elements.stressButton.textContent = "运行反事实测试";
   elements.stressList.replaceChildren();
+  window.SignalInsightLayout?.syncConditional?.();
 }
 
 function markDataChanged(message) {
@@ -831,6 +832,7 @@ function render(result) {
   renderLocalExplanation(result);
   elements.download.disabled = false;
   requestAnimationFrame(() => renderCharts(result));
+  window.SignalInsightLayout?.syncConditional?.();
 }
 
 function renderCandidates(result) {
@@ -1614,6 +1616,78 @@ init();
     window.setTimeout(() => element.classList.remove("tile-pulse"), 1100);
   };
 
+  const channelVerdict = () => {
+    if (!state.uploadedColumns) {
+      return { known: true, available: false, reason: "多通道需要上传含 ≥2 个信号列的 CSV / MAT 数据。" };
+    }
+    if (state.inputMode === "iq") {
+      return { known: true, available: false, reason: "IQ 数据为单通道复信号，暂不支持多通道分析。" };
+    }
+    const columns = signalColumns();
+    if (columns.length < 2) {
+      return { known: true, available: false, reason: "当前数据只有 1 个信号列，多通道至少需要 2 个。" };
+    }
+    return { known: true, available: true, reason: "" };
+  };
+
+  const modulationVerdict = () => {
+    if (!state.result || state.resultStale) return { known: false, available: true, reason: "" };
+    const best = state.result.best;
+    const available = Boolean(best?.modulationView) && ["am", "fm"].includes(best?.family);
+    return {
+      known: true,
+      available,
+      reason: available ? "" : `当前最佳模型为${best?.label ?? "未知"}，不属于 AM / FM 调制。`,
+    };
+  };
+
+  const conditionalRules = {
+    channel: channelVerdict,
+    modulation: modulationVerdict,
+  };
+
+  const closeTimers = new Map();
+  const syncConditional = () => {
+    for (const [name, rule] of Object.entries(conditionalRules)) {
+      const item = meta.get(name);
+      if (!item?.chip) continue;
+      const verdict = rule();
+      if (!verdict.known) continue;
+      const label = item.element.querySelector(".tile-head h3")?.textContent?.trim() || name;
+      const stateLabel = item.chip.querySelector(".chip-state");
+      if (verdict.available) {
+        item.chip.classList.remove("is-unavailable");
+        item.chip.disabled = false;
+        item.chip.removeAttribute("aria-disabled");
+        item.chip.removeAttribute("title");
+        const timer = closeTimers.get(name);
+        if (timer) {
+          window.clearTimeout(timer);
+          closeTimers.delete(name);
+        }
+        item.element.classList.remove("is-invalid");
+        if (stateLabel) stateLabel.textContent = active.has(name) ? "已放置" : "拖入";
+        continue;
+      }
+      item.chip.classList.add("is-unavailable");
+      item.chip.disabled = true;
+      item.chip.setAttribute("aria-disabled", "true");
+      item.chip.title = verdict.reason;
+      if (stateLabel) stateLabel.textContent = "不可用";
+      if (!active.has(name) || closeTimers.has(name)) continue;
+      item.element.classList.add("is-invalid");
+      closeTimers.set(name, window.setTimeout(() => {
+        closeTimers.delete(name);
+        item.element.classList.remove("is-invalid");
+        if (!active.has(name)) return;
+        const again = rule();
+        if (!again.known || again.available) return;
+        removeModule(name, { quiet: true });
+        notify(`${label} 已不适用当前数据，自动关闭。`, "error");
+      }, 700));
+    }
+  };
+
   const paint = (element, p) => {
     if (element.classList.contains("is-focused")) return;
     element.style.left = `${p.x}px`;
@@ -1637,7 +1711,13 @@ init();
       if (item.chip) {
         item.chip.classList.toggle("is-placed", isActive);
         const stateLabel = item.chip.querySelector(".chip-state");
-        if (stateLabel) stateLabel.textContent = isActive ? "已放置" : "拖入";
+        if (stateLabel) {
+          stateLabel.textContent = isActive
+            ? "已放置"
+            : item.chip.classList.contains("is-unavailable")
+              ? "不可用"
+              : "拖入";
+        }
       }
     }
     if (status) status.textContent = `${active.size} / ${meta.size}`;
@@ -1717,6 +1797,12 @@ init();
   const addModule = (name, { quiet = false } = {}) => {
     const item = meta.get(name);
     if (!item) return false;
+    const verdict = conditionalRules[name]?.();
+    if (verdict?.known && !verdict.available) {
+      syncConditional();
+      if (!quiet) notify(verdict.reason, "error");
+      return false;
+    }
     if (active.has(name)) {
       flash(name);
       return true;
@@ -1772,13 +1858,13 @@ init();
     return false;
   };
 
-  const removeModule = (name) => {
+  const removeModule = (name, { quiet = false } = {}) => {
     if (!active.has(name)) return;
     active.delete(name);
     placements.delete(name);
     apply();
     save();
-    notify(`${meta.get(name)?.element.querySelector(".tile-head h3")?.textContent || name} 已移入任务栏。`);
+    if (!quiet) notify(`${meta.get(name)?.element.querySelector(".tile-head h3")?.textContent || name} 已移入任务栏。`);
   };
 
   const reset = () => {
@@ -2181,8 +2267,7 @@ init();
     if (!target) return;
     const check = () => {
       if (target.hidden || autoDone.has(module)) return;
-      autoDone.add(module);
-      addModule(module, { quiet: true });
+      if (addModule(module, { quiet: true })) autoDone.add(module);
     };
     new MutationObserver(check).observe(target, { attributes: true, attributeFilter: ["hidden"] });
     check();
@@ -2206,6 +2291,7 @@ init();
     restore();
     apply();
     fitRail();
+    syncConditional();
     window.setTimeout(() => { fitTiles(); fitRail(); }, 120);
   };
 
@@ -2217,6 +2303,7 @@ init();
     addModule,
     removeModule,
     reset,
+    syncConditional,
     fit: scheduleFit,
     refresh: () => { apply(); fitTiles(); },
   };

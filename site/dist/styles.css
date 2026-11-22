@@ -1213,6 +1213,30 @@ body {
 
 .task-chip.is-placed { border-color: color-mix(in srgb, var(--accent) 22%, var(--border)); }
 
+/* Conditional modules: unavailable chips turn red and refuse to add */
+.task-chip.is-unavailable,
+.task-chip.is-unavailable:hover,
+.task-chip.is-unavailable:active,
+.task-chip.is-placed.is-unavailable {
+  border-color: rgba(255, 96, 96, .55);
+  background: rgba(255, 74, 74, .08);
+  color: #ffb0b0;
+  opacity: 1;
+  cursor: not-allowed;
+}
+.task-chip.is-unavailable .chip-code,
+.task-chip.is-unavailable .chip-state { color: #ff9a9a; }
+.task-chip.is-unavailable .chip-state { display: inline; }
+.tile.is-invalid {
+  border-color: rgba(255, 96, 96, .78);
+  box-shadow: 0 0 0 1px rgba(255, 96, 96, .5), 0 0 22px rgba(255, 74, 74, .2);
+  animation: tile-invalid 700ms ease-in-out;
+}
+@keyframes tile-invalid {
+  0%, 100% { border-color: rgba(255, 96, 96, .78); }
+  40% { border-color: rgba(255, 120, 120, 1); box-shadow: 0 0 0 2px rgba(255, 96, 96, .6), 0 0 26px rgba(255, 74, 74, .3); }
+}
+
 /* Compact tile content: keep dense summaries readable, reveal detail on resize */
 .tile { container-type: size; container-name: tile; }
 .tile .result-head .eyebrow { display: none; }
