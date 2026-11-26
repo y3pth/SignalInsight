@@ -1,8 +1,8 @@
 # SignalInsight 新对话交接书
 
-> 生成日期：2026-11-16  
-> 状态：Qoder Sites 公开提交版已发布；Python 后端方向暂停并从工作区移除  
-> 这是新对话的首要入口。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
+> 更新日期：2026-11-17
+> 状态：Qoder Sites 公开站点可用；Qwen 已配置并在线。分析页重设计 + 学习页（15 场景）+ AI 加固/严谨化已发布上线（action `4bcf140b`），在线验证 AI 稳定且严谨。
+> 这是新对话的首要入口。接口规范见 `BACKEND-API.md`、数据格式见 `DATA-FORMATS.md`；早期工程转接旧档见 `olddoc/TRANSFER.md`。与旧设计文档冲突时，以本文件和实际 `site/` 源码为准。
 
 ---
 
@@ -14,9 +14,7 @@ SignalInsight 最初规划为 Vue + FastAPI + SQLite 的完整信号分析平台
 
 > 在 Qoder Sites 上发布一个可用于天池比赛提交的浏览器端信号可信分析演示。
 
-现在的实现不再依赖 Python 后端，所有核心数值计算在浏览器本地完成，Qoder Sites Edge Function 只负责可选的 Qwen 解释。
-
-`立项确定书.md` 继续保留，作为原始动机、研究问题和比赛背景依据；它不是当前技术实现说明。
+所有核心数值计算在浏览器本地完成，Qoder Sites Edge Function 只负责可选的 Qwen 解释。`立项确定书.md` 继续保留，作为原始动机、研究问题和比赛背景依据；它不是当前技术实现说明。
 
 ---
 
@@ -27,10 +25,14 @@ SignalInsight 最初规划为 Vue + FastAPI + SQLite 的完整信号分析平台
 - 生命周期：active
 - Site ID：`01a1e4bb-ea05-7b36-88f4-72a743ddb34d`
 - Project ID：`01a1e4bb-ea05-7036-8eea-6bdc90a0ab26`
-- 当前发布 action：`0ce2bc13-f6ea-49d2-a9ba-775b9ae53345`
+- 当前线上发布 action：`4bcf140b-7292-4cb3-88b8-de809f68f8f8`
 - 当前 Function：`app`，edge runtime，已发布
-- 当前站点 Secrets：空
-- Function `/functions/v1/app/health` 返回：`configured:false`
+- Function `required_secret_names`：`["DASHSCOPE_API_KEY"]`
+- 站点 Secret：`DASHSCOPE_API_KEY` 已配置
+- Function `/functions/v1/app/health` 返回：`{"ok":true,"configured":true,"provider":"dashscope-compatible"}`
+- 线上 Qwen 已真实调用成功：单频、双频、噪声 unknown、CSV 上传均已验证
+
+新版 AI UI（限制展示、请求超时、错误细分）已发布并完成线上回归。
 
 本地发布描述：
 
@@ -59,21 +61,45 @@ site/.SignalInsight.qoder.site
 - 时域、频谱、残差 Canvas 图
 - JSON 报告导出
 - Qwen 解释代理及确定性规则降级
+- Qwen 解释已在线可用
+- 新版 AI UI 已发布：
+  - Qwen 返回的 `limitations` 展示
+  - health 8 秒超时、explain 30 秒超时
+  - `service_not_configured`、`upstream_error` 等错误细分
+- DSP 已移入 Web Worker，失败时自动回退主线程
+- AI 结果按 payload 做会话缓存；Qwen 端点增加 60 次/分钟/IP 的软限流，可用 `RATE_LIMIT_MAX` 调整
+- CSV 解析抽成 `csv.js`，支持引号内换行、自动识别分隔符、前 3 行预览
+- 分析结果增加 `aria-live` 播报
+- AM/FM 调制候选（保守证据门控）
+- 参数不确定度：线性拟合近似标准误 + 1/T 分辨率
+- 无噪声/数值精度极高时优先参数更少的模型，避免多频过拟合
+- 单频/双频/三频改为阶梯式选择，只有显著改善才升级
+- 500k 样本栈溢出已修复；CSV 解析 O(n²) 已修复
+- AI 状态区分“已配置 / 未配置 / 服务不可达”
+- 可信结论卡与可点击证据链（依据 chips、会改变结论的条件）
+- 数据体检（削顶/漂移/跳变/平稳性/阶梯/Nyquist/周期）与实验设计建议
+- AM/FM 调制解构卡（包络 / 瞬时频率 / 边带）
+- 反事实压力测试（加噪 20/10 dB、观测减半、降采样 2×）
+- 多通道逐通道独立分析；MAT v5 实数矩阵导入；IQ 单分量复指数分析
+- 结果过期/AI 竞态/Worker 超时/Function 输入重建等架构加固
+- 本地分析历史（localStorage 只读快照，仅存摘要，不含原始序列，不覆盖当前结果）
+- Qwen 回答具体化（提示词要求引用证据数值、解释模型竞争为何如此选、限制结合数据）；用户可选模型（服务端白名单 qwen-plus/max/turbo/long，Key 仅服务端）
+- 拟真 CSV fixtures、零依赖静态检查、AI 数字一致性程序化审计、零依赖 CDP 浏览器 E2E
 
 ---
 
 ## 4. 明确未实现
 
-- AM、FM 自动辨识
-- MAT 文件
-- 多通道批量分析
-- 复数 IQ
+当前不能宣称支持：
+
+- MAT v7.3/HDF5 或复数 MAT（当前仅 MAT v5 实数矩阵）
+- IQ 多分量/复数调制模型（当前仅单分量复指数）
+- 多通道联合模型（当前逐通道独立分析）
 - 非均匀采样
 - Python FastAPI/SQLite 线上部署
 - 用户系统、历史持久化、共享报告
-- Qwen 真实调用（Secret 未配置）
 
-不能把浏览器 MVP 描述为完整 Python 后端；不能把未实现模型说成已支持。
+AM/FM、参数不确定度、多通道逐通道、MAT v5 实数和 IQ 单分量已实现，但都受候选库和采样条件限制。不能把浏览器 MVP 描述为完整 Python 后端；不能把未实现模型说成已支持。
 
 ---
 
@@ -90,21 +116,34 @@ SignalInsight/
 └── site/
     ├── .SignalInsight.qoder.site # 发布描述，不要手改
     ├── dist/
-    │   ├── index.html
-    │   ├── styles.css
-    │   ├── dsp.js                # 浏览器数值核心
-    │   └── app.js                # 状态、图表、CSV、AI 请求
+    │   ├── index.html            # 前端：页面结构
+    │   ├── styles.css            # 前端：视觉
+    │   ├── app.js                # 前端：UI 状态/渲染/事件
+    │   ├── service.js            # 后端：Worker/AI/导出/历史逻辑（DOM-free）
+    │   ├── learn.js              # 后端：学习库（场景/原理/诊断，DOM-free）
+    │   ├── dsp.js                # 后端：数值核心
+    │   ├── csv.js / mat.js       # 后端：解析
+    │   └── analyzer-worker.js    # 后端：Web Worker
     ├── functions/
     │   ├── index.ts              # Deno.serve
     │   └── handler.ts            # Qwen 代理、校验、降级
     └── test/
         ├── dsp.test.mjs
-        └── function.test.mjs
+        ├── csv.test.mjs
+        ├── extreme.test.mjs
+        ├── mat.test.mjs
+        ├── iq.test.mjs
+        ├── function.test.mjs
+        ├── fixtures.test.mjs
+        ├── static.test.mjs
+        ├── ai-consistency.test.mjs
+        ├── contract.test.mjs
+        ├── learn.test.mjs
+        ├── e2e.mjs              # 零依赖 CDP 浏览器端到端（需 Chrome/Edge）
+        └── fixtures/            # 12 个仿真拟真 CSV + manifest.json + generate.mjs
 ```
 
-已删除：`backend/`、`backend/.venv`、`contracts/`、`fixtures/`、`docs/`、旧审计会话、缓存、旧根设计文档。
-
-保留 `site/test/` 是因为它直接验证线上算法和 Function，不是无关文件。
+`site/test/` 直接验证线上算法和 Function，不是无关文件。
 
 ---
 
@@ -168,126 +207,219 @@ y(t) = c + Σ Aᵢ sin(2πfᵢ(t-t₀)+φᵢ)
 
 可信等级是规则汇总，不是概率。
 
+### 6.7 AM / FM 候选
+
+- 用 FFT 构造解析信号，提取包络与瞬时频率。
+- AM：包络正弦拟合 + 载波约束拟合，估计调制频率/调制指数。
+- FM：瞬时频率正弦拟合得到载频/频偏/调制相位，再做载频、频偏、相位局部精化。
+- 选择门控：调制指数、包络/瞬时频率显著度、BIC 与 RSS；残差都接近数值精度时优先参数更少的模型。
+- AM/FM 残差证据使用中间 90% 样本，规避解析信号边缘效应。
+- 参数不确定度是线性拟合近似标准误；频率类标注 1/T 分辨率，不是严格置信区间。
+
 ---
 
-## 7. Qwen 配置现状
+## 7. Qwen 配置与发布流程
 
-当前 Secret 为空，AI 按钮禁用并显示“Qwen 尚未配置”。
+当前账号：Qoder CN，用户名 `mathcrazy`。
 
-Qoder CLI 已安装到：
+### 7.1 CLI 位置
 
-```text
-C:\Users\y\.qoder-cli
-```
-
-版本：`1.1.89`，尚未加入系统 PATH。
-
-启动：
-
-```powershell
-& "$HOME\.qoder-cli\qoder.cmd"
-```
-
-登录：
+中国版 CLI（npm 安装，用户目录）：
 
 ```text
-/login
+C:\Users\y\.qodercn-cli\qodercn.cmd
 ```
 
-打开站点面板：
+国际版 CLI：
 
 ```text
-/sites
+C:\Users\y\AppData\Roaming\SPB_Data\.qoder-cli\qoder.cmd
 ```
 
-选择 `SignalInsight`，进入环境变量/Secrets，添加：
+两者不要混用。CN 站点必须用 `qodercn` / Qoder CN 桌面端。CLI 配置目录为 `~/.qoder-cn`。
+
+### 7.2 Secret
+
+Secret 名称：
 
 ```text
-名称：DASHSCOPE_API_KEY
-值：百炼 API Key
+DASHSCOPE_API_KEY
 ```
 
-不要把密钥放入聊天、源码、Git 或命令行参数。
+通过 Qoder CN 桌面端站点设置 → 环境变量/Secrets 输入。不要放入聊天、源码、Git 或命令行参数。
 
-旧 Qwen draft `44149eab-d4f3-4dca-8da6-583ca2447c18` 早于后续 CSS 和健康检查修改，必须视为过期。Secret 同步后应基于最新 `site/` 新建 action，声明 `secretNames: ["DASHSCOPE_API_KEY"]`，再发布并验证：
+当前 Secret 是站点级配置。已发布的 Function 会在运行时读取它，因此新增 Secret 后 health 立即变为 `configured:true`，不需要为此重新发布。但以后重新发布 Function 时，建议显式传：
 
-1. `get_site(include:["secrets"])`
-2. `prepare_site`
-3. `publish_site`
-4. `/functions/v1/app/health` 返回 `configured:true`
-5. 点击 AI 解释，确认返回结构化解释
+```json
+"secretNames": ["DASHSCOPE_API_KEY"]
+```
 
-默认模型和端点：
+可选配置：
 
 ```text
-qwen-plus
-https://dashscope.aliyuncs.com/compatible-mode/v1
+QWEN_MODEL            默认 qwen-plus
+DASHSCOPE_BASE_URL    默认 https://dashscope.aliyuncs.com/compatible-mode/v1
 ```
 
-如账号不支持，需发布声明 `QWEN_MODEL` 的新版本。
+只有使用国际站 Key 时才需要改 `DASHSCOPE_BASE_URL`。
+
+### 7.3 发布路径
+
+**优先使用 Qoder CN 桌面端的 Sites 面板 / Sites MCP 发布。**
+
+原因：CN CLI 1.1.89 只接受旧版扁平 `.qoder.site` 描述文件（顶层 actionId/projectId/siteId/deploymentId/artifactSha256/indexSha256/indexHtml），当前描述文件是国际版生成的 `design + publication` 嵌套格式。CN CLI 的 `get_context` / `prepare_site` 会报 `sites_document_invalid` 或 `sites_invalid_request`。
+
+不要为了迁就 CN CLI 手工改发布描述文件。描述文件只保留 `site/.SignalInsight.qoder.site` 一个，不要同时在仓库根生成第二个。需要发布时使用桌面端 MCP：
+
+1. `get_context`
+2. `prepare_site`（projectRoot=`F:/SignalInsight/site`，webDirectory=`dist`，functionDirectory=`functions`，projectId 如上，secretNames 含 `DASHSCOPE_API_KEY`）
+3. `get_publish_status` 直到 `artifactReady` / `dependenciesReady` / `canPublish`
+4. `publish_site`
+5. 验证 health、单频/双频/噪声/CSV、AI、导出
+
+发布是公网可见操作，执行前要得到用户明确确认。发布后不要手改 `site/.SignalInsight.qoder.site`。
+
+### 7.4 AI 防滥用约束
+
+`/functions/v1/app/explain` 是公开端点。任何限流/缓存方案都必须满足：
+
+- 正常单用户连续点击、单频/双频/噪声/CSV 切换不受影响
+- 优先用结果哈希缓存相同请求，减少重复 token
+- 只对异常高频请求做软限制，不阻断正常演示
+- 在百炼侧设置预算/告警，避免额度被刷
+
+### 7.5 软限流与缓存
+
+- `/explain` 默认 60 次/分钟/IP，可用 `RATE_LIMIT_MAX` 调整。
+- 计数在单个 Function isolate 内存中，属于软限制；正常单用户演示不会触发。
+- 浏览器端按结构化 payload 做会话缓存，相同结果重复点击不再请求 Qwen。
 
 ---
 
 ## 8. 验证基线
 
-清理前最后验证：
+2026-11-17 线上试运行：
 
-- DSP Node 测试通过
-- Function Node 测试通过
-- 单频 93.7001 Hz
-- 双频 80.4999 / 173.2000 Hz
-- 纯噪声 unknown
-- 公开站点单频/双频/unknown/CSV 均通过
-- 未上传时映射面板隐藏
-- AI 未配置时按钮禁用
-- 线上 Function health HTTP 200
-- 浏览器控制台无应用错误
+- 单频 93.7002 Hz，较高可信
+- 双频 80.50 / 173.20 Hz
+- 纯噪声 unknown / 证据不足
+- CSV 上传 50 Hz 测试数据：50.0000 Hz，幅值 2.0001，相位 0.1999，R² 1.0000
+- Qwen 对单频、双频、噪声、CSV 均返回结构化解释
+- 报告导出 JSON 含 3 个候选模型、可靠性和方法边界
+- 浏览器控制台无 error/warning
+- `/explain` 网络请求 200
+- 516px 窄视口无横向溢出
 
-清理后只需保留并重新运行：
+本地验证：
 
 ```bash
 node site/test/dsp.test.mjs
+node site/test/csv.test.mjs
+node site/test/extreme.test.mjs
+node site/test/mat.test.mjs
+node site/test/iq.test.mjs
 node site/test/function.test.mjs
+node site/test/fixtures.test.mjs
+node site/test/static.test.mjs
+node site/test/ai-consistency.test.mjs
+node site/test/contract.test.mjs
+node site/test/learn.test.mjs
+node site/test/e2e.mjs
 python -m http.server 4173 --bind 127.0.0.1 --directory site/dist
 ```
 
+拟真 fixtures 回归（2026-11-17，`fixtures.test.mjs`）：
+
+- 12 个落盘仿真 CSV（明确标注仿真，非真实测量），由 `fixtures/generate.mjs` 确定性生成，`manifest.json` 记录真值/种子/期望。
+- 单频/双频/AM/FM/IQ/抖动/多通道：模型与参数在容差内命中，体检 ok。
+- 削顶→clipping fail + 不可信；漂移→drift fail + unknown；4-bit 量化→quantization fail + 不可信。
+- 库外 chirp 与纯噪声→unknown / insufficient_evidence。
+- 浏览器上传路径已验证：单频/多通道/IQ 三类 fixture 经 文件→解析→映射→Worker→渲染 正确；IQ 自动识别 I/Q、隐藏通道卡、禁用压力测试；控制台仅有本地 health 404（预期）。
+
+2026-11-17 P1/P2 本地验证：
+
+- Web Worker 生效（副标题显示 Worker）
+- CSV 引号换行可解析，前 3 行预览正常
+- AI 缓存重复点击只请求一次
+- AM 合成信号：5 Hz / 0.60
+- FM 合成信号：4 Hz / β≈2.00
+- 参数不确定度列正常
+- 无噪声 FM 因残差结构显示“需要谨慎”
+- 线上 Qwen 对 AM payload 返回结构化解释
+
+P1/P2 已发布并完成线上回归：
+
+- 线上 Worker 生效（副标题显示 Worker）
+- 线上 AM CSV：120 Hz / 5 Hz / 调制指数 0.6002，较高可信
+- 线上 AM 参数表显示不确定度；Qwen 解释包含 AM 机制与不确定度限制
+- 线上单频 Qwen 正常，并主动提到 AM 候选与 BIC 区分度
+- `app.js`、`dsp.js`、`csv.js`、`analyzer-worker.js` 均 200
+- `/explain` 请求 200；默认软限流未影响正常演示
+
+信任实验室功能本地验证：
+
+- 结论卡：单频/unknown/AM 均给出依据 chips；点击会高亮证据行和对应图表
+- 数据体检：削顶信号正确标红；干净 50 Hz 周期信号不再误报削顶/量化
+- 实验设计：AM 给出调制周期和采样率建议
+- 调制解构：AM 3 条边带、FM 5 条边带，曲线与参数正常
+- 压力测试：单频 4 个扰动场景均稳定；翻转标识逻辑可用
+- 多通道：time + 3 信号列批量分析，3 个通道均返回单频模型
+- MAT v5：SciPy 生成的 64×2 矩阵正确解析为 time+signal，分析正常
+- IQ：120 Hz/幅值 2/相位 0.3 的复指数正确识别，Worker 运行；噪声 IQ 输出 unknown
+- 结果过期会禁用 AI/导出；旧 AI 响应不会覆盖新结果
+
+线上信任实验室回归（2026-11-17）：
+
+- 结论卡 4 个依据 chips；数据体检/实验设计正常
+- 压力测试 4 个场景全部稳定；结论翻转标识可用
+- IQ CSV：120 Hz / 复幅值 2 / 复相位 0.3，Worker 运行
+- 多通道 CSV：3 个通道均返回单频模型，较高可信
+- 单频 Qwen 正常返回解释，Function 使用重建后的安全 payload
+- 页面控制台无 error/warning；健康检查 `configured:true`
+
+边界与极限测试（已发布并完成线上回归）：
+
+- 63 样本：正确拒绝“至少需要 64 个样本”
+- 64 样本：可完成分析，可信等级“需要谨慎”
+- 500,001 样本：正确拒绝
+- 非递增时间、抖动 >5%、NaN/Infinity：正确拒绝
+- 重复/空表头、单数值列、>10 MB、同列映射：正确拒绝
+- 无噪声双频：阶梯选择保留 2 频模型，不被 3 频过拟合
+- 弱 AM/FM：不会误判为 AM/FM
+- 50 万点单频：Node 9.4 秒；浏览器 Worker 29.7 秒，结果正确且 UI 保持响应
+- 10 万行 CSV 解析：约 66–151 ms
+- 本地静态预览：AI 显示“AI 服务不可达”；公开站点：AI 正常启用
+
+本次边界修复已发布：公开站点 AI 按钮正常启用，单频与 AM CSV + Qwen 均通过；本地静态预览会显示“AI 服务不可达”，这是预期行为，因为本地没有 Function。
+
 ---
 
-## 9. Git 历史与远端
+## 9. Git 状态与分支
 
-历史已找到，没有删除或重建。
-
-- 历史提交数：43（清理提交之前）
-- 最早提交：`91025b5 chore: establish project documentation baseline`
-- 清理前主线：`ab91832 docs: record local Qoder CLI installation`
-- 当前分支：`main`
-- 远端：尚未配置
-
-查看完整历史：
-
-```bash
-git log --oneline --reverse
-```
-
-本次部署收敛会形成新的清理提交，历史保留。
-
-建议另一台电脑通过私有远端协作：
-
-```bash
-git remote add origin <private-repo-url>
-git push -u origin main
-```
-
-另一台电脑：
-
-```bash
-git clone <private-repo-url> SignalInsight
-cd SignalInsight
-git config user.name "<name>"
-git config user.email "<email>"
-```
-
-不要公开仓库，避免违反赛事共享规则。
+- 当前分支：`feat/realistic-fixtures`（从 `feat/trust-lab` 分出）
+- 最近提交：`adfa9c9 feat: specific Qwen explanations and user-selectable model whitelist`
+- 转接旧档：`olddoc/TRANSFER.md`（接口/数据见 BACKEND-API.md / DATA-FORMATS.md）
+- 本轮（P1/P2 扩展）提交：
+  - `c37c6d0 test: add realistic simulated CSV fixtures and regression suite`
+  - `23bbd0d fix: unify module version tags and set real result kind`
+  - `7801e5c test: add dependency-free static checks`
+  - `9f4ae3c test: add programmatic AI numeric-consistency audit`
+  - `3478b9c test: add zero-dependency browser E2E via CDP`
+  - `4003863 feat: add local analysis history with read-only snapshots`
+  - `adfa9c9 feat: specific Qwen explanations and user-selectable model whitelist`
+- 模块版本：v=12（全部模块/资源统一，`static.test.mjs` 强制一致）
+- 状态：分析页重设计 + 学习页 + AI 加固已发布上线（action `4bcf140b`）；在线验证 `/explain` 与 `/learn-explain` 稳定（无 invalid_model_output）、模型名称与证据解读严谨
+- 信任实验室提交：
+  - `e45afb0 fix: harden result and AI data flow`
+  - `d5d7834 feat: add a deterministic trust conclusion card`
+  - `b9a8720 feat: add data health and experiment design guidance`
+  - `352f630 feat: add an AM/FM modulation deconstruction lab`
+  - `e4d6e4c feat: add counterfactual stress testing`
+  - `48ad325 feat: add multi-channel, MAT and IQ data modes`
+- `main` 仍为 `ff2b226 refactor: reduce repository to deployed Qoder Sites deliverable`
+- 远端：`origin` = https://github.com/y3pth/SignalInsight.git（私有）；已推送 `integration`/`feat/trust-lab`/`main`。本机访问 GitHub 需代理 `HTTPS_PROXY=http://127.0.0.1:7890`（按命令传入，未持久化 git 配置）；GitHub 直连在本机网络不可达，Gitee 可直连。
+- 不直接修改 `main`；每个任务使用独立分支
+- 提交身份使用仓库历史已有作者，不在全局改写 Git 配置
 
 ---
 
@@ -315,24 +447,82 @@ git config user.email "<email>"
 
 ## 11. 后续优先级
 
-1. 配置 `DASHSCOPE_API_KEY`，新建 action 并发布 Qwen。
-2. 核对天池正式规则、提交格式和截止时间。
-3. 将 DSP 移入 Web Worker，避免大样本阻塞 UI。
-4. 拆分 `app.js` 和 `dsp.js`，引入 JS 静态检查。
-5. 扩展 AM/FM 前先设计可靠模型和证据。
-6. 确认比赛提交是否只要求公开 URL、代码包或视频，再决定是否增加持久化。
+### P1：质量与架构
+
+1. [已完成] DSP 移入 Web Worker，失败回退主线程。
+2. [已完成] AI 结果缓存 + 60 次/分钟/IP 软限流；数字一致性程序化审计（`ai-consistency.test.mjs`）。
+3. [已完成] CSV 引号换行、数据预览、aria-live 播报。
+4. [已完成] 拟真 CSV fixtures（12 个仿真 fixture + manifest + `fixtures.test.mjs`，明确标注仿真）；浏览器 E2E 自动化（`e2e.mjs`，零依赖 CDP，复用 fixtures）。
+5. [已完成] 已抽离 `csv.js`；零依赖静态检查（`static.test.mjs`：语法/版本一致性/导入导出/引用存在）。`app.js` / `dsp.js` 仍较大，进一步拆分为可选后续。
+6. [已完成] 63/64/500k 样本、抖动、非递增、NaN、>10MB、同列映射等边界回归。
+
+### P2：模型扩展
+
+1. [已完成] AM/FM 候选模型与保守证据选择。
+2. [已完成] 参数不确定度展示（近似标准误 + 分辨率）。
+3. [已完成] 多通道逐通道、MAT v5 实数矩阵、IQ 单分量复指数。
+4. [已完成] 本地分析历史（localStorage，只读快照，仅存摘要不含原始序列，不覆盖当前结果）。报告增强为可选后续。
+5. [另立阶段] MAT v7.3/复数、IQ 多分量/复数调制、非均匀采样、联合多通道模型。
+
+### P3：信任实验室（本轮）
+
+1. [已完成] 结果过期/AI 竞态/Worker 超时/Function 输入重建等架构加固。
+2. [已完成] 结论卡与可点击证据链。
+3. [已完成] 数据体检与实验设计建议。
+4. [已完成] AM/FM 调制解构视图。
+5. [已完成] 反事实压力测试。
+6. [已完成] 多通道、MAT v5、IQ 单分量数据模式。
+7. [已发布] 信任实验室最终版本已上线并完成回归。
+
+### 学习模式（M1 后端学习库已实现）
+
+进度：后端 `site/dist/learn.js`（DOM-free）已实现 **M1+M2**——`listScenarios/getScenario/generateScenarioSignal/analyzeScenario/buildLearnPayload` API + **15 场景（含 IQ）**（clean/modulation/defect/out-of-library，含结构化原理/诊断/思考题/步骤）；M2 Qwen 原理展开经 `/functions/v1/app/learn-explain` + `service.fetchLearnExplanation`（文本-only、不改数值、白名单、共享限流）；`learn.test.mjs`/`function.test`/`ai-consistency` 覆盖；契约 §4/§8 + 样例 `sample-scenario-*.json` 就绪。**前端学习页 `learn.html` 已建**（learn-app.js 消费 learn.js + M2，见 FRONTEND.md §15）。**实验沙盒 generator.js 已删除**（2026-11-18），信号合成器内联回 learn.js，场景仍 15 个。剩余前端代办见 FRONTEND-TODO.md（学习页打磨 / M2 验证 / 学习页 E2E）。
+
+目标：双模式双页面。**分析模式**即现有全部功能；**学习模式**用内置仿真数据引导学习，讲清"为什么这样选模型"，对极限/问题数据指出"哪里有问题"，以原理分析帮助理解。
+
+复用现有资产（不需新算法）：`dsp.js` 数值内核、`fixtures/generate.mjs` 仿真数据、`buildDecision`/`inspectData`/`buildExperimentPlan`（证据/体检/设计）、具体化后的 Qwen 解释。学习模式主要是**教学叙事层 + 引导式 UI**。
+
+关键设计：
+1. 课程化场景库：由 fixtures 扩展（干净单频→双频→AM/FM→削顶/漂移/量化/抖动→库外/噪声），每场景含预期结论 + 原理讲解 + 思考题。
+2. 原理先行：先给确定性原理（频谱/BIC/残差/体检规则），再由 Qwen 结合具体证据数值展开解释（AI 只解释、不改数值）。
+3. 问题诊断：对缺陷数据定位具体体检项（削顶/漂移/量化），解释成因、影响与改进建议（复用 inspectData/buildExperimentPlan）。
+4. 引导式交互：分步揭示（观察→假设→验证→结论），避免直接给答案。
+5. 与分析模式共享数值内核与版本/竞态/unknown 守卫。
+
+风险与边界：AI 解释须约束只基于证据、防误导；课程叙事需人工审核准确性；双页面增加导航/状态复杂度；不引入新模型库（属另立阶段）。
+
+里程碑建议：M1 场景库 + 原理卡片（静态内容）→ M2 Qwen 具体化解释 + 问题诊断接入 → M3 引导式分步 UI + 学习进度（localStorage）→ M4 E2E 覆盖学习路径。
+
+### 比赛
+
+- 天池报名/组队、实名认证、阿里云大学生认证
+- 11 月 30 日 18:00 前发布论坛作品帖
+- 作品帖五部分：自我介绍、一句话作品、为什么做、5 步以内怎么用、Qoder 过程与截图
+- 3 分钟演示脚本
+- 不保证获奖；以官方规则为准
 
 ---
 
 ## 12. 风险与不可承诺事项
 
-- 未获得官方规则，无法保证获奖或确认格式合规。
-- Qwen 未真实联调。
-- 单频/多频算法只对候选库和当前采样条件负责。
+- 未获得官方评分权重，无法保证获奖或确认格式合规。
+- Qwen 已真实联调，但公开端点仍受额度、网络和模型可用性影响。
+- 单频/多频/AM/FM/IQ 算法只对候选库和当前采样条件负责。
+- AM/FM 结论受调制证据门控，不等同于物理调制机制。
+- IQ 仅支持单分量复指数；MAT 仅支持 v5 实数矩阵；多通道为逐通道独立分析。
+- 结论卡、数据体检和实验设计是规则汇总，不是物理证明。
+- 压力测试只覆盖有限扰动（加噪/观测减半/降采样），且仅支持 5 万点以内。
+- 参数不确定度为线性拟合近似；频率行是 1/T 分辨率，不是严格置信区间。
+- AI 限流是单 Function isolate 内存软限制，不是全局配额。
+- 50 万点属于极端输入，浏览器端约 30 秒；正常 1k–4k 样本约 1 秒。
 - 可信等级不是概率。
 - 浏览器 MVP 不是 Python 后端。
-- 公开站点可匿名访问，但 Function 依赖账号 Secret 和额度。
+- 公开站点可匿名访问，Function 依赖账号 Secret 和额度。
 - 不应在公开仓库保存密钥、测试数据或赛事受限材料。
+- CN CLI 与当前描述文件格式不兼容；发布统一走桌面端 Sites MCP。
+- 架构自检（2026-11-17）：Worker/DSP 版本一致、结果过期/AI 竞态/Worker 超时回退/Function 白名单重建与限流均严谨。原两处低风险项已修复：模块/资源版本号统一为 v=9（含主线程回退导入，由 `static.test.mjs` 强制一致）；实数 `analyzeSignal` 结果已补 `kind:"real"`，与文档 schema 一致。
+- 本地分析历史仅存摘要快照（不含原始序列），只读、不重新计算、不覆盖当前结果/AI/导出；localStorage 上限 20 条，配额不足或被禁用时降级提示，损坏存储自动恢复为空。
+- 数据流审计（2026-11-17）：输入边界（63/500001/抖动>5%/非递增/NaN）正确拒绝；恒定/纯噪声/库外→unknown；削顶/量化/漂移/低 SNR→unreliable；近 Nyquist→warn/fail；恰 Nyquist→退化 unknown；IQ 边界正确。**固有局限**：超 Nyquist 信号混叠为假频且可能判 reliable（采样定理限制，无法从采样数据区分真频/假频）——非 bug，学习产生器以真值感知 `aliasing-warning` 揭示。
 
 ---
 
@@ -343,3 +533,35 @@ git config user.email "<email>"
 - 保留项目原始立项书作为背景，不再以其完整技术方案约束当前提交版。
 - 保留 Git 历史，不删除历史提交。
 - 保留部署验证测试，即使它们不随网站打包。
+- 新版 AI UI 在独立分支提交，完成线上回归后发布。
+- AI 防滥用以“不影响正常演示”为硬约束，优先缓存和软限制。
+- AM/FM 仅在调制证据与 BIC/RSS 通过时选择；数值精度平局优先少参数模型。
+- 参数不确定度只做近似标准误与分辨率，不包装成严格置信区间。
+- 前后端分离协作：后端=纯逻辑（dsp/解析/Worker/Function/service），前端=DOM/UI（index.html/styles.css/app.js）；契约冻结 + 文件所有权 + 加法演进。详见 `COLLABORATION.md` 与 `CONTRACT.md`。
+- 学习模式删除"生活类比"，改为原理先行 + Qwen 结合具体证据数值解释。
+
+---
+
+## 14. 前后端分离协作
+
+- 指南：`COLLABORATION.md`（角色/所有权/分支同步/契约优先/版本协调/测试边界/冲突预防）。
+- 契约：`CONTRACT.md` v1.0（结果/压力/Worker/Function/service.js API）。
+- 前端独立开发样例：`site/test/fixtures/sample-result.json`（单频）、`sample-unknown.json`（噪声）。
+- 集成分支：`integration`（待从 `feat/trust-lab` 创建）；后端 `backend/*`、前端 `frontend/*`。
+- `app.js → service.js` 逻辑/视图拆分**已完成**（后端 `service.js` DOM-free，前端 `app.js` 渲染/事件）；详见 COLLABORATION.md §11。`contract.test.mjs` 锁契约形状。
+
+### 协作日志
+
+- 2026-11-17 · 后端 · feat/trust-lab · 契约1.0 · 产出 COLLABORATION.md/CONTRACT.md + 样例 fixture；删除学习生活类比 · 全套测试+E2E绿 · 阻塞:无
+- 2026-11-17 · 后端 · backend/service-split · 契约1.0 · 实施 app.js→service.js 拆分（DOM-free）+ contract.test；模块 v=9 · 10 测试+E2E 14 场景全绿，零行为变化 · 阻塞:无 · 下一步:合并 integration，前端按契约并行改 UI
+- 2026-11-17 · 后端 · integration · 契约1.0 · 配置 origin（GitHub 私有仓库）并经 127.0.0.1:7890 代理推送 integration/feat/trust-lab/main；feat/trust-lab 同步至 integration · 远端分支已验证 · 阻塞:无 · 下一步:前端 clone 后按所有权表并行
+- 2026-11-17 · 后端 · backend/learning-library · 契约1.0(加法§8) · 学习库 M1 learn.js（clean-single/clipped-tone）+ learn.test + 样例；FRONTEND.md §15 扩为 learn.html 完整施工规格（API/schema/组件/数据流/步骤/进度/验收）· 11 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html，后端 M2 Qwen 原理展开
+- 2026-11-17 · 后端 · backend/learning-m2 · 契约1.0(加法) · M2 /learn-explain + buildLearnPayload + fetchLearnExplanation；学习库扩至 10 场景；FRONTEND.md §0 开工提示词 + §15.15 M2 用法；模块 v=11 · 11 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html（含 M2 降级）
+- 2026-11-17 · 后端 · backend/learning-scenarios · 契约1.0 · 学习库扩至 15 场景（新增 iq-single/weak-modulation/low-snr/short-record/near-nyquist）；合成器支持 IQ；learn.test 15 场景全匹配；IQ 样例；模块 v=12 · 11 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html
+- 2026-11-17 · 后端 · backend/generator · 契约1.0(加法§9) · 数据流审计（边界全正确；混叠固有局限已记录）；新增 generator.js 随机数据产生器（17 条件/真值感知结论/混叠揭示），learn.js 复用 synthesizeSignal；generator.test；模块 v=13 · 12 测试+E2E绿 · 阻塞:无 · 下一步:前端建 learn.html + 实验沙盒
+- 2026-11-17 · 后端 · backend/generator-conditions · 契约1.0 · generator.js 扩至 29 条件（谐波/脉冲/掉零/近频/过调制/极弱/少周期/恰Nyquist/工频/时间重复/NaN/超长）；合成器加 dropout/spikes/nan/duplicateTime 修饰；generator.test 29 条件断言；模块 v=14 · 12 测试+E2E绿 · 阻塞:无 · 下一步:前端实验沙盒
+- 2026-11-17 · 后端 · backend/outcome-notes · 契约1.0 · classifyOutcome 解释数据驱动自适应（真实误差/R²/BIC/具体原因/精度分级/缺陷成因），新增 buildExperimentPayload 供 Qwen 展开；generator.test 加变化性断言；模块 v=15 · 12 测试+E2E绿 · 阻塞:无 · 下一步:前端实验沙盒
+- 2026-11-17 · 后端代集成 · frontend/ui-redesign · 前端误传 main 根目录的 3 文件（app.js/index.html/styles.css）移入 site/dist/、基于 integration 开分支、?v=12→15；static+11 后端测试+E2E 14 场景全绿（分析页 UI 完整覆盖分析态后端功能）；产出 FRONTEND-TODO.md（学习模式 UI 代办：learn.html/沙盒/M2）· 阻塞:无 · 下一步:前端按 TODO 建学习页
+- 2026-11-18 · 后端 · backend/reconcile · 合并 origin/UI（fea7659，含学习页 learn-app/learn.html/charts）+ integration 后端，前端 UI 原样未改；修复 P1 版本统一 v=12/P2 恢复 generator.js/P3 用 integration learn.js/P5 E2E 压力断言适配；P6 学习进度为前端设计不动；static+11 测试+E2E 14 场景+学习页实测全绿；详见 INTEGRATION-ISSUES.md · 阻塞:无 · 下一步:前端补实验沙盒 UI
+- 2026-11-18 · 后端 · backend/remove-sandbox · 安全审计（XSS：CSV 表头/AI 解释/learn-app 全转义，无 eval，Key 仅服务端，后端白名单+注入防护——未发现漏洞）；按需求删除实验沙盒 generator.js + generator.test，合成器内联回 learn.js（场景仍 15）；清理 CONTRACT§9/BACKEND-API/DATA-FORMATS/FRONTEND/FRONTEND-TODO/README/AGENTS 沙盒引用；版本 v=12 · static+11 测试+E2E 全绿 · 阻塞:无
+- 2026-11-18 · 后端 · backend/ai-harden · AI 加固：parseModelText 去围栏/截断修复/summary-only 降级；提示词多元化+数值/名称/术语/证据纪律；temp 0.6/max_tokens 1600 · 发布上线 action 4bcf140b（经用户明确授权）· 在线验证 /explain×3 + /learn-explain 全成功，模型名称正确（单频模型非 FM）、证据解读正确（1136×为显著度比值非 FFT 点数）· 阻塞:无
